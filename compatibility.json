@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "status": "bootstrap",
+  "class_id": 10,
+  "class_mask": 512,
+  "supported_core_commits": [],
+  "reference_archaeology": {
+    "repository": "sageoffroy/aventurerosdeazeroth",
+    "clean_reference_commit": "8c2bdae68f2217d73c5b4bbb6b1f731fe6a758e6",
+    "validated_historical_integration_commit": "302c5912076874493ddbe809a51cf56bbcfc3e95"
+  },
+  "locales": {
+    "canonical": "enUS",
+    "first_class": ["enUS", "esMX"],
+    "compatible": ["esES"]
+  }
+}
