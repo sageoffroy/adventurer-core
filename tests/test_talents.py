@@ -110,7 +110,6 @@ class TalentGeneratorTests(unittest.TestCase):
                 spell_rows.append(row(234, spell_values))
             talent_rows.append(row(23, values))
 
-        # Troll Regeneration source mechanic used by Cicatrization.
         spell_rows.append(row(234, {
             0: 20555,
             4: 0x33,
@@ -124,8 +123,6 @@ class TalentGeneratorTests(unittest.TestCase):
             225: 1,
         }))
 
-        # Battle Stance Passive gives us a stock passive SPELL_AURA_MOD_THREAT
-        # mechanic. Guardian rewrites its scalar and school mask.
         spell_rows.append(row(234, {
             0: 21156,
             4: 0x44,
@@ -140,7 +137,6 @@ class TalentGeneratorTests(unittest.TestCase):
         write_dbc(self.dbc_dir / "Talent.dbc", 23, talent_rows)
         write_dbc(self.dbc_dir / "Spell.dbc", 234, spell_rows)
 
-        # Stock SpellIcon rows. Adventurer resolves these by existing Blizzard names.
         icon_strings = bytearray(b"\0")
         icon_rows = []
         for icon_id, name in (
@@ -186,7 +182,9 @@ class TalentGeneratorTests(unittest.TestCase):
 
         for key in ("shield_discipline", "bulwark", "retaliating_shield", "perfect_block"):
             self.assertEqual(definitions[key]["col"], 3, key)
-        self.assertNotIn("requires", definitions["retaliating_shield"])
+        self.assertEqual((definitions["retaliating_shield"]["row"], definitions["retaliating_shield"]["col"]), (6, 3))
+        self.assertEqual((definitions["bulwark"]["row"], definitions["bulwark"]["col"]), (7, 3))
+        self.assertEqual(definitions["retaliating_shield"]["requires"], "shield_discipline")
 
     def test_clones_owned_spell_ids_and_localizes_names(self) -> None:
         patch_talent_directory(self.dbc_dir)
