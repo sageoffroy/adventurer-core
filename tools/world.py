@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install Adventurer Core world-database maintenance updates into AzerothCore."""
+"""Install and verify Adventurer Core world-database maintenance updates."""
 
 from __future__ import annotations
 
@@ -64,11 +64,26 @@ def verify(core: Path) -> Path:
     return target
 
 
+def remove(core: Path) -> tuple[Path, bool]:
+    core = validate_core(core)
+    target = core / WORLD_UPDATE_RELATIVE
+    if not target.exists():
+        return target, False
+    if not target.is_file():
+        raise WorldUpdateError(f"World update target is not a file: {target}")
+    if target.read_bytes() != source_payload():
+        raise WorldUpdateError(
+            f"Refusing to remove world update with different contents: {target}"
+        )
+    target.unlink()
+    return target, True
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="world.py")
     sub = result.add_subparsers(dest="command", required=True)
 
-    for name in ("install", "verify"):
+    for name in ("install", "verify", "remove"):
         command = sub.add_parser(name)
         command.add_argument("--core-dir", required=True, type=Path)
 
@@ -87,9 +102,17 @@ def main() -> int:
             )
             print(f"  {target}")
             print("  AzerothCore will apply it on the next worldserver startup.")
-        else:
+        elif args.command == "verify":
             target = verify(args.core_dir)
             print("Adventurer world update verifies cleanly.")
+            print(f"  {target}")
+        else:
+            target, changed = remove(args.core_dir)
+            print(
+                "Adventurer world update removed."
+                if changed
+                else "Adventurer world update was already absent."
+            )
             print(f"  {target}")
         return 0
     except (WorldUpdateError, OSError) as exc:
