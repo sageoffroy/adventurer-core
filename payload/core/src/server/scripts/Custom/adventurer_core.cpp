@@ -1,5 +1,5 @@
-#include "Chat.h"
 #include "Language.h"
+#include "Opcodes.h"
 #include "Player.h"
 #include "ScriptDefines/PlayerScript.h"
 #include "SharedDefines.h"
@@ -27,8 +27,8 @@ constexpr uint32 ADVENTURER_MAX_RUNIC_POWER = 1000;
 // The 3.3.5a client refuses to expose combo points through GetComboPoints for a
 // non-Rogue/non-Druid class even though AzerothCore's Unit combo-point backend
 // is class agnostic. Keep Blizzard's target ComboFrame, but mirror the visible
-// server count over the normal addon-message channel so FrameXML can feed that
-// native frame for class 10.
+// server count over the addon-message channel so FrameXML can feed that native
+// frame for class 10.
 constexpr uint32 ADVENTURER_COMBO_SYNC_INTERVAL_MS = 100;
 constexpr char ADVENTURER_COMBO_PREFIX[] = "AdventurerCP";
 
@@ -84,23 +84,21 @@ bool IsAdventurer(Player const* player)
 
 void SendVisibleComboPoints(Player* player, uint8 points)
 {
-    // Addon traffic is encoded as "prefix\tpayload" in LANG_ADDON chat. Use
-    // the low-level packet builder so GM mode cannot turn this into a GM chat
-    // packet; the client should always receive CHAT_MSG_ADDON.
+    // This is the same 3.3.5a packet shape that the old SpellDraft classless
+    // implementation used successfully: CHAT_MSG_ADDON (0), LANG_ADDON, self
+    // sender/receiver and a "prefix\tpayload" message. Keeping that proven wire
+    // format avoids depending on the client's normal class-filtered combo API.
     std::string message = std::string(ADVENTURER_COMBO_PREFIX) + "\t" + std::to_string(points);
-    WorldPacket data;
-    ChatHandler::BuildChatPacket(
-        data,
-        CHAT_MSG_WHISPER,
-        LANG_ADDON,
-        player->GetGUID(),
-        player->GetGUID(),
-        message,
-        player->GetChatTag(),
-        player->GetName(),
-        player->GetName(),
-        0,
-        false);
+
+    WorldPacket data(SMSG_MESSAGECHAT, 100);
+    data << uint8(0); // CHAT_MSG_ADDON
+    data << int32(LANG_ADDON);
+    data << player->GetGUID();
+    data << uint32(0);
+    data << player->GetGUID();
+    data << uint32(message.length() + 1);
+    data << message;
+    data << uint8(0);
     player->SendDirectMessage(&data);
 }
 
