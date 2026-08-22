@@ -200,6 +200,16 @@ def build_adventurer_resources_lua() -> bytes:
         b"AdventurerEnergyBar",
         b"AdventurerRunicPowerBar",
         b"RuneFrame:SetPoint",
+        b'COMBO_PREFIX = "AdventurerCP"',
+        b"local nativeGetComboPoints = GetComboPoints",
+        b"GetComboPoints = function(unit, target)",
+        b'unit == "player" and target == "target"',
+        b"return nativeGetComboPoints(unit, target)",
+        b'RegisterEvent("CHAT_MSG_ADDON")',
+        b"RegisterAddonMessagePrefix(COMBO_PREFIX)",
+        b'RegisterEvent("RUNE_POWER_UPDATE")',
+        b"GetRuneCooldown(index)",
+        b"ActionButton_UpdateUsable(button)",
     )
     missing = [token.decode("ascii") for token in required if token not in payload]
     if missing:
@@ -207,11 +217,17 @@ def build_adventurer_resources_lua() -> bytes:
             "Adventurer resource HUD is missing required contract markers: "
             + ", ".join(missing)
         )
-    if b"GetComboPoints =" in payload:
-        raise ClientError(
-            "Adventurer resource HUD must not replace Blizzard GetComboPoints; "
-            "the native TargetFrame ComboFrame stays authoritative"
-        )
+
+    # 3.3.5a suppresses the client-side combo-point query for class 10. Keep
+    # Blizzard's TargetFrame/ComboFrame renderer, but permit exactly one narrow
+    # wrapper around GetComboPoints that substitutes only player -> target data
+    # delivered by the AdventurerCP server sync. All other calls must delegate
+    # to Blizzard's original API.
+    if payload.count(b"GetComboPoints = function(unit, target)") != 1:
+        raise ClientError("Adventurer resource HUD must contain exactly one combo-point shim")
+    if b"SpellDraft" in payload:
+        raise ClientError("Adventurer resource HUD must not depend on SpellDraft")
+
     return payload
 
 
