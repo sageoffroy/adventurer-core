@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install and verify Adventurer Core world-database maintenance updates."""
+"""Install, verify and clean Adventurer Core world maintenance updates."""
 
 from __future__ import annotations
 
@@ -8,9 +8,12 @@ from dataclasses import dataclass
 from pathlib import Path
 import sys
 
+from database import _run_mysql, query_scalar, read_database_info
+
 
 ROOT = Path(__file__).resolve().parent.parent
 PENDING_WORLD_RELATIVE = Path("data/sql/updates/pending_db_world")
+DEFAULT_CONF_RELATIVE = Path("env/dist/etc/worldserver.conf")
 
 
 @dataclass(frozen=True)
@@ -117,6 +120,48 @@ def remove(core: Path) -> list[tuple[Path, bool]]:
     return [remove_one(core, update) for update in reversed(WORLD_UPDATES)]
 
 
+def cleanup_database(core: Path, conf: Path | None = None) -> None:
+    """Remove only DB rows uniquely owned by maintenance updates 002+.
+
+    The main database rollback snapshot already restores every class-10 stat
+    range touched by 001/003. This cleanup covers the extra Last Bastion script
+    binding and the AzerothCore update markers, which older snapshots could not
+    have known about when they were created.
+    """
+    core = validate_core(core)
+    conf = (
+        conf.expanduser().resolve()
+        if conf
+        else (core / DEFAULT_CONF_RELATIVE).resolve()
+    )
+    db = read_database_info(conf, "WorldDatabaseInfo")
+    names = ", ".join("'" + update.name.replace("'", "''") + "'" for update in WORLD_UPDATES)
+    sql = f"""
+DELETE FROM `spell_script_names`
+WHERE `spell_id` = 290050
+  AND `ScriptName` = 'spell_warr_last_stand';
+
+DELETE FROM `updates`
+WHERE `name` IN ({names});
+""".encode()
+    _run_mysql(db, sql)
+
+    binding_count = int(query_scalar(
+        db,
+        "SELECT COUNT(*) FROM `spell_script_names` "
+        "WHERE `spell_id`=290050 AND `ScriptName`='spell_warr_last_stand'",
+    ))
+    marker_count = int(query_scalar(
+        db,
+        f"SELECT COUNT(*) FROM `updates` WHERE `name` IN ({names})",
+    ))
+    if binding_count or marker_count:
+        raise WorldUpdateError(
+            "Maintenance DB cleanup did not converge: "
+            f"binding={binding_count}, update_markers={marker_count}"
+        )
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="world.py")
     sub = result.add_subparsers(dest="command", required=True)
@@ -124,6 +169,10 @@ def parser() -> argparse.ArgumentParser:
     for name in ("install", "verify", "remove"):
         command = sub.add_parser(name)
         command.add_argument("--core-dir", required=True, type=Path)
+
+    cleanup = sub.add_parser("cleanup-db")
+    cleanup.add_argument("--core-dir", required=True, type=Path)
+    cleanup.add_argument("--worldserver-conf", type=Path)
 
     return result
 
@@ -147,7 +196,7 @@ def main() -> int:
             print(f"Adventurer world updates verify cleanly: {len(targets)}.")
             for target in targets:
                 print(f"  {target}")
-        else:
+        elif args.command == "remove":
             results = remove(args.core_dir)
             removed = sum(1 for _target, was_removed in results if was_removed)
             print(
@@ -157,6 +206,9 @@ def main() -> int:
             for target, was_removed in results:
                 state = "removed" if was_removed else "already absent"
                 print(f"  {state}: {target}")
+        else:
+            cleanup_database(args.core_dir, args.worldserver_conf)
+            print("Adventurer maintenance DB rows cleaned.")
         return 0
     except (WorldUpdateError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
