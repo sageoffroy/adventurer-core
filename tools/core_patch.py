@@ -140,9 +140,33 @@ def patch_custom_loader(text: str) -> str:
 
 
 def patch_player_storage(text: str) -> str:
-    old = "    if ((proto->AllowableClass & getClassMask()) == 0 || (proto->AllowableRace & getRaceMask()) == 0)\n        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;"
-    new = "    if (((proto->AllowableClass & getClassMask()) == 0 && getClass() != CLASS_ADVENTURER) ||\n        (proto->AllowableRace & getRaceMask()) == 0)\n        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;"
-    text = replace_exact_count(text, old, new, 2, "PlayerStorage AllowableClass checks")
+    old_braced = """    if ((proto->AllowableClass & getClassMask()) == 0 || (proto->AllowableRace & getRaceMask()) == 0)
+    {
+        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+    }"""
+    new_braced = """    if (((proto->AllowableClass & getClassMask()) == 0 && getClass() != CLASS_ADVENTURER) ||
+        (proto->AllowableRace & getRaceMask()) == 0)
+    {
+        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+    }"""
+    old_unbraced = """    if ((proto->AllowableClass & getClassMask()) == 0 || (proto->AllowableRace & getRaceMask()) == 0)
+        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;"""
+    new_unbraced = """    if (((proto->AllowableClass & getClassMask()) == 0 && getClass() != CLASS_ADVENTURER) ||
+        (proto->AllowableRace & getRaceMask()) == 0)
+        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;"""
+
+    clean_counts = (text.count(old_braced), text.count(old_unbraced))
+    patched_counts = (text.count(new_braced), text.count(new_unbraced))
+    if clean_counts == (1, 1) and patched_counts == (0, 0):
+        text = text.replace(old_braced, new_braced, 1)
+        text = text.replace(old_unbraced, new_unbraced, 1)
+    elif clean_counts == (0, 0) and patched_counts == (1, 1):
+        pass
+    else:
+        raise PatchError(
+            "PlayerStorage AllowableClass checks: expected one braced and one "
+            f"unbraced anchor in the same state, found clean={clean_counts}, patched={patched_counts}"
+        )
 
     # Playerbots has hard class gates in addition to AllowableClass. Without
     # these exceptions an Adventurer can know the proficiency and still be
