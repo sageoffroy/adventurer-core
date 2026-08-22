@@ -46,6 +46,6 @@
     {"key":"unyielding","source_talent_id":2204,"row":9,"col":0,"enUS":"Unyielding","esMX":"Inquebrantable"},
     {"key":"last_defense","source_talent_id":1959,"row":9,"col":2,"enUS":"Last Defense","esMX":"Última defensa"},
 
-    {"key":"guardian_wrath","source_talent_id":1872,"row":10,"col":1,"enUS":"Guardian's Wrath","esMX":"Cólera del guardián","requires":"concussive_force"}
+    {"key":"guardian_wrath","source_talent_id":1872,"row":10,"col":1,"enUS":"Guardian's Wrath","esMX":"Cólera del guardián"}
   ]
 }
