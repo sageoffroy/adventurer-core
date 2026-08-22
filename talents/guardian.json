@@ -9,7 +9,7 @@
   "talent_id_base": 5000,
   "talents": [
     {"key":"enduring_spirit","source_talent_id":1442,"row":0,"col":0,"enUS":"Tenacity","esMX":"Tenacidad","icon":"Ability_Butcher_Exsanguination"},
-    {"key":"guardian_strength","source_talent_id":2185,"row":0,"col":2,"enUS":"Steady Hand","esMX":"Mano firme","icon":"Ability_Butcher_Heavyhanded"},
+    {"key":"guardian_strength","source_talent_id":2185,"row":0,"col":2,"enUS":"Steady Hand","esMX":"Mano firme","icon":"inv_gauntlets_12"},
 
     {"key":"stoic_resolve","source_talent_id":1748,"row":1,"col":0,"enUS":"Cicatrization","esMX":"Cicatrización","icon":"Ability_Butcher_GushingWounds","spell_source_id":20555,"effect_values":{"0":[5,10,15],"1":[5,10,15]}},
     {"key":"battle_awareness","source_talent_id":1629,"row":1,"col":1,"enUS":"Battle Awareness","esMX":"Percepción de combate"},
