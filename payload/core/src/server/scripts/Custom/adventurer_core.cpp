@@ -73,7 +73,7 @@ void LearnRacialBaseline(Player* player)
         case RACE_HUMAN: LearnMissingSpells(player, HUMAN_SPELLS); break;
         case RACE_ORC: LearnMissingSpells(player, ORC_SPELLS); break;
         case RACE_DWARF: LearnMissingSpells(player, DWARF_SPELLS); break;
-        case RACE_NIGHTELF: LearnMissingSpells(player, NIGHT_ELF_SPELLS); break;
+        case RACE_NIGHTELF: LearnMissingSpells(player, NIGHTELF_SPELLS); break;
         case RACE_UNDEAD_PLAYER: LearnMissingSpells(player, UNDEAD_SPELLS); break;
         case RACE_TAUREN: LearnMissingSpells(player, TAUREN_SPELLS); break;
         case RACE_GNOME: LearnMissingSpells(player, GNOME_SPELLS); break;
@@ -168,7 +168,8 @@ public:
     AdventurerCorePlayerScript() : PlayerScript("AdventurerCorePlayerScript",
     {
         PLAYERHOOK_ON_CREATE,
-        PLAYERHOOK_ON_LOGIN
+        PLAYERHOOK_ON_LOGIN,
+        PLAYERHOOK_ON_LEVEL_CHANGED
     }) { }
 
     void OnPlayerCreate(Player* player) override
@@ -177,6 +178,12 @@ public:
     }
 
     void OnPlayerLogin(Player* player) override
+    {
+        if (IsAdventurer(player))
+            ApplyRuntimeCapabilities(player);
+    }
+
+    void OnPlayerLevelChanged(Player* player, uint8 /*oldLevel*/) override
     {
         if (IsAdventurer(player))
             ApplyRuntimeCapabilities(player);
