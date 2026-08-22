@@ -143,3 +143,10 @@ INSERT INTO `gtregenmpperspt_dbc` (`ID`,`Data`)
 SELECT 800 + `ID`, `Data`
 FROM `gtregenmpperspt_dbc`
 WHERE `ID` BETWEEN 100 AND 199;
+
+-- Last Bastion clones Warrior Last Stand (12975) into Adventurer spell 290050.
+-- Its dummy effect only works when AzerothCore binds the existing warrior SpellScript.
+DELETE FROM `spell_script_names`
+WHERE `spell_id` = 290050 AND `ScriptName` = 'spell_warr_last_stand';
+INSERT INTO `spell_script_names` (`spell_id`, `ScriptName`)
+VALUES (290050, 'spell_warr_last_stand');
