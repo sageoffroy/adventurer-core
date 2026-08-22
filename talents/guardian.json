@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "tabs": [
+    {"id": 5000, "key": "guardian", "source_tab_id": 383, "order": 0, "enUS": "Guardian", "esMX": "Guardián"},
+    {"id": 5001, "key": "champion", "source_tab_id": 161, "order": 1, "enUS": "Champion", "esMX": "Campeón"},
+    {"id": 5002, "key": "scholar", "source_tab_id": 382, "order": 2, "enUS": "Scholar", "esMX": "Erudito"}
+  ],
+  "spell_id_base": 290000,
+  "talent_id_base": 5000,
+  "talents": [
+    {"key":"enduring_spirit","source_talent_id":1442,"row":0,"col":0,"enUS":"Enduring Spirit","esMX":"Espíritu perdurable"},
+    {"key":"guardian_strength","source_talent_id":2185,"row":0,"col":2,"enUS":"Guardian's Strength","esMX":"Fuerza del guardián"},
+
+    {"key":"stoic_resolve","source_talent_id":1748,"row":1,"col":0,"enUS":"Stoic Resolve","esMX":"Resolución estoica"},
+    {"key":"battle_awareness","source_talent_id":1629,"row":1,"col":1,"enUS":"Battle Awareness","esMX":"Percepción de combate"},
+    {"key":"steel_reflexes","source_talent_id":1403,"row":1,"col":2,"enUS":"Steel Reflexes","esMX":"Reflejos de acero"},
+
+    {"key":"last_bastion","source_talent_id":153,"row":2,"col":0,"enUS":"Last Bastion","esMX":"Último bastión"},
+    {"key":"hardened_armor","source_talent_id":1423,"row":2,"col":1,"enUS":"Hardened Armor","esMX":"Armadura endurecida"},
+    {"key":"shield_discipline","source_talent_id":1601,"row":2,"col":2,"enUS":"Shield Discipline","esMX":"Disciplina con escudo"},
+    {"key":"shield_mastery","source_talent_id":1654,"row":2,"col":3,"enUS":"Shield Mastery","esMX":"Maestría con escudo"},
+
+    {"key":"arcane_deflection","source_talent_id":2018,"row":3,"col":0,"enUS":"Arcane Deflection","esMX":"Desvío arcano"},
+    {"key":"disarming_mastery","source_talent_id":151,"row":3,"col":2,"enUS":"Disarming Mastery","esMX":"Maestría de desarme"},
+
+    {"key":"concussive_force","source_talent_id":152,"row":4,"col":0,"enUS":"Concussive Force","esMX":"Fuerza de conmoción"},
+    {"key":"combat_instinct","source_talent_id":1753,"row":4,"col":1,"enUS":"Combat Instinct","esMX":"Instinto de combate"},
+    {"key":"battle_hardened","source_talent_id":1950,"row":4,"col":2,"enUS":"Battle-Hardened","esMX":"Curtido en batalla"},
+
+    {"key":"unwavering_duty","source_talent_id":1750,"row":5,"col":0,"enUS":"Unwavering Duty","esMX":"Deber inquebrantable"},
+    {"key":"survival_training","source_talent_id":1794,"row":5,"col":1,"enUS":"Survival Training","esMX":"Entrenamiento de supervivencia"},
+    {"key":"one_handed_mastery","source_talent_id":702,"row":5,"col":2,"enUS":"One-Handed Mastery","esMX":"Maestría a una mano"},
+
+    {"key":"indomitable_vitality","source_talent_id":1653,"row":6,"col":0,"enUS":"Indomitable Vitality","esMX":"Vitalidad indomable"},
+    {"key":"ardent_soul","source_talent_id":1751,"row":6,"col":2,"enUS":"Ardent Soul","esMX":"Alma ardiente","requires":"last_bastion"},
+
+    {"key":"bulwark","source_talent_id":1421,"row":7,"col":0,"enUS":"Bulwark","esMX":"Baluarte","requires":"shield_mastery"},
+    {"key":"arcane_adaptation","source_talent_id":1997,"row":7,"col":1,"enUS":"Arcane Adaptation","esMX":"Adaptación arcana"},
+    {"key":"unshakable_presence","source_talent_id":1981,"row":7,"col":2,"enUS":"Unshakable Presence","esMX":"Presencia inquebrantable"},
+    {"key":"retaliating_shield","source_talent_id":2246,"row":7,"col":3,"enUS":"Retaliating Shield","esMX":"Escudo de represalia","requires":"shield_mastery"},
+
+    {"key":"stalwart_mind","source_talent_id":2195,"row":8,"col":0,"enUS":"Stalwart Mind","esMX":"Mente firme"},
+    {"key":"mystic_ward","source_talent_id":2194,"row":8,"col":1,"enUS":"Mystic Ward","esMX":"Resguardo místico"},
+    {"key":"perfect_block","source_talent_id":1893,"row":8,"col":2,"enUS":"Perfect Block","esMX":"Bloqueo perfecto","requires":"bulwark"},
+
+    {"key":"unyielding","source_talent_id":2204,"row":9,"col":0,"enUS":"Unyielding","esMX":"Inquebrantable"},
+    {"key":"last_defense","source_talent_id":1959,"row":9,"col":2,"enUS":"Last Defense","esMX":"Última defensa","requires":"ardent_soul"},
+
+    {"key":"guardian_wrath","source_talent_id":1872,"row":10,"col":1,"enUS":"Guardian's Wrath","esMX":"Cólera del guardián","requires":"concussive_force"}
+  ]
+}
