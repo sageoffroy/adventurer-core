@@ -32,6 +32,22 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
     return text.replace(old, new, 1)
 
 
+def replace_transition(text: str, clean: str, legacy: str, new: str, label: str) -> str:
+    """Accept a stock core or the previous Adventurer-owned form, never fuzz."""
+    if new in text:
+        return text
+    clean_count = text.count(clean)
+    legacy_count = text.count(legacy)
+    if clean_count == 1 and legacy_count == 0:
+        return text.replace(clean, new, 1)
+    if clean_count == 0 and legacy_count == 1:
+        return text.replace(legacy, new, 1)
+    raise PatchError(
+        f"{label}: expected exactly one stock or legacy anchor, "
+        f"found stock={clean_count}, legacy={legacy_count}"
+    )
+
+
 def replace_exact_count(text: str, old: str, new: str, count: int, label: str) -> str:
     if old not in text:
         if text.count(new) == count:
@@ -110,16 +126,67 @@ def patch_stat_system(text: str) -> str:
         "        150.375940f,    // Warlock\n        145.560408f,    // Adventurer\n        116.890707f     // Druid",
         "StatSystem dodge cap",
     )
-    text = replace_once(
+
+    clean_ranged = """        if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;
+        }"""
+    legacy_ranged = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+        {
+            // Classless ranged baseline: Hunter-style level scaling.
+            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;
+        }
+        else if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;
+        }"""
+    universal_ranged = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+        {
+            // Universal ranged baseline: 95% of Hunter's native formula.
+            val2 = (level * 2.0f + GetStat(STAT_AGILITY) - 10.0f) * 0.95f;
+        }
+        else if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;
+        }"""
+    text = replace_transition(
         text,
-        "        if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))\n        {\n            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;\n        }",
-        "        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))\n        {\n            // Classless ranged baseline: Hunter-style level scaling.\n            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;\n        }\n        else if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))\n        {\n            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;\n        }",
+        clean_ranged,
+        legacy_ranged,
+        universal_ranged,
         "StatSystem Adventurer ranged attack power",
     )
-    return replace_once(
+
+    clean_melee = """        if (IsClass(CLASS_PALADIN, CLASS_CONTEXT_STATS) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+        }"""
+    legacy_melee = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+        {
+            // Classless melee baseline: hybrid Strength/Agility progression.
+            val2 = level * 2.0f + GetStat(STAT_STRENGTH) + GetStat(STAT_AGILITY) - 20.0f;
+        }
+        else if (IsClass(CLASS_PALADIN, CLASS_CONTEXT_STATS) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+        }"""
+    universal_melee = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+        {
+            // Universal melee baseline: compare the two strongest native
+            // archetypes and keep 95% of whichever the current gear favours.
+            float strengthBaseline = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+            float hybridBaseline = level * 2.0f + GetStat(STAT_STRENGTH) + GetStat(STAT_AGILITY) - 20.0f;
+            val2 = (strengthBaseline > hybridBaseline ? strengthBaseline : hybridBaseline) * 0.95f;
+        }
+        else if (IsClass(CLASS_PALADIN, CLASS_CONTEXT_STATS) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+        }"""
+    return replace_transition(
         text,
-        "        if (IsClass(CLASS_PALADIN, CLASS_CONTEXT_STATS) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))\n        {\n            val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;\n        }",
-        "        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))\n        {\n            // Classless melee baseline: hybrid Strength/Agility progression.\n            val2 = level * 2.0f + GetStat(STAT_STRENGTH) + GetStat(STAT_AGILITY) - 20.0f;\n        }\n        else if (IsClass(CLASS_PALADIN, CLASS_CONTEXT_STATS) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))\n        {\n            val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;\n        }",
+        clean_melee,
+        legacy_melee,
+        universal_melee,
         "StatSystem Adventurer melee attack power",
     )
 
@@ -240,11 +307,23 @@ def patch_player_storage(text: str) -> str:
 
 
 def patch_player_cpp(text: str) -> str:
-    return replace_once(
+    text = replace_once(
         text,
         "    if (!(pProto->AllowableClass & getClassMask()) && pProto->Bonding == BIND_WHEN_PICKED_UP && !IsGameMaster())",
         "    if (getClass() != CLASS_ADVENTURER && !(pProto->AllowableClass & getClassMask()) && pProto->Bonding == BIND_WHEN_PICKED_UP && !IsGameMaster())",
         "Player vendor AllowableClass check",
+    )
+    text = replace_once(
+        text,
+        "        0.024211f, // Warlock\n        0.0f,      // ??\n        0.056097f  // Druid",
+        "        0.024211f, // Warlock\n        0.053292f, // Adventurer: 95% of Druid's strongest native base dodge\n        0.056097f  // Druid",
+        "Player Adventurer base dodge",
+    )
+    return replace_once(
+        text,
+        "        0.97f / 1.15f,  // Warlock (?)\n        0.0f,           // ??\n        2.00f / 1.15f   // Druid",
+        "        0.97f / 1.15f,  // Warlock (?)\n        2.00f / 1.15f,  // Adventurer; its class-10 crit curve already carries the 95% scale\n        2.00f / 1.15f   // Druid",
+        "Player Adventurer agility-to-dodge coefficient",
     )
 
 
@@ -258,7 +337,7 @@ TRANSFORMS = {
 }
 
 
-def plan(core: Path, payload_root: Path) -> list[PlannedFile]:
+def plan(core: Path, payload_root: Path, *, allow_payload_replace: bool = False) -> list[PlannedFile]:
     planned: list[PlannedFile] = []
     for relative, transform in TRANSFORMS.items():
         path = core / relative
@@ -279,7 +358,7 @@ def plan(core: Path, payload_root: Path) -> list[PlannedFile]:
     destination = core / payload_rel
     original = destination.read_bytes() if destination.exists() else None
     patched = payload.read_bytes()
-    if original is not None and original != patched:
+    if original is not None and original != patched and not allow_payload_replace:
         raise PatchError(
             f"{payload_rel}: target already exists with content not owned by this package"
         )
