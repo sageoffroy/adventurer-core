@@ -58,6 +58,59 @@ ALLOWABLE = """    if ((proto->AllowableClass & getClassMask()) == 0 || (proto->
 X
     if ((proto->AllowableClass & getClassMask()) == 0 || (proto->AllowableRace & getRaceMask()) == 0)
         return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+
+InventoryResult Player::BotCanUseItem(ItemTemplate const* proto) const
+{
+    if (proto->Class == ITEM_CLASS_ARMOR && proto->SubClass == ITEM_SUBCLASS_ARMOR_IDOL && !IsClass(CLASS_DRUID, CLASS_CONTEXT_EQUIP_RELIC))
+    {
+        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+    }
+    if (proto->Class == ITEM_CLASS_ARMOR && proto->SubClass == ITEM_SUBCLASS_ARMOR_TOTEM && !IsClass(CLASS_SHAMAN, CLASS_CONTEXT_EQUIP_RELIC))
+    {
+        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+    }
+    if (proto->Class == ITEM_CLASS_ARMOR && proto->SubClass == ITEM_SUBCLASS_ARMOR_LIBRAM && !IsClass(CLASS_PALADIN, CLASS_CONTEXT_EQUIP_RELIC))
+    {
+        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+    }
+    if (proto->Class == ITEM_CLASS_ARMOR && proto->SubClass == ITEM_SUBCLASS_ARMOR_SIGIL && !IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_EQUIP_RELIC))
+    {
+        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+    }
+}
+
+    if (proto->Class == ITEM_CLASS_ARMOR)
+    {
+        if (proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD && !(
+            IsClass(CLASS_PALADIN, CLASS_CONTEXT_EQUIP_SHIELDS)
+            || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_EQUIP_SHIELDS)
+            || IsClass(CLASS_SHAMAN, CLASS_CONTEXT_EQUIP_SHIELDS)))
+        {
+            return EQUIP_ERR_NO_REQUIRED_PROFICIENCY;
+        }
+        if (proto->SubClass == ITEM_SUBCLASS_ARMOR_LIBRAM && !IsClass(CLASS_PALADIN, CLASS_CONTEXT_EQUIP_RELIC))
+        {
+            return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+        }
+        if (proto->SubClass == ITEM_SUBCLASS_ARMOR_IDOL && !IsClass(CLASS_DRUID, CLASS_CONTEXT_EQUIP_RELIC))
+        {
+            return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+        }
+        if (proto->SubClass == ITEM_SUBCLASS_ARMOR_TOTEM && !IsClass(CLASS_SHAMAN, CLASS_CONTEXT_EQUIP_RELIC))
+        {
+            return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+        }
+        if (proto->SubClass == ITEM_SUBCLASS_ARMOR_SIGIL && !IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_EQUIP_RELIC))
+        {
+            return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+        }
+    }
+
+    if (proto->Class == ITEM_CLASS_ARMOR && proto->SubClass > ITEM_SUBCLASS_ARMOR_MISC && proto->SubClass < ITEM_SUBCLASS_ARMOR_BUCKLER &&
+        proto->InventoryType != INVTYPE_CLOAK)
+    {
+    }
+
         case INVTYPE_RELIC:
         {
             switch (proto->SubClass)
@@ -103,6 +156,10 @@ class CorePatchTests(unittest.TestCase):
             payload = self.make_tree(core)
             first = plan(core, payload)
             self.assertEqual(len(first), 7)
+            storage = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("PlayerStorage.cpp"))
+            self.assertIn("getClass() != CLASS_ADVENTURER && proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD", storage)
+            self.assertIn("getClass() != CLASS_ADVENTURER && proto->Class == ITEM_CLASS_ARMOR", storage)
+            self.assertIn("if (getClass() == CLASS_ADVENTURER)", storage)
             for item in first:
                 target = core / item.relative_path
                 target.parent.mkdir(parents=True, exist_ok=True)
