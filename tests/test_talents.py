@@ -186,7 +186,7 @@ class TalentGeneratorTests(unittest.TestCase):
 
         for key in ("shield_discipline", "bulwark", "retaliating_shield", "perfect_block"):
             self.assertEqual(definitions[key]["col"], 3, key)
-        self.assertEqual(definitions["retaliating_shield"]["requires"], "shield_discipline")
+        self.assertNotIn("requires", definitions["retaliating_shield"])
 
     def test_clones_owned_spell_ids_and_localizes_names(self) -> None:
         patch_talent_directory(self.dbc_dir)
