@@ -1,0 +1,70 @@
+from __future__ import annotations
+
+import re
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+RUNTIME = ROOT / "payload" / "core" / "src" / "server" / "scripts" / "Custom" / "adventurer_core.cpp"
+
+
+class AdventurerResourceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = RUNTIME.read_text(encoding="utf-8")
+
+    def test_auxiliary_power_pool_sizes_match_wotlk_storage_scale(self) -> None:
+        self.assertIn("ADVENTURER_MAX_RAGE = 1000", self.source)
+        self.assertIn("ADVENTURER_MAX_ENERGY = 100", self.source)
+        self.assertIn("ADVENTURER_MAX_RUNIC_POWER = 1000", self.source)
+        self.assertIn("SetMaxPower(POWER_RAGE, ADVENTURER_MAX_RAGE)", self.source)
+        self.assertIn("SetMaxPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY)", self.source)
+        self.assertIn("SetMaxPower(POWER_RUNIC_POWER, ADVENTURER_MAX_RUNIC_POWER)", self.source)
+
+    def test_adventurer_keeps_mana_native_and_activates_auxiliary_powers(self) -> None:
+        self.assertIn("PLAYERHOOK_ON_PLAYER_HAS_ACTIVE_POWER_TYPE", self.source)
+        self.assertIn("OnPlayerHasActivePowerType", self.source)
+        self.assertRegex(
+            self.source,
+            re.compile(
+                r"case POWER_RAGE:\s*case POWER_ENERGY:\s*case POWER_RUNIC_POWER:\s*"
+                r"return player->GetMaxPower\(power\) > 0;",
+                re.MULTILINE,
+            ),
+        )
+        # Mana is deliberately not given a fake fixed pool: class-10 DBC/stat
+        # scaling remains authoritative for the primary resource.
+        self.assertNotIn("ADVENTURER_MAX_MANA", self.source)
+
+    def test_stat_recalculation_cannot_erase_auxiliary_power_pools(self) -> None:
+        self.assertIn("PLAYERHOOK_ON_AFTER_UPDATE_MAX_POWER", self.source)
+        self.assertIn("OnPlayerAfterUpdateMaxPower", self.source)
+        for token in (
+            "ADVENTURER_MAX_RAGE",
+            "ADVENTURER_MAX_ENERGY",
+            "ADVENTURER_MAX_RUNIC_POWER",
+        ):
+            self.assertIn(f"std::max(value, static_cast<float>({token}))", self.source)
+
+    def test_runes_reuse_native_dk_ability_context_only(self) -> None:
+        self.assertIn("PLAYERHOOK_ON_PLAYER_IS_CLASS", self.source)
+        self.assertIn("OnPlayerIsClass", self.source)
+        self.assertIn(
+            "playerClass == CLASS_DEATH_KNIGHT && context == CLASS_CONTEXT_ABILITY",
+            self.source,
+        )
+        self.assertNotIn(
+            "playerClass == CLASS_DEATH_KNIGHT && context == CLASS_CONTEXT_INIT",
+            self.source,
+        )
+        self.assertNotIn("CLASS_CONTEXT_QUEST)", self.source)
+        self.assertNotIn("CLASS_CONTEXT_TAXI)", self.source)
+
+    def test_new_adventurer_starts_energy_full_and_generated_powers_empty(self) -> None:
+        self.assertIn("SetPower(POWER_RAGE, 0)", self.source)
+        self.assertIn("SetPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY)", self.source)
+        self.assertIn("SetPower(POWER_RUNIC_POWER, 0)", self.source)
+
+
+if __name__ == "__main__":
+    unittest.main()
