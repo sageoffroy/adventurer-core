@@ -34,12 +34,19 @@ TALENTTAB_ORDER_FIELD = 22
 SPELL_EFFECT_FIELDS = (71, 72, 73)
 SPELL_EFFECT_BASEPOINT_FIELDS = (80, 81, 82)
 SPELL_EFFECT_APPLY_AURA_FIELDS = (95, 96, 97)
+SPELL_EFFECT_MISC_VALUE_FIELDS = (110, 111, 112)
 SPELL_EFFECT_TRIGGER_SPELL_FIELDS = (116, 117, 118)
 SPELL_ICON_FIELD = 133
 SPELL_NAME_START = 136
 SPELL_RANK_START = 153
 SPELL_DESCRIPTION_START = 170
 SPELLICON_PATH_FIELD = 1
+
+# These ranges are Adventurer-owned. Purging the whole reservation before each
+# rebuild lets talents be removed or reordered without leaving ghost DBC rows
+# behind on development installations that are already patched.
+TALENT_ID_RESERVATION = 1000
+SPELL_ID_RESERVATION = 10000
 
 
 def load_spec(path: Path = SPEC_PATH) -> dict:
@@ -164,6 +171,14 @@ def apply_authored_effect_values(spell: bytearray, definition: dict, rank_index:
         set_u32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[slot], value - 1)
 
 
+def apply_authored_effect_misc_values(spell: bytearray, definition: dict) -> None:
+    for raw_slot, raw_value in definition.get("effect_misc_values", {}).items():
+        slot = int(raw_slot)
+        if not 0 <= slot < len(SPELL_EFFECT_MISC_VALUE_FIELDS):
+            raise DBCError(f"Effect misc-value slot {slot} out of range for {definition['key']}")
+        set_u32(spell, SPELL_EFFECT_MISC_VALUE_FIELDS[slot], int(raw_value))
+
+
 def apply_authored_disabled_effects(spell: bytearray, definition: dict) -> None:
     for raw_slot in definition.get("disable_effects", []):
         slot = int(raw_slot)
@@ -202,16 +217,12 @@ def patch_talents_and_spells(
     before_spells = spells.to_bytes()
     talent_defs = spec["talents"]
 
-    owned_talent_ids = {custom_talent_id(spec, i) for i in range(len(talent_defs))}
-    owned_spell_ids: set[int] = set()
-    for i, definition in enumerate(talent_defs):
-        source = record_by_id(talents, int(definition["source_talent_id"]), "Talent.dbc")
-        for rank_index, field in enumerate(TALENT_RANK_FIELDS):
-            if u32(source, field):
-                owned_spell_ids.add(custom_spell_id(spec, i, rank_index))
-
-    talents.records = [r for r in talents.records if u32(r, 0) not in owned_talent_ids]
-    spells.records = [r for r in spells.records if u32(r, 0) not in owned_spell_ids]
+    talent_min = int(spec["talent_id_base"])
+    talent_max = talent_min + TALENT_ID_RESERVATION
+    spell_min = int(spec["spell_id_base"])
+    spell_max = spell_min + SPELL_ID_RESERVATION
+    talents.records = [r for r in talents.records if not talent_min <= u32(r, 0) < talent_max]
+    spells.records = [r for r in spells.records if not spell_min <= u32(r, 0) < spell_max]
 
     source_talents = {
         int(d["source_talent_id"]): bytearray(record_by_id(talents, int(d["source_talent_id"]), "Talent.dbc"))
@@ -263,6 +274,7 @@ def patch_talents_and_spells(
             if index in icon_ids:
                 set_u32(cloned_spell, SPELL_ICON_FIELD, icon_ids[index])
             apply_authored_effect_values(cloned_spell, definition, rank_index)
+            apply_authored_effect_misc_values(cloned_spell, definition)
             apply_authored_disabled_effects(cloned_spell, definition)
             spells.records.append(cloned_spell)
             set_u32(source, field, new_spell_id)
@@ -338,6 +350,13 @@ def validate_talents(dbc_dir: Path, spec: dict | None = None) -> None:
                 if actual != expected:
                     raise DBCError(
                         f"Talent {definition['key']} rank {rank_index + 1} effect {slot} expected {expected}, got {actual}"
+                    )
+            for raw_slot, raw_value in definition.get("effect_misc_values", {}).items():
+                slot = int(raw_slot)
+                actual = u32(spell, SPELL_EFFECT_MISC_VALUE_FIELDS[slot])
+                if actual != int(raw_value):
+                    raise DBCError(
+                        f"Talent {definition['key']} rank {rank_index + 1} misc {slot} expected {raw_value}, got {actual}"
                     )
             for raw_slot in definition.get("disable_effects", []):
                 slot = int(raw_slot)
