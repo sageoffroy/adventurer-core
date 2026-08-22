@@ -1,8 +1,13 @@
+#include "Chat.h"
+#include "Language.h"
 #include "Player.h"
 #include "ScriptDefines/PlayerScript.h"
 #include "SharedDefines.h"
+#include "WorldPacket.h"
 
 #include <algorithm>
+#include <string>
+#include <unordered_map>
 
 namespace
 {
@@ -18,6 +23,23 @@ constexpr uint32 APPRENTICE_RIDING_VALUE = 75;
 constexpr uint32 ADVENTURER_MAX_RAGE = 1000;
 constexpr uint32 ADVENTURER_MAX_ENERGY = 100;
 constexpr uint32 ADVENTURER_MAX_RUNIC_POWER = 1000;
+
+// The 3.3.5a client refuses to expose combo points through GetComboPoints for a
+// non-Rogue/non-Druid class even though AzerothCore's Unit combo-point backend
+// is class agnostic. Keep Blizzard's target ComboFrame, but mirror the visible
+// server count over the normal addon-message channel so FrameXML can feed that
+// native frame for class 10.
+constexpr uint32 ADVENTURER_COMBO_SYNC_INTERVAL_MS = 100;
+constexpr char ADVENTURER_COMBO_PREFIX[] = "AdventurerCP";
+
+struct ComboSyncState
+{
+    uint32 elapsed = 0;
+    ObjectGuid selectedTarget = ObjectGuid::Empty;
+    uint8 points = 0xFF; // impossible sentinel: force the first sync
+};
+
+std::unordered_map<uint64, ComboSyncState> comboSyncStates;
 
 constexpr uint32 UNIVERSAL_SKILLS[] =
 {
@@ -58,6 +80,50 @@ constexpr uint32 DRAENEI_SPELLS[] = { 59547, 28878, 28875 };
 bool IsAdventurer(Player const* player)
 {
     return player && player->getClass() == CLASS_ADVENTURER;
+}
+
+void SendVisibleComboPoints(Player* player, uint8 points)
+{
+    // Addon traffic is encoded as "prefix\tpayload" in LANG_ADDON chat. Use
+    // the low-level packet builder so GM mode cannot turn this into a GM chat
+    // packet; the client should always receive CHAT_MSG_ADDON.
+    std::string message = std::string(ADVENTURER_COMBO_PREFIX) + "\t" + std::to_string(points);
+    WorldPacket data;
+    ChatHandler::BuildChatPacket(
+        data,
+        CHAT_MSG_WHISPER,
+        LANG_ADDON,
+        player->GetGUID(),
+        player->GetGUID(),
+        message,
+        player->GetChatTag(),
+        player->GetName(),
+        player->GetName(),
+        0,
+        false);
+    player->SendDirectMessage(&data);
+}
+
+void UpdateComboPointSync(Player* player, uint32 diff)
+{
+    if (!IsAdventurer(player) || !player->IsInWorld())
+        return;
+
+    uint64 key = player->GetGUID().GetRawValue();
+    ComboSyncState& state = comboSyncStates[key];
+    state.elapsed += diff;
+    if (state.elapsed < ADVENTURER_COMBO_SYNC_INTERVAL_MS)
+        return;
+    state.elapsed = 0;
+
+    ObjectGuid selectedTarget = player->GetTarget();
+    uint8 visiblePoints = selectedTarget ? player->GetComboPoints(selectedTarget) : 0;
+    if (state.selectedTarget == selectedTarget && state.points == visiblePoints)
+        return;
+
+    state.selectedTarget = selectedTarget;
+    state.points = visiblePoints;
+    SendVisibleComboPoints(player, visiblePoints);
 }
 
 void LearnMissingSpells(Player* player, uint32 const* spells, uint32 count)
@@ -201,7 +267,9 @@ public:
     {
         PLAYERHOOK_ON_CREATE,
         PLAYERHOOK_ON_LOGIN,
+        PLAYERHOOK_ON_LOGOUT,
         PLAYERHOOK_ON_LEVEL_CHANGED,
+        PLAYERHOOK_ON_UPDATE,
         PLAYERHOOK_ON_AFTER_UPDATE_MAX_POWER,
         PLAYERHOOK_ON_PLAYER_HAS_ACTIVE_POWER_TYPE,
         PLAYERHOOK_ON_PLAYER_IS_CLASS
@@ -215,7 +283,20 @@ public:
     void OnPlayerLogin(Player* player) override
     {
         if (IsAdventurer(player))
+        {
             ApplyRuntimeCapabilities(player);
+            comboSyncStates.erase(player->GetGUID().GetRawValue());
+        }
+    }
+
+    void OnPlayerLogout(Player* player) override
+    {
+        comboSyncStates.erase(player->GetGUID().GetRawValue());
+    }
+
+    void OnPlayerUpdate(Player* player, uint32 diff) override
+    {
+        UpdateComboPointSync(player, diff);
     }
 
     void OnPlayerLevelChanged(Player* player, uint8 /*oldLevel*/) override
@@ -270,10 +351,11 @@ public:
         if (!IsAdventurer(player))
             return std::nullopt;
 
-        // Rune storage, rune cooldown regeneration, Runic Power handling and
-        // rune-cost checks all use the deliberately narrow ABILITY context in
-        // AzerothCore. Treating Adventurer as DK only there gives it native
-        // runes without inheriting DK starting levels, quests, taxis, etc.
+        // AzerothCore already routes rune initialization, rune-cost checks,
+        // cooldown regeneration and Runic Power decay through this ABILITY
+        // context. Treating Adventurer as DK only there gives it the complete
+        // native rune economy without inheriting DK starting levels, quests,
+        // taxis, etc.
         if (playerClass == CLASS_DEATH_KNIGHT && context == CLASS_CONTEXT_ABILITY)
             return true;
 
