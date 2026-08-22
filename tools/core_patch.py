@@ -166,7 +166,7 @@ def patch_stat_system(text: str) -> str:
             // Classless melee baseline: hybrid Strength/Agility progression.
             val2 = level * 2.0f + GetStat(STAT_STRENGTH) + GetStat(STAT_AGILITY) - 20.0f;
         }
-        else if (IsClass(CLASS_PALIN, CLASS_CONTEXT_STATS) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))
+        else if (IsClass(CLASS_PALADIN, CLASS_CONTEXT_STATS) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))
         {
             val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
         }"""
@@ -235,6 +235,9 @@ def patch_player_storage(text: str) -> str:
             f"unbraced anchor in the same state, found clean={clean_counts}, patched={patched_counts}"
         )
 
+    # Playerbots has hard class gates in addition to AllowableClass. Without
+    # these exceptions an Adventurer can know the proficiency and still be
+    # rejected before CanUseItem reaches the generic skill checks.
     bot_relics = (
         ("ITEM_SUBCLASS_ARMOR_IDOL", "CLASS_DRUID"),
         ("ITEM_SUBCLASS_ARMOR_TOTEM", "CLASS_SHAMAN"),
@@ -291,6 +294,8 @@ def patch_player_storage(text: str) -> str:
             switch (proto->SubClass)"""
     new_relic = """        case INVTYPE_RELIC:
         {
+            // Adventurer is classless: every relic subtype may use the ranged
+            // equipment slot. Native classes keep their stock restrictions.
             if (getClass() == CLASS_ADVENTURER)
             {
                 slots[0] = EQUIPMENT_SLOT_RANGED;
@@ -352,6 +357,8 @@ def patch_player_cpp(text: str) -> str:
 
     if (pclass == CLASS_ADVENTURER)
     {
+        // Compare every native class as a complete formula; never mix a base
+        // from one class with the Agility coefficient from another.
         float bestCrit = 0.0f;
         bool found = false;
         for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
@@ -376,7 +383,12 @@ def patch_player_cpp(text: str) -> str:
 
     GtChanceToMeleeCritBaseEntry const* critBase  = sGtChanceToMeleeCritBaseStore.LookupEntry(pclass - 1);
     GtChanceToMeleeCritEntry     const* critRatio = sGtChanceToMeleeCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
-    text = replace_once(text, melee_anchor, melee_runtime, "Player Adventurer complete melee crit formula")
+    text = replace_once(
+        text,
+        melee_anchor,
+        melee_runtime,
+        "Player Adventurer complete melee crit formula",
+    )
 
     dodge_anchor = """    float base_agility = GetCreateStat(STAT_AGILITY) * GetPctModifierValue(UnitMods(UNIT_MOD_STAT_START + AsUnderlyingType(STAT_AGILITY)), BASE_PCT);
     float bonus_agility = GetStat(STAT_AGILITY) - base_agility;
@@ -388,6 +400,8 @@ def patch_player_cpp(text: str) -> str:
 
     if (pclass == CLASS_ADVENTURER)
     {
+        // Keep each native dodge model intact (base dodge plus that class's own
+        // Agility conversion), choose the best total, then apply the 5% penalty.
         float bestDiminishing = 0.0f;
         float bestNondiminishing = 0.0f;
         float bestTotal = 0.0f;
@@ -418,9 +432,15 @@ def patch_player_cpp(text: str) -> str:
         return;
     }
 
+    // calculate diminishing (green in char screen) and non-diminishing (white) contribution
     diminishing = 100.0f * bonus_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1];
     nondiminishing = 100.0f * (dodge_base[pclass - 1] + base_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1]);"""
-    text = replace_once(text, dodge_anchor, dodge_runtime, "Player Adventurer complete dodge formula")
+    text = replace_once(
+        text,
+        dodge_anchor,
+        dodge_runtime,
+        "Player Adventurer complete dodge formula",
+    )
 
     spell_anchor = """    if (level > GT_MAX_LEVEL)
         level = GT_MAX_LEVEL;
@@ -431,6 +451,7 @@ def patch_player_cpp(text: str) -> str:
 
     if (pclass == CLASS_ADVENTURER)
     {
+        // Compare complete native spell-crit formulas against current Intellect.
         float bestCrit = 0.0f;
         bool found = false;
         for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
@@ -455,7 +476,12 @@ def patch_player_cpp(text: str) -> str:
 
     GtChanceToSpellCritBaseEntry const* critBase  = sGtChanceToSpellCritBaseStore.LookupEntry(pclass - 1);
     GtChanceToSpellCritEntry     const* critRatio = sGtChanceToSpellCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
-    return replace_once(text, spell_anchor, spell_runtime, "Player Adventurer complete spell crit formula")
+    return replace_once(
+        text,
+        spell_anchor,
+        spell_runtime,
+        "Player Adventurer complete spell crit formula",
+    )
 
 
 TRANSFORMS = {
