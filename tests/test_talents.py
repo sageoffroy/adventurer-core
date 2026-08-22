@@ -15,6 +15,7 @@ from talents import (  # noqa: E402
     SPELL_EFFECT_APPLY_AURA_FIELDS,
     SPELL_EFFECT_BASEPOINT_FIELDS,
     SPELL_EFFECT_FIELDS,
+    SPELL_EFFECT_MISC_VALUE_FIELDS,
     SPELL_EFFECT_TRIGGER_SPELL_FIELDS,
     SPELL_ICON_FIELD,
     SPELL_NAME_START,
@@ -71,8 +72,13 @@ class TalentGeneratorTests(unittest.TestCase):
         talent_rows = []
         spell_rows = []
         next_native_spell = 10000
+        seen_source_talents: set[int] = set()
         for definition in self.spec["talents"]:
             source_talent = int(definition["source_talent_id"])
+            if source_talent in seen_source_talents:
+                continue
+            seen_source_talents.add(source_talent)
+
             effect_lengths = [len(values) for values in definition.get("effect_values", {}).values()]
             rank_count = max(effect_lengths) if effect_lengths else (3 if definition.get("spell_source_id") else 2)
             rank_ids = list(range(next_native_spell, next_native_spell + rank_count))
@@ -118,6 +124,19 @@ class TalentGeneratorTests(unittest.TestCase):
             225: 1,
         }))
 
+        # Battle Stance Passive gives us a stock passive SPELL_AURA_MOD_THREAT
+        # mechanic. Guardian rewrites its scalar and school mask.
+        spell_rows.append(row(234, {
+            0: 21156,
+            4: 0x44,
+            71: 6,
+            80: 0,
+            95: 10,
+            110: 127,
+            133: 1,
+            225: 1,
+        }))
+
         write_dbc(self.dbc_dir / "Talent.dbc", 23, talent_rows)
         write_dbc(self.dbc_dir / "Spell.dbc", 234, spell_rows)
 
@@ -126,7 +145,7 @@ class TalentGeneratorTests(unittest.TestCase):
         icon_rows = []
         for icon_id, name in (
             (501, "ability_warrior_intensifyrage"),
-            (502, "inv_gauntlets_12"),
+            (502, "ability_warrior_secondwind"),
             (503, "Spell_deathknight_bloodboil"),
             (504, "inv_misc_bone_03"),
         ):
@@ -154,6 +173,20 @@ class TalentGeneratorTests(unittest.TestCase):
         generated_rows = [r for r in talents.records if 5000 <= u32(r, 0) < 6000]
         self.assertEqual(len(generated_rows), len(self.spec["talents"]))
         self.assertTrue(all(u32(r, 1) == guardian_id for r in generated_rows))
+
+    def test_guardian_columns_and_early_rows_have_clear_identity(self) -> None:
+        definitions = {definition["key"]: definition for definition in self.spec["talents"]}
+
+        self.assertEqual(definitions["guardian_strength"]["icon"], "ability_warrior_secondwind")
+        self.assertEqual((definitions["shield_discipline"]["row"], definitions["shield_discipline"]["col"]), (2, 3))
+        self.assertEqual((definitions["threatening_presence"]["row"], definitions["threatening_presence"]["col"]), (3, 2))
+        self.assertNotIn("shield_mastery", definitions)
+        self.assertNotIn("arcane_deflection", definitions)
+        self.assertNotIn("disarming_mastery", definitions)
+
+        for key in ("shield_discipline", "bulwark", "retaliating_shield", "perfect_block"):
+            self.assertEqual(definitions[key]["col"], 3, key)
+        self.assertEqual(definitions["retaliating_shield"]["requires"], "shield_discipline")
 
     def test_clones_owned_spell_ids_and_localizes_names(self) -> None:
         patch_talent_directory(self.dbc_dir)
@@ -206,9 +239,10 @@ class TalentGeneratorTests(unittest.TestCase):
         talents = DBC.read(self.dbc_dir / "Talent.dbc")
         spells = DBC.read(self.dbc_dir / "Spell.dbc")
 
-        shield_discipline = next(r for r in talents.records if u32(r, 0) == custom_talent_id(self.spec, 7))
+        index = next(i for i, definition in enumerate(self.spec["talents"]) if definition["key"] == "shield_discipline")
+        shield_discipline = next(r for r in talents.records if u32(r, 0) == custom_talent_id(self.spec, index))
         rank_ids = [u32(shield_discipline, f) for f in TALENT_RANK_FIELDS if u32(shield_discipline, f)]
-        self.assertEqual(rank_ids, [290070, 290071, 290072, 290073, 290074])
+        self.assertEqual(rank_ids, [custom_spell_id(self.spec, index, i) for i in range(5)])
 
         for spell_id, displayed_value in zip(rank_ids, (2, 4, 6, 8, 10)):
             spell = next(r for r in spells.records if u32(r, 0) == spell_id)
@@ -219,6 +253,25 @@ class TalentGeneratorTests(unittest.TestCase):
             self.assertEqual(
                 dbc_string(spells, u32(spell, SPELL_DESCRIPTION_START + 7)),
                 "Aumenta un $s1% tu probabilidad de bloquear ataques con un escudo.",
+            )
+
+    def test_threatening_presence_is_physical_threat_only(self) -> None:
+        patch_talent_directory(self.dbc_dir)
+        talents = DBC.read(self.dbc_dir / "Talent.dbc")
+        spells = DBC.read(self.dbc_dir / "Spell.dbc")
+        index = next(i for i, definition in enumerate(self.spec["talents"]) if definition["key"] == "threatening_presence")
+        threatening = next(r for r in talents.records if u32(r, 0) == custom_talent_id(self.spec, index))
+        rank_ids = [u32(threatening, f) for f in TALENT_RANK_FIELDS if u32(threatening, f)]
+        self.assertEqual(rank_ids, [custom_spell_id(self.spec, index, i) for i in range(3)])
+
+        for spell_id, displayed_value in zip(rank_ids, (5, 10, 15)):
+            spell = next(r for r in spells.records if u32(r, 0) == spell_id)
+            self.assertEqual(u32(spell, SPELL_EFFECT_APPLY_AURA_FIELDS[0]), 10)
+            self.assertEqual(u32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), displayed_value - 1)
+            self.assertEqual(u32(spell, SPELL_EFFECT_MISC_VALUE_FIELDS[0]), 1)
+            self.assertEqual(
+                dbc_string(spells, u32(spell, SPELL_DESCRIPTION_START + 7)),
+                "Aumenta un $s1% la amenaza generada por tus ataques y facultades físicas.",
             )
 
     def test_replaces_stock_prerequisites_with_adventurer_prerequisites(self) -> None:
@@ -233,11 +286,32 @@ class TalentGeneratorTests(unittest.TestCase):
                 self.assertEqual(u32(generated, 16), 0)
             else:
                 required_index = key_to_index[definition["requires"]]
+                required_talent = next(
+                    r for r in talents.records if u32(r, 0) == custom_talent_id(self.spec, required_index)
+                )
+                required_rank_count = sum(1 for field in TALENT_RANK_FIELDS if u32(required_talent, field))
                 self.assertEqual(u32(generated, 13), custom_talent_id(self.spec, required_index))
-                self.assertEqual(u32(generated, 16), 1)
+                self.assertEqual(u32(generated, 16), required_rank_count - 1)
             self.assertEqual(u32(generated, 20), 0)
             self.assertEqual(u32(generated, 21), 0)
             self.assertEqual(u32(generated, 22), 0)
+
+    def test_rebuild_purges_retired_adventurer_ids(self) -> None:
+        patch_talent_directory(self.dbc_dir)
+
+        talents = DBC.read(self.dbc_dir / "Talent.dbc")
+        talents.records.append(row(23, {0: 5999, 1: 5000, 2: 3, 3: 0, 4: 299999}))
+        (self.dbc_dir / "Talent.dbc").write_bytes(talents.to_bytes())
+
+        spells = DBC.read(self.dbc_dir / "Spell.dbc")
+        spells.records.append(row(234, {0: 299999, 71: 6, 95: 10}))
+        (self.dbc_dir / "Spell.dbc").write_bytes(spells.to_bytes())
+
+        patch_talent_directory(self.dbc_dir)
+        talents = DBC.read(self.dbc_dir / "Talent.dbc")
+        spells = DBC.read(self.dbc_dir / "Spell.dbc")
+        self.assertFalse(any(u32(r, 0) == 5999 for r in talents.records))
+        self.assertFalse(any(u32(r, 0) == 299999 for r in spells.records))
 
     def test_generation_is_idempotent(self) -> None:
         first = patch_talent_directory(self.dbc_dir)
