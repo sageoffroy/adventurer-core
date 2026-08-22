@@ -159,16 +159,14 @@ void UpdateRuneClientSync(Player* player)
     uint8 newlyReady = uint8(readyMask & ~state.readyMask);
     state.readyMask = readyMask;
 
-    // Native Death Knights do not need a server packet when a rune cooldown
-    // reaches zero: the 3.3.5a client advances that state locally. Class 10
-    // renders the native RuneFrame but does not perform the hidden DK-only
-    // usability transition. SMSG_ADD_RUNE_POWER is Blizzard's native packet for
-    // telling the client that a rune is available, so send it only on the exact
-    // 0->ready transition. This updates the client's real spell-usability cache,
-    // not merely the visual RuneFrame.
-    for (uint8 index = 0; index < MAX_RUNES; ++index)
-        if (newlyReady & uint8(1u << index))
-            player->AddRunePower(index);
+    // A native DK advances rune cooldowns locally in the 3.3.5a client, but
+    // class 10 does not run that hidden DK-only usability transition. The
+    // decisive clue is that relogging fixes the stale action immediately:
+    // SMSG_RESYNC_RUNES replaces the client's complete rune state (type plus
+    // remaining cooldown). Re-send that authoritative snapshot only when at
+    // least one server rune actually crosses cooldown -> ready.
+    if (newlyReady != 0)
+        player->ResyncRunes(MAX_RUNES);
 }
 
 void LearnMissingSpells(Player* player, uint32 const* spells, uint32 count)
