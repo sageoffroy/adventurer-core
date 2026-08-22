@@ -60,6 +60,16 @@ class AdventurerResourceTests(unittest.TestCase):
         self.assertNotIn("CLASS_CONTEXT_QUEST", self.source)
         self.assertNotIn("CLASS_CONTEXT_TAXI", self.source)
 
+    def test_rune_cooldown_completion_notifies_the_native_client(self) -> None:
+        self.assertIn("PLAYERHOOK_ON_AFTER_UPDATE", self.source)
+        self.assertIn("OnPlayerAfterUpdate(Player* player", self.source)
+        self.assertIn("GetRuneReadyMask(Player const* player)", self.source)
+        self.assertIn("player->GetRuneCooldown(index) == 0", self.source)
+        self.assertIn("readyMask & ~state.readyMask", self.source)
+        self.assertIn("player->AddRunePower(index)", self.source)
+        self.assertIn("runeSyncStates.erase(key)", self.source)
+        self.assertNotIn("player->ResyncRunes(MAX_RUNES)", self.source)
+
     def test_new_adventurer_starts_energy_full_and_generated_powers_empty(self) -> None:
         self.assertIn("SetPower(POWER_RAGE, 0)", self.source)
         self.assertIn("SetPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY)", self.source)
@@ -78,10 +88,11 @@ class AdventurerResourceTests(unittest.TestCase):
         self.assertIn("player->SendDirectMessage(&data)", self.source)
         self.assertNotIn("AddComboPoints(", self.source)
 
-    def test_combo_sync_state_is_removed_on_logout(self) -> None:
+    def test_runtime_sync_state_is_removed_on_logout(self) -> None:
         self.assertIn("PLAYERHOOK_ON_LOGOUT", self.source)
         self.assertIn("OnPlayerLogout(Player* player)", self.source)
-        self.assertIn("comboSyncStates.erase(player->GetGUID().GetRawValue())", self.source)
+        self.assertIn("comboSyncStates.erase(key)", self.source)
+        self.assertIn("runeSyncStates.erase(key)", self.source)
 
 
 if __name__ == "__main__":
