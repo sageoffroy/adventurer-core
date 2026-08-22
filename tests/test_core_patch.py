@@ -54,7 +54,9 @@ STAT = """    0.9830f,  // Warlock
 """
 
 ALLOWABLE = """    if ((proto->AllowableClass & getClassMask()) == 0 || (proto->AllowableRace & getRaceMask()) == 0)
+    {
         return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+    }
 X
     if ((proto->AllowableClass & getClassMask()) == 0 || (proto->AllowableRace & getRaceMask()) == 0)
         return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
@@ -157,6 +159,7 @@ class CorePatchTests(unittest.TestCase):
             first = plan(core, payload)
             self.assertEqual(len(first), 7)
             storage = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("PlayerStorage.cpp"))
+            self.assertEqual(storage.count("getClass() != CLASS_ADVENTURER) ||"), 2)
             self.assertIn("getClass() != CLASS_ADVENTURER && proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD", storage)
             self.assertIn("getClass() != CLASS_ADVENTURER && proto->Class == ITEM_CLASS_ARMOR", storage)
             self.assertIn("if (getClass() == CLASS_ADVENTURER)", storage)
