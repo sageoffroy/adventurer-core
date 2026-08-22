@@ -1,15 +1,16 @@
 -- Adventurer Core: universal resource HUD for the native class-10 Adventurer.
 --
--- The server owns the actual pools. This file only exposes them together in
--- the stock 3.3.5a UI: Mana remains the normal PlayerFrame bar; Rage, Energy
--- and Runic Power are stacked below it; the native Death Knight RuneFrame is
--- reused below the stack. Combo points deliberately stay on Blizzard's native
--- ComboFrame, which is already anchored to TargetFrame.
+-- The server owns the actual pools. This file exposes them together in the
+-- stock 3.3.5a UI: Mana remains the normal PlayerFrame bar; Rage, Energy and
+-- Runic Power are stacked below it; the native Death Knight RuneFrame is reused
+-- below the stack. Blizzard's native ComboFrame remains attached to TargetFrame.
 
 local ADVENTURER_CLASS_ID = 10
 local POWER_RAGE = 1
 local POWER_ENERGY = 3
 local POWER_RUNIC_POWER = 6
+local COMBO_PREFIX = "AdventurerCP"
+local MAX_RUNES = 6
 
 local locale = GetLocale()
 local labels
@@ -28,8 +29,8 @@ else
 end
 
 local function IsAdventurer()
-    local className, _, classId = UnitClass("player")
-    if classId == ADVENTURER_CLASS_ID then
+    local className, classToken, classId = UnitClass("player")
+    if classId == ADVENTURER_CLASS_ID or classToken == "ADVENTURER" then
         return true
     end
 
@@ -60,7 +61,7 @@ local function CreateResourceBar(name, powerId)
     bar.powerId = powerId
     bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
     bar:SetFrameStrata("LOW")
-    bar:SetHeight(10)
+    bar:SetHeight(11)
     bar:SetWidth(119)
 
     local r, g, b = GetPowerColor(powerId)
@@ -116,13 +117,13 @@ local function PositionBars()
     end
 
     rageBar:ClearAllPoints()
-    rageBar:SetPoint("TOPLEFT", PlayerFrameManaBar, "BOTTOMLEFT", 0, -1)
+    rageBar:SetPoint("TOPLEFT", PlayerFrameManaBar, "BOTTOMLEFT", 0, -2)
 
     energyBar:ClearAllPoints()
-    energyBar:SetPoint("TOPLEFT", rageBar, "BOTTOMLEFT", 0, -1)
+    energyBar:SetPoint("TOPLEFT", rageBar, "BOTTOMLEFT", 0, -2)
 
     runicBar:ClearAllPoints()
-    runicBar:SetPoint("TOPLEFT", energyBar, "BOTTOMLEFT", 0, -1)
+    runicBar:SetPoint("TOPLEFT", energyBar, "BOTTOMLEFT", 0, -2)
 end
 
 local function RefreshRunes()
@@ -132,11 +133,11 @@ local function RefreshRunes()
 
     RuneFrame:ClearAllPoints()
     RuneFrame:SetScale(0.85)
-    RuneFrame:SetPoint("TOPLEFT", runicBar, "BOTTOMLEFT", 2, -4)
+    RuneFrame:SetPoint("TOPLEFT", runicBar, "BOTTOMLEFT", 2, -6)
     RuneFrame:Show()
 
     if RuneButton_Update then
-        for index = 1, 6 do
+        for index = 1, MAX_RUNES do
             local button = _G["RuneButtonIndividual" .. index]
             if button then
                 RuneButton_Update(button, button:GetID(), true)
@@ -159,6 +160,91 @@ local function PlayerIsUsingVehicleUI()
     return UnitHasVehicleUI and UnitHasVehicleUI("player")
 end
 
+-- ---------------------------------------------------------------------------
+-- Combo points
+-- ---------------------------------------------------------------------------
+-- The 3.3.5a client deliberately returns zero from GetComboPoints for classes
+-- other than Rogue/Druid. AzerothCore still tracks combo points for Adventurer,
+-- so the server mirrors the visible count through AdventurerCP. We only replace
+-- the player->target query used by Blizzard's own ComboFrame; every other call
+-- continues to use the original API.
+local nativeGetComboPoints = GetComboPoints
+local adventurerComboPoints = 0
+
+GetComboPoints = function(unit, target)
+    if IsAdventurer() and unit == "player" and target == "target" then
+        return adventurerComboPoints
+    end
+    return nativeGetComboPoints(unit, target)
+end
+
+local function SetVisibleComboPoints(points)
+    adventurerComboPoints = tonumber(points) or 0
+    if adventurerComboPoints < 0 then
+        adventurerComboPoints = 0
+    elseif adventurerComboPoints > 5 then
+        adventurerComboPoints = 5
+    end
+
+    if ComboFrame_Update then
+        ComboFrame_Update()
+    end
+end
+
+-- ---------------------------------------------------------------------------
+-- Rune usability
+-- ---------------------------------------------------------------------------
+-- RuneFrame polls GetRuneCooldown itself, so its cooldown sweep can finish even
+-- when the action bar never receives ACTIONBAR_UPDATE_USABLE for class 10. Poll
+-- the six native runes too; only when their ready mask changes do we ask the
+-- stock action buttons to recalculate IsUsableAction.
+local lastRuneReadyMask = -1
+
+local function GetRuneReadyMask()
+    local mask = 0
+    for index = 1, MAX_RUNES do
+        local _, _, ready = GetRuneCooldown(index)
+        if ready then
+            mask = mask + (2 ^ (index - 1))
+        end
+    end
+    return mask
+end
+
+local actionButtonPrefixes = {
+    "ActionButton",
+    "MultiBarBottomLeftButton",
+    "MultiBarBottomRightButton",
+    "MultiBarRightButton",
+    "MultiBarLeftButton",
+    "BonusActionButton",
+}
+
+local function RefreshActionButtonUsability()
+    if not ActionButton_UpdateUsable then
+        return
+    end
+
+    for _, prefix in ipairs(actionButtonPrefixes) do
+        for index = 1, 12 do
+            local button = _G[prefix .. index]
+            if button and button.action and HasAction(button.action) then
+                ActionButton_UpdateUsable(button)
+            end
+        end
+    end
+end
+
+local function RefreshRuneActionUsability()
+    local mask = GetRuneReadyMask()
+    if mask == lastRuneReadyMask then
+        return
+    end
+
+    lastRuneReadyMask = mask
+    RefreshActionButtonUsability()
+end
+
 local function RefreshAdventurerResources()
     if not IsAdventurer() then
         return
@@ -178,11 +264,8 @@ local function RefreshAdventurerResources()
     energyBar:Show()
     runicBar:Show()
     RefreshRunes()
+    RefreshRuneActionUsability()
 
-    -- Blizzard's ComboFrame is intentionally left native. The core sends the
-    -- normal SMSG_UPDATE_COMBO_POINTS packet, and stock ComboFrame is already
-    -- attached to TargetFrame, so a generated combo point belongs over the
-    -- enemy rather than in this player-resource stack.
     if ComboFrame_Update then
         ComboFrame_Update()
     end
@@ -196,11 +279,37 @@ AdventurerResourceFrame:RegisterEvent("UNIT_DISPLAYPOWER")
 AdventurerResourceFrame:RegisterEvent("UNIT_ENTERED_VEHICLE")
 AdventurerResourceFrame:RegisterEvent("UNIT_EXITED_VEHICLE")
 AdventurerResourceFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+AdventurerResourceFrame:RegisterEvent("CHAT_MSG_ADDON")
+AdventurerResourceFrame:RegisterEvent("RUNE_POWER_UPDATE")
 
-AdventurerResourceFrame:SetScript("OnEvent", function(self, event, unit)
-    if unit and unit ~= "player" and event ~= "PLAYER_TARGET_CHANGED" then
+AdventurerResourceFrame:SetScript("OnEvent", function(self, event, ...)
+    if event == "CHAT_MSG_ADDON" then
+        local prefix, message = ...
+        if IsAdventurer() and prefix == COMBO_PREFIX then
+            SetVisibleComboPoints(message)
+        end
         return
     end
+
+    if event == "PLAYER_ENTERING_WORLD" then
+        if RegisterAddonMessagePrefix then
+            RegisterAddonMessagePrefix(COMBO_PREFIX)
+        end
+        SetVisibleComboPoints(0)
+        lastRuneReadyMask = -1
+    elseif event == "PLAYER_TARGET_CHANGED" then
+        -- Hide stale points immediately; the server sends the correct count for
+        -- the new selected target on its next 100 ms sync tick.
+        SetVisibleComboPoints(0)
+    elseif event == "RUNE_POWER_UPDATE" then
+        RefreshRuneActionUsability()
+    else
+        local unit = ...
+        if unit and unit ~= "player" then
+            return
+        end
+    end
+
     RefreshAdventurerResources()
 end)
 
@@ -225,8 +334,9 @@ AdventurerResourceFrame:SetScript("OnUpdate", function(self, elapsed)
     UpdateBar(runicBar)
 
     -- PlayerFrame can change width/anchors when vehicle or other Blizzard art
-    -- changes. Reassert the simple stack without replacing any stock texture.
+    -- changes. Reassert the stack without replacing any stock texture.
     PositionBars()
+    RefreshRuneActionUsability()
 
     if not rageBar:IsShown() then
         rageBar:Show()
