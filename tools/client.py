@@ -15,7 +15,9 @@ from mpq import write_mpq
 from talents import patch_talent_directory
 
 ROOT = Path(__file__).resolve().parent.parent
-BASELINE = ROOT / "client" / "baseline" / "CharacterCreate.lua"
+CHARACTER_CREATE_BASELINE = ROOT / "client" / "baseline" / "CharacterCreate.lua"
+FRAME_XML_BASELINE = ROOT / "client" / "baseline" / "FrameXML.toc"
+ADVENTURER_RESOURCES = ROOT / "client" / "AdventurerResources.lua"
 DEFAULT_LOCALE = "esMX"
 PROJECT_SUFFIX = "Z"
 OWNER_MANIFEST = ".adventurer-core.json"
@@ -64,9 +66,11 @@ def replace_lua_function(text: str, start_marker: str, next_marker: str, replace
 
 
 def build_character_create_lua() -> bytes:
-    if not BASELINE.is_file():
-        raise ClientError(f"Missing bundled CharacterCreate baseline: {BASELINE}")
-    text = BASELINE.read_text(encoding="utf-8")
+    if not CHARACTER_CREATE_BASELINE.is_file():
+        raise ClientError(
+            f"Missing bundled CharacterCreate baseline: {CHARACTER_CREATE_BASELINE}"
+        )
+    text = CHARACTER_CREATE_BASELINE.read_text(encoding="utf-8")
 
     marker = "local TECHNICAL_CLASS_ID = 1; -- Warrior; hidden from the player."
     if marker not in text:
@@ -165,6 +169,52 @@ end""",
     return text.encode("utf-8")
 
 
+def build_frame_xml_toc() -> bytes:
+    if not FRAME_XML_BASELINE.is_file():
+        raise ClientError(f"Missing bundled FrameXML baseline: {FRAME_XML_BASELINE}")
+
+    text = FRAME_XML_BASELINE.read_text(encoding="utf-8")
+    marker = "RuneFrame.xml\nEasyMenu.lua"
+    replacement = "RuneFrame.xml\nAdventurerResources.lua\nEasyMenu.lua"
+
+    if replacement in text:
+        raise ClientError("FrameXML baseline must remain pristine")
+    if text.count(marker) != 1:
+        raise ClientError(
+            "FrameXML baseline is not the expected 3.3.5a revision: "
+            f"RuneFrame/EasyMenu anchor count={text.count(marker)}"
+        )
+
+    return text.replace(marker, replacement, 1).encode("utf-8")
+
+
+def build_adventurer_resources_lua() -> bytes:
+    if not ADVENTURER_RESOURCES.is_file():
+        raise ClientError(f"Missing Adventurer resource HUD: {ADVENTURER_RESOURCES}")
+
+    payload = ADVENTURER_RESOURCES.read_bytes()
+    required = (
+        b"ADVENTURER_CLASS_ID = 10",
+        b"AdventurerResourceFrame",
+        b"AdventurerRageBar",
+        b"AdventurerEnergyBar",
+        b"AdventurerRunicPowerBar",
+        b"RuneFrame:SetPoint",
+    )
+    missing = [token.decode("ascii") for token in required if token not in payload]
+    if missing:
+        raise ClientError(
+            "Adventurer resource HUD is missing required contract markers: "
+            + ", ".join(missing)
+        )
+    if b"GetComboPoints =" in payload:
+        raise ClientError(
+            "Adventurer resource HUD must not replace Blizzard GetComboPoints; "
+            "the native TargetFrame ComboFrame stays authoritative"
+        )
+    return payload
+
+
 def patch_dbc_copy(source: Path, work: Path) -> dict[str, bool]:
     missing = [name for name in DBC_SOURCE_NAMES if not (source / name).is_file()]
     if missing:
@@ -179,6 +229,8 @@ def patch_dbc_copy(source: Path, work: Path) -> dict[str, bool]:
 def build_archive_files(work: Path) -> tuple[dict[str, bytes], dict[str, bytes]]:
     root_files = {
         "Interface\\GlueXML\\CharacterCreate.lua": build_character_create_lua(),
+        "Interface\\FrameXML\\FrameXML.toc": build_frame_xml_toc(),
+        "Interface\\FrameXML\\AdventurerResources.lua": build_adventurer_resources_lua(),
         **{
             f"DBFilesClient\\{name}": (work / name).read_bytes()
             for name in ROOT_SHARED_DBCS
@@ -238,6 +290,8 @@ def build_patch(dbc_source: Path, output: Path, locale: str = DEFAULT_LOCALE) ->
         "locale_patch": str(locale_patch.relative_to(output)),
         "locale_sha256": sha256(locale_patch),
         "character_create_sha256": hashlib.sha256(build_character_create_lua()).hexdigest(),
+        "frame_xml_toc_sha256": hashlib.sha256(build_frame_xml_toc()).hexdigest(),
+        "resource_hud_sha256": hashlib.sha256(build_adventurer_resources_lua()).hexdigest(),
     }
     (output / "manifest.json").write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
