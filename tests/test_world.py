@@ -34,7 +34,12 @@ class WorldUpdateTests(unittest.TestCase):
             self.assertFalse(changed_again)
             self.assertEqual(world.verify(core), target)
 
-    def test_refuses_to_overwrite_different_pending_update(self):
+            removed_target, removed = world.remove(core)
+            self.assertEqual(removed_target, target)
+            self.assertTrue(removed)
+            self.assertFalse(target.exists())
+
+    def test_refuses_to_overwrite_or_remove_different_pending_update(self):
         with tempfile.TemporaryDirectory() as td:
             core = self.make_core(Path(td) / "core")
             target = core / world.WORLD_UPDATE_RELATIVE
@@ -42,6 +47,16 @@ class WorldUpdateTests(unittest.TestCase):
 
             with self.assertRaises(world.WorldUpdateError):
                 world.install(core)
+            with self.assertRaises(world.WorldUpdateError):
+                world.remove(core)
+
+    def test_official_clean_apply_installs_and_verify_checks_world_updates(self):
+        apply_text = (ROOT / "apply.sh").read_text(encoding="utf-8")
+        verify_text = (ROOT / "verify.sh").read_text(encoding="utf-8")
+
+        self.assertIn('tools/world.py" install', apply_text)
+        self.assertIn('tools/world.py" verify', verify_text)
+        self.assertIn("fresh apply never depends on remembering that extra step", apply_text)
 
 
 if __name__ == "__main__":
