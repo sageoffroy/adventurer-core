@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """Read-only comparison of native WotLK class chassis data from the World DB.
 
-The report intentionally reads the same World-DB mirror tables AzerothCore loads
-for base class stats and crit/regen curves.  It also shows naked HP/mana using
-the exact WotLK stamina/intellect rules and, for Adventurer, the runtime crit
-result used by the class-10 core patch: 95% of the best complete native formula
-for the Adventurer's current base Agility/Intellect.
+The report reads the same World-DB mirror tables AzerothCore uses for base class
+stats and crit/regen curves. It also shows naked HP/mana using the exact WotLK
+stamina/intellect rules and, for Adventurer, the runtime crit result used by the
+class-10 core patch: 95% of the best complete native formula for the
+Adventurer's current base Agility/Intellect.
+
+Death Knight has no player_class_stats rows below level 55, but its DBC crit
+curves still exist and the runtime class-10 formula evaluates every native DBC
+slot. Therefore crit curves are queried independently from player_class_stats so
+level-1 audits exactly mirror the core instead of failing on the missing DK stat
+row.
 
 No database rows are modified.
 """
@@ -62,6 +68,16 @@ class ChassisRow:
     regen_hp: float
     regen_hp_per_spirit: float
     regen_mp_per_spirit: float
+
+
+@dataclass(frozen=True)
+class CritCurveRow:
+    player_class: int
+    level: int
+    melee_crit_base: float
+    melee_crit_ratio: float
+    spell_crit_base: float
+    spell_crit_ratio: float
 
 
 def parse_levels(raw: str) -> tuple[int, ...]:
@@ -140,6 +156,39 @@ ORDER BY pcs.`Level`, pcs.`Class`
 """.strip()
 
 
+def _union_values(values: tuple[int, ...], alias: str) -> str:
+    first, *rest = values
+    parts = [f"SELECT {first} AS `{alias}`"]
+    parts.extend(f"SELECT {value}" for value in rest)
+    return "\n        UNION ALL ".join(parts)
+
+
+def build_native_crit_query(levels: tuple[int, ...]) -> str:
+    classes = _union_values(NATIVE_CLASSES, "player_class")
+    requested_levels = _union_values(levels, "level")
+    return f"""
+SELECT
+    classes.`player_class`, levels.`level`,
+    COALESCE(mcb.`Data`, 0), COALESCE(mc.`Data`, 0),
+    COALESCE(scb.`Data`, 0), COALESCE(sc.`Data`, 0)
+FROM (
+        {classes}
+) classes
+CROSS JOIN (
+        {requested_levels}
+) levels
+LEFT JOIN `gtchancetomeleecritbase_dbc` mcb
+    ON mcb.`ID` = classes.`player_class` - 1
+LEFT JOIN `gtchancetomeleecrit_dbc` mc
+    ON mc.`ID` = (classes.`player_class` - 1) * 100 + levels.`level` - 1
+LEFT JOIN `gtchancetospellcritbase_dbc` scb
+    ON scb.`ID` = classes.`player_class` - 1
+LEFT JOIN `gtchancetospellcrit_dbc` sc
+    ON sc.`ID` = (classes.`player_class` - 1) * 100 + levels.`level` - 1
+ORDER BY levels.`level`, classes.`player_class`
+""".strip()
+
+
 def parse_row(raw: list[str]) -> ChassisRow:
     if len(raw) != 16:
         raise AuditError(f"Expected 16 columns from chassis query, got {len(raw)}")
@@ -163,12 +212,26 @@ def parse_row(raw: list[str]) -> ChassisRow:
     )
 
 
-def adventurer_runtime_crits(row: ChassisRow, level_rows: list[ChassisRow]) -> tuple[float, float]:
-    native = [candidate for candidate in level_rows if candidate.player_class in NATIVE_CLASSES]
-    if len(native) != len(NATIVE_CLASSES):
-        missing = sorted(set(NATIVE_CLASSES) - {candidate.player_class for candidate in native})
+def parse_crit_curve_row(raw: list[str]) -> CritCurveRow:
+    if len(raw) != 6:
+        raise AuditError(f"Expected 6 columns from native crit query, got {len(raw)}")
+    return CritCurveRow(
+        player_class=int(raw[0]),
+        level=int(raw[1]),
+        melee_crit_base=float(raw[2]),
+        melee_crit_ratio=float(raw[3]),
+        spell_crit_base=float(raw[4]),
+        spell_crit_ratio=float(raw[5]),
+    )
+
+
+def adventurer_runtime_crits(row: ChassisRow, crit_rows: list[CritCurveRow]) -> tuple[float, float]:
+    native = [candidate for candidate in crit_rows if candidate.level == row.level]
+    found_classes = {candidate.player_class for candidate in native}
+    if found_classes != set(NATIVE_CLASSES):
+        missing = sorted(set(NATIVE_CLASSES) - found_classes)
         raise AuditError(
-            f"Level {row.level} is missing native class row(s) required for runtime comparison: {missing}"
+            f"Level {row.level} is missing native DBC crit curve(s) required for runtime comparison: {missing}"
         )
     melee = max(
         crit_percent(candidate.melee_crit_base, candidate.melee_crit_ratio, row.agility)
@@ -181,7 +244,7 @@ def adventurer_runtime_crits(row: ChassisRow, level_rows: list[ChassisRow]) -> t
     return melee, spell
 
 
-def derived_values(row: ChassisRow, level_rows: list[ChassisRow]) -> dict[str, float]:
+def derived_values(row: ChassisRow, crit_rows: list[CritCurveRow]) -> dict[str, float]:
     hp = row.base_hp + health_bonus_from_stamina(row.stamina)
     mana = row.base_mana + mana_bonus_from_intellect(row.intellect, row.base_mana)
     melee_dbc = crit_percent(row.melee_crit_base, row.melee_crit_ratio, row.agility)
@@ -189,7 +252,7 @@ def derived_values(row: ChassisRow, level_rows: list[ChassisRow]) -> dict[str, f
     melee_runtime = melee_dbc
     spell_runtime = spell_dbc
     if row.player_class == ADVENTURER_CLASS:
-        melee_runtime, spell_runtime = adventurer_runtime_crits(row, level_rows)
+        melee_runtime, spell_runtime = adventurer_runtime_crits(row, crit_rows)
     return {
         "hp": hp,
         "mana": mana,
@@ -200,7 +263,7 @@ def derived_values(row: ChassisRow, level_rows: list[ChassisRow]) -> dict[str, f
     }
 
 
-def format_table(rows: list[ChassisRow], level: int) -> str:
+def format_table(rows: list[ChassisRow], crit_rows: list[CritCurveRow], level: int) -> str:
     level_rows = [row for row in rows if row.level == level]
     if not level_rows:
         return f"LEVEL {level}: no rows found"
@@ -212,7 +275,7 @@ def format_table(rows: list[ChassisRow], level: int) -> str:
     )
     lines = [f"LEVEL {level}", header, "-" * len(header)]
     for row in level_rows:
-        derived = derived_values(row, level_rows)
+        derived = derived_values(row, crit_rows)
         lines.append(
             f"{CLASS_NAMES.get(row.player_class, str(row.player_class)):<12} "
             f"{derived['hp']:>6.0f} {derived['mana']:>6.0f} "
@@ -224,7 +287,9 @@ def format_table(rows: list[ChassisRow], level: int) -> str:
     return "\n".join(lines)
 
 
-def load_rows(core: Path, explicit_conf: Path | None, levels: tuple[int, ...]) -> tuple[Path, object, list[ChassisRow]]:
+def load_rows(
+    core: Path, explicit_conf: Path | None, levels: tuple[int, ...]
+) -> tuple[Path, object, list[ChassisRow], list[CritCurveRow]]:
     conf = resolve_conf(core, explicit_conf)
     world = read_database_info(conf, "WorldDatabaseInfo")
     validate_connection(world)
@@ -232,7 +297,15 @@ def load_rows(core: Path, explicit_conf: Path | None, levels: tuple[int, ...]) -
     rows = [parse_row(raw) for raw in raw_rows]
     if not rows:
         raise AuditError("World DB returned no player_class_stats rows for the requested levels")
-    return conf, world, rows
+
+    raw_crit_rows = query_rows(world, build_native_crit_query(levels))
+    crit_rows = [parse_crit_curve_row(raw) for raw in raw_crit_rows]
+    expected = len(NATIVE_CLASSES) * len(levels)
+    if len(crit_rows) != expected:
+        raise AuditError(
+            f"World DB returned {len(crit_rows)} native crit curve rows; expected {expected}"
+        )
+    return conf, world, rows, crit_rows
 
 
 def parser() -> argparse.ArgumentParser:
@@ -250,17 +323,20 @@ def main() -> int:
     args = parser().parse_args()
     try:
         levels = parse_levels(args.levels)
-        conf, world, rows = load_rows(args.core_dir.expanduser().resolve(), args.worldserver_conf, levels)
+        conf, world, rows, crit_rows = load_rows(
+            args.core_dir.expanduser().resolve(), args.worldserver_conf, levels
+        )
         print("Adventurer chassis audit (read-only)")
         print(f"config: {conf}")
         print(f"world DB: {world.database}")
         print("M.Crit/S.Crit = runtime formula; M.DBC/S.DBC = this class's DB slot formula.")
         print("For native classes those pairs are equal. For Adventurer they intentionally differ after the full-formula fix.")
+        print("Death Knight has no stat row below 55; its DBC crit curve is still included in Adventurer runtime comparisons.")
         print()
         for index, level in enumerate(levels):
             if index:
                 print()
-            print(format_table(rows, level))
+            print(format_table(rows, crit_rows, level))
         return 0
     except (AuditError, DatabaseError, OSError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
