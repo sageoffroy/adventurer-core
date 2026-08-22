@@ -12,6 +12,13 @@ constexpr uint32 SPELL_BROWN_HORSE = 458;
 constexpr uint32 SPELL_DUAL_WIELD = 674;
 constexpr uint32 APPRENTICE_RIDING_VALUE = 75;
 
+// Rage and Runic Power are stored at ten times the value shown by the 3.3.5a
+// client. Energy is stored 1:1. These are the same native pool sizes used by
+// SpellDraft's proven classless-resource implementation.
+constexpr uint32 ADVENTURER_MAX_RAGE = 1000;
+constexpr uint32 ADVENTURER_MAX_ENERGY = 100;
+constexpr uint32 ADVENTURER_MAX_RUNIC_POWER = 1000;
+
 constexpr uint32 UNIVERSAL_SKILLS[] =
 {
     43, 44, 45, 46, 54, 55, 95, 136, 160, 162, 172, 173, 176,
@@ -128,6 +135,29 @@ void SetRacialLanguages(Player* player)
     }
 }
 
+void ApplyUniversalResources(Player* player, bool initializeCurrent = false)
+{
+    if (!IsAdventurer(player))
+        return;
+
+    // Mana remains the Adventurer's native primary pool and therefore keeps
+    // AzerothCore's normal class/stat scaling. Auxiliary pools are always
+    // available so abilities from every native class can spend/generate them.
+    if (player->GetMaxPower(POWER_RAGE) < ADVENTURER_MAX_RAGE)
+        player->SetMaxPower(POWER_RAGE, ADVENTURER_MAX_RAGE);
+    if (player->GetMaxPower(POWER_ENERGY) < ADVENTURER_MAX_ENERGY)
+        player->SetMaxPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY);
+    if (player->GetMaxPower(POWER_RUNIC_POWER) < ADVENTURER_MAX_RUNIC_POWER)
+        player->SetMaxPower(POWER_RUNIC_POWER, ADVENTURER_MAX_RUNIC_POWER);
+
+    if (initializeCurrent)
+    {
+        player->SetPower(POWER_RAGE, 0);
+        player->SetPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY);
+        player->SetPower(POWER_RUNIC_POWER, 0);
+    }
+}
+
 void ApplyRuntimeCapabilities(Player* player)
 {
     uint32 allWeapons = (1u << MAX_ITEM_SUBCLASS_WEAPON) - 1u;
@@ -138,6 +168,7 @@ void ApplyRuntimeCapabilities(Player* player)
     player->SetCanParry(true);
     player->SetCanBlock(true);
     player->UpdateDefenseBonusesMod();
+    ApplyUniversalResources(player);
 }
 
 void FinalizeNewAdventurer(Player* player)
@@ -154,6 +185,7 @@ void FinalizeNewAdventurer(Player* player)
     LearnRacialBaseline(player);
     SetRacialLanguages(player);
     ApplyRuntimeCapabilities(player);
+    ApplyUniversalResources(player, true);
 
     // PLAYERHOOK_ON_CREATE runs after AzerothCore's original creation
     // transaction. Persist the completed class baseline before the temporary
@@ -169,7 +201,10 @@ public:
     {
         PLAYERHOOK_ON_CREATE,
         PLAYERHOOK_ON_LOGIN,
-        PLAYERHOOK_ON_LEVEL_CHANGED
+        PLAYERHOOK_ON_LEVEL_CHANGED,
+        PLAYERHOOK_ON_AFTER_UPDATE_MAX_POWER,
+        PLAYERHOOK_ON_PLAYER_HAS_ACTIVE_POWER_TYPE,
+        PLAYERHOOK_ON_PLAYER_IS_CLASS
     }) { }
 
     void OnPlayerCreate(Player* player) override
@@ -187,6 +222,62 @@ public:
     {
         if (IsAdventurer(player))
             ApplyRuntimeCapabilities(player);
+    }
+
+    void OnPlayerAfterUpdateMaxPower(Player* player, Powers& power, float& value) override
+    {
+        if (!IsAdventurer(player))
+            return;
+
+        // Preserve a native-sized floor for every auxiliary pool while still
+        // allowing talents/auras to increase that pool above the baseline.
+        switch (power)
+        {
+            case POWER_RAGE:
+                value = std::max(value, static_cast<float>(ADVENTURER_MAX_RAGE));
+                break;
+            case POWER_ENERGY:
+                value = std::max(value, static_cast<float>(ADVENTURER_MAX_ENERGY));
+                break;
+            case POWER_RUNIC_POWER:
+                value = std::max(value, static_cast<float>(ADVENTURER_MAX_RUNIC_POWER));
+                break;
+            default:
+                break;
+        }
+    }
+
+    bool OnPlayerHasActivePowerType(Player const* player, Powers power) override
+    {
+        if (!IsAdventurer(player))
+            return false;
+        if (player->getPowerType() == power)
+            return false; // Native Mana continues through AzerothCore's stock path.
+
+        switch (power)
+        {
+            case POWER_RAGE:
+            case POWER_ENERGY:
+            case POWER_RUNIC_POWER:
+                return player->GetMaxPower(power) > 0;
+            default:
+                return false;
+        }
+    }
+
+    Optional<bool> OnPlayerIsClass(Player const* player, Classes playerClass, ClassContext context) override
+    {
+        if (!IsAdventurer(player))
+            return std::nullopt;
+
+        // Rune storage, rune cooldown regeneration, Runic Power handling and
+        // rune-cost checks all use the deliberately narrow ABILITY context in
+        // AzerothCore. Treating Adventurer as DK only there gives it native
+        // runes without inheriting DK starting levels, quests, taxis, etc.
+        if (playerClass == CLASS_DEATH_KNIGHT && context == CLASS_CONTEXT_ABILITY)
+            return true;
+
+        return std::nullopt;
     }
 };
 
