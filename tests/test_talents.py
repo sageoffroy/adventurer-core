@@ -11,7 +11,11 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from dbc import ADVENTURER_CLASS_MASK, DBC, u32, set_u32  # noqa: E402
 from talents import (  # noqa: E402
+    SPELL_DESCRIPTION_START,
+    SPELL_EFFECT_APPLY_AURA_FIELDS,
     SPELL_EFFECT_BASEPOINT_FIELDS,
+    SPELL_EFFECT_FIELDS,
+    SPELL_EFFECT_TRIGGER_SPELL_FIELDS,
     SPELL_ICON_FIELD,
     SPELL_NAME_START,
     TALENT_RANK_FIELDS,
@@ -69,7 +73,8 @@ class TalentGeneratorTests(unittest.TestCase):
         next_native_spell = 10000
         for definition in self.spec["talents"]:
             source_talent = int(definition["source_talent_id"])
-            rank_count = 3 if definition.get("spell_source_id") else 2
+            effect_lengths = [len(values) for values in definition.get("effect_values", {}).values()]
+            rank_count = max(effect_lengths) if effect_lengths else (3 if definition.get("spell_source_id") else 2)
             rank_ids = list(range(next_native_spell, next_native_spell + rank_count))
             next_native_spell += rank_count
             values = {
@@ -85,7 +90,18 @@ class TalentGeneratorTests(unittest.TestCase):
             }
             for rank_index, spell_id in enumerate(rank_ids):
                 values[4 + rank_index] = spell_id
-                spell_rows.append(row(234, {0: spell_id, 4: 0x11 + rank_index, 133: 1, 225: 1}))
+                spell_values = {0: spell_id, 4: 0x11 + rank_index, 133: 1, 225: 1}
+                if definition["key"] == "shield_discipline":
+                    spell_values.update({
+                        71: 6,
+                        72: 6,
+                        80: rank_index,
+                        81: 4,
+                        95: 51,
+                        96: 42,
+                        116: 20000 + rank_index,
+                    })
+                spell_rows.append(row(234, spell_values))
             talent_rows.append(row(23, values))
 
         # Troll Regeneration source mechanic used by Cicatrization.
@@ -105,14 +121,14 @@ class TalentGeneratorTests(unittest.TestCase):
         write_dbc(self.dbc_dir / "Talent.dbc", 23, talent_rows)
         write_dbc(self.dbc_dir / "Spell.dbc", 234, spell_rows)
 
-        # Stock SpellIcon rows. Adventurer must resolve these IDs by existing
-        # Blizzard names and must not add or modify SpellIcon.dbc rows.
+        # Stock SpellIcon rows. Adventurer resolves these by existing Blizzard names.
         icon_strings = bytearray(b"\0")
         icon_rows = []
         for icon_id, name in (
-            (501, "Ability_Butcher_Exsanguination"),
-            (502, "Ability_Butcher_Heavyhanded"),
-            (503, "Ability_Butcher_GushingWounds"),
+            (501, "ability_warrior_intensifyrage"),
+            (502, "inv_gauntlets_12"),
+            (503, "Spell_deathknight_bloodboil"),
+            (504, "inv_misc_bone_03"),
         ):
             path = f"Interface\\Icons\\{name}".encode() + b"\0"
             offset = len(icon_strings)
@@ -157,7 +173,10 @@ class TalentGeneratorTests(unittest.TestCase):
     def test_uses_existing_stock_icons_and_cicatrization_mechanics(self) -> None:
         original_spell_icon = (self.dbc_dir / "SpellIcon.dbc").read_bytes()
         expected_icon_ids = resolve_existing_icon_ids(self.dbc_dir / "SpellIcon.dbc", self.spec)
-        self.assertEqual({k: expected_icon_ids[k] for k in (0, 1, 2)}, {0: 501, 1: 502, 2: 503})
+        self.assertEqual(
+            {k: expected_icon_ids[k] for k in (0, 1, 2, 6)},
+            {0: 501, 1: 502, 2: 503, 6: 504},
+        )
 
         patch_talent_directory(self.dbc_dir)
         self.assertEqual((self.dbc_dir / "SpellIcon.dbc").read_bytes(), original_spell_icon)
@@ -165,7 +184,7 @@ class TalentGeneratorTests(unittest.TestCase):
         talents = DBC.read(self.dbc_dir / "Talent.dbc")
         spells = DBC.read(self.dbc_dir / "Spell.dbc")
 
-        for index, icon_id in ((0, 501), (1, 502), (2, 503)):
+        for index, icon_id in ((0, 501), (1, 502), (2, 503), (6, 504)):
             talent = next(r for r in talents.records if u32(r, 0) == custom_talent_id(self.spec, index))
             rank_ids = [u32(talent, f) for f in TALENT_RANK_FIELDS if u32(talent, f)]
             for spell_id in rank_ids:
@@ -181,6 +200,26 @@ class TalentGeneratorTests(unittest.TestCase):
             self.assertEqual(u32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), displayed_value - 1)
             self.assertEqual(u32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[1]), displayed_value - 1)
             self.assertEqual(dbc_string(spells, u32(spell, SPELL_NAME_START + 7)), "Cicatrización")
+
+    def test_shield_discipline_doubles_block_and_removes_rage_proc(self) -> None:
+        patch_talent_directory(self.dbc_dir)
+        talents = DBC.read(self.dbc_dir / "Talent.dbc")
+        spells = DBC.read(self.dbc_dir / "Spell.dbc")
+
+        shield_discipline = next(r for r in talents.records if u32(r, 0) == custom_talent_id(self.spec, 7))
+        rank_ids = [u32(shield_discipline, f) for f in TALENT_RANK_FIELDS if u32(shield_discipline, f)]
+        self.assertEqual(rank_ids, [290070, 290071, 290072, 290073, 290074])
+
+        for spell_id, displayed_value in zip(rank_ids, (2, 4, 6, 8, 10)):
+            spell = next(r for r in spells.records if u32(r, 0) == spell_id)
+            self.assertEqual(u32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), displayed_value - 1)
+            self.assertEqual(u32(spell, SPELL_EFFECT_FIELDS[1]), 0)
+            self.assertEqual(u32(spell, SPELL_EFFECT_APPLY_AURA_FIELDS[1]), 0)
+            self.assertEqual(u32(spell, SPELL_EFFECT_TRIGGER_SPELL_FIELDS[1]), 0)
+            self.assertEqual(
+                dbc_string(spells, u32(spell, SPELL_DESCRIPTION_START + 7)),
+                "Aumenta un $s1% tu probabilidad de bloquear ataques con un escudo.",
+            )
 
     def test_replaces_stock_prerequisites_with_adventurer_prerequisites(self) -> None:
         patch_talent_directory(self.dbc_dir)
