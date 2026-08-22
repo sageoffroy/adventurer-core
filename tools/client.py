@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import hashlib
 import json
 import shutil
@@ -17,7 +16,6 @@ from talents import patch_talent_directory
 
 ROOT = Path(__file__).resolve().parent.parent
 BASELINE = ROOT / "client" / "baseline" / "CharacterCreate.lua"
-ICON_DIR = ROOT / "client" / "icons"
 DEFAULT_LOCALE = "esMX"
 PROJECT_SUFFIX = "Z"
 OWNER_MANIFEST = ".adventurer-core.json"
@@ -33,14 +31,17 @@ TALENT_DBCS = (
     "TalentTab.dbc",
     "Talent.dbc",
     "Spell.dbc",
-    "SpellIcon.dbc",
 )
+# SpellIcon.dbc is read only to resolve existing Blizzard icon IDs by name. It is
+# never modified or packaged by Adventurer Core.
+TALENT_SOURCE_ONLY_DBCS = ("SpellIcon.dbc",)
 DBC_NAMES = CLASS_DBCS + TALENT_DBCS
+DBC_SOURCE_NAMES = DBC_NAMES + TALENT_SOURCE_ONLY_DBCS
 
 # Native talents are one atomic client bundle. Some 3.3.5a client patch stacks
 # can resolve DBFilesClient data from root and locale archives differently.
-# Keeping the exact same talent DBC bytes in both Z archives avoids split state
-# where the tree exists but its cloned spell/icon rows come from stock DBCs.
+# Keeping the exact same TalentTab/Talent/Spell bytes in both Z archives avoids
+# a split state where the tree exists but its cloned spell rows come from stock.
 ROOT_SHARED_DBCS = TALENT_DBCS
 
 
@@ -164,30 +165,11 @@ end""",
     return text.encode("utf-8")
 
 
-def load_custom_icon_assets() -> dict[str, bytes]:
-    if not ICON_DIR.is_dir():
-        return {}
-    result: dict[str, bytes] = {}
-    for source in sorted(ICON_DIR.glob("*.blp.b64")):
-        name = source.name.removesuffix(".blp.b64")
-        try:
-            payload = base64.b64decode(source.read_text(encoding="ascii").strip(), validate=True)
-        except ValueError as exc:
-            raise ClientError(f"Invalid base64 icon asset: {source}") from exc
-        if not payload.startswith(b"BLP2"):
-            raise ClientError(f"Custom icon is not a BLP2 texture: {source}")
-        internal = f"Interface\\Icons\\{name}.blp"
-        if internal in result:
-            raise ClientError(f"Duplicate custom icon asset: {internal}")
-        result[internal] = payload
-    return result
-
-
 def patch_dbc_copy(source: Path, work: Path) -> dict[str, bool]:
-    missing = [name for name in DBC_NAMES if not (source / name).is_file()]
+    missing = [name for name in DBC_SOURCE_NAMES if not (source / name).is_file()]
     if missing:
         raise ClientError("DBC source is incomplete: " + ", ".join(missing))
-    for name in DBC_NAMES:
+    for name in DBC_SOURCE_NAMES:
         shutil.copy2(source / name, work / name)
     changed = patch_directory(work)
     changed.update(patch_talent_directory(work))
@@ -195,14 +177,12 @@ def patch_dbc_copy(source: Path, work: Path) -> dict[str, bool]:
 
 
 def build_archive_files(work: Path) -> tuple[dict[str, bytes], dict[str, bytes]]:
-    icon_files = load_custom_icon_assets()
     root_files = {
         "Interface\\GlueXML\\CharacterCreate.lua": build_character_create_lua(),
         **{
             f"DBFilesClient\\{name}": (work / name).read_bytes()
             for name in ROOT_SHARED_DBCS
         },
-        **icon_files,
     }
     locale_files = {
         f"DBFilesClient\\{name}": (work / name).read_bytes()
@@ -244,7 +224,6 @@ def build_patch(dbc_source: Path, output: Path, locale: str = DEFAULT_LOCALE) ->
         for name in DBC_NAMES:
             shutil.copy2(work / name, patched_dbc_dir / name)
 
-    custom_icons = sorted(load_custom_icon_assets())
     manifest = {
         "schema": 1,
         "owner": "adventurer-core",
@@ -253,7 +232,6 @@ def build_patch(dbc_source: Path, output: Path, locale: str = DEFAULT_LOCALE) ->
         "dbc_source": str(dbc_source),
         "dbc_payload": list(DBC_NAMES),
         "root_dbc_payload": list(ROOT_SHARED_DBCS),
-        "custom_icon_payload": custom_icons,
         "dbc_changed": changed,
         "root_patch": str(root_patch.relative_to(output)),
         "root_sha256": sha256(root_patch),
@@ -426,7 +404,6 @@ def main() -> int:
             print("Adventurer client/server DBC bundle built.")
             print(f"root patch: {manifest['root_patch']}")
             print(f"locale patch: {manifest['locale_patch']}")
-            print(f"custom icons: {len(manifest['custom_icon_payload'])}")
         elif args.command == "install":
             install_server_dbcs(args.build_dir, args.server_dbc_dir)
             owner = install_patch(args.client_dir, args.build_dir, args.locale)
