@@ -144,6 +144,60 @@ def patch_player_storage(text: str) -> str:
     new = "    if (((proto->AllowableClass & getClassMask()) == 0 && getClass() != CLASS_ADVENTURER) ||\n        (proto->AllowableRace & getRaceMask()) == 0)\n        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;"
     text = replace_exact_count(text, old, new, 2, "PlayerStorage AllowableClass checks")
 
+    # Playerbots has hard class gates in addition to AllowableClass. Without
+    # these exceptions an Adventurer can know the proficiency and still be
+    # rejected before CanUseItem reaches the generic skill checks.
+    bot_relics = (
+        ("ITEM_SUBCLASS_ARMOR_IDOL", "CLASS_DRUID"),
+        ("ITEM_SUBCLASS_ARMOR_TOTEM", "CLASS_SHAMAN"),
+        ("ITEM_SUBCLASS_ARMOR_LIBRAM", "CLASS_PALADIN"),
+        ("ITEM_SUBCLASS_ARMOR_SIGIL", "CLASS_DEATH_KNIGHT"),
+    )
+    for subclass, native_class in bot_relics:
+        old_bot = (
+            f"    if (proto->Class == ITEM_CLASS_ARMOR && proto->SubClass == {subclass} && "
+            f"!IsClass({native_class}, CLASS_CONTEXT_EQUIP_RELIC))"
+        )
+        new_bot = (
+            f"    if (getClass() != CLASS_ADVENTURER && proto->Class == ITEM_CLASS_ARMOR && "
+            f"proto->SubClass == {subclass} && !IsClass({native_class}, CLASS_CONTEXT_EQUIP_RELIC))"
+        )
+        text = replace_once(text, old_bot, new_bot, f"PlayerStorage bot relic gate {subclass}")
+
+    old_shield = """        if (proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD && !(
+            IsClass(CLASS_PALADIN, CLASS_CONTEXT_EQUIP_SHIELDS)
+            || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_EQUIP_SHIELDS)
+            || IsClass(CLASS_SHAMAN, CLASS_CONTEXT_EQUIP_SHIELDS)))"""
+    new_shield = """        if (getClass() != CLASS_ADVENTURER && proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD && !(
+            IsClass(CLASS_PALADIN, CLASS_CONTEXT_EQUIP_SHIELDS)
+            || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_EQUIP_SHIELDS)
+            || IsClass(CLASS_SHAMAN, CLASS_CONTEXT_EQUIP_SHIELDS)))"""
+    text = replace_once(text, old_shield, new_shield, "PlayerStorage Adventurer shield gate")
+
+    direct_relics = (
+        ("ITEM_SUBCLASS_ARMOR_LIBRAM", "CLASS_PALADIN"),
+        ("ITEM_SUBCLASS_ARMOR_IDOL", "CLASS_DRUID"),
+        ("ITEM_SUBCLASS_ARMOR_TOTEM", "CLASS_SHAMAN"),
+        ("ITEM_SUBCLASS_ARMOR_SIGIL", "CLASS_DEATH_KNIGHT"),
+    )
+    for subclass, native_class in direct_relics:
+        old_direct = (
+            f"        if (proto->SubClass == {subclass} && "
+            f"!IsClass({native_class}, CLASS_CONTEXT_EQUIP_RELIC))"
+        )
+        new_direct = (
+            f"        if (getClass() != CLASS_ADVENTURER && proto->SubClass == {subclass} && "
+            f"!IsClass({native_class}, CLASS_CONTEXT_EQUIP_RELIC))"
+        )
+        text = replace_once(text, old_direct, new_direct, f"PlayerStorage relic gate {subclass}")
+
+    old_armor_rank = """    if (proto->Class == ITEM_CLASS_ARMOR && proto->SubClass > ITEM_SUBCLASS_ARMOR_MISC && proto->SubClass < ITEM_SUBCLASS_ARMOR_BUCKLER &&
+        proto->InventoryType != INVTYPE_CLOAK)"""
+    new_armor_rank = """    if (getClass() != CLASS_ADVENTURER && proto->Class == ITEM_CLASS_ARMOR &&
+        proto->SubClass > ITEM_SUBCLASS_ARMOR_MISC && proto->SubClass < ITEM_SUBCLASS_ARMOR_BUCKLER &&
+        proto->InventoryType != INVTYPE_CLOAK)"""
+    text = replace_once(text, old_armor_rank, new_armor_rank, "PlayerStorage Adventurer armor hierarchy")
+
     old_relic = """        case INVTYPE_RELIC:
         {
             switch (proto->SubClass)"""
