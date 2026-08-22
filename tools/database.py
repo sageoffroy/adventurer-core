@@ -128,7 +128,6 @@ def _write_defaults(path: Path, info: DatabaseInfo) -> None:
         f"port={info.port}\n"
         f"user={info.user}\n"
         f"password={password}\n"
-        f"database={info.database}\n"
         "protocol=tcp\n"
     )
     path.write_text(text, encoding="utf-8")
@@ -141,7 +140,14 @@ def _run_mysql(info: DatabaseInfo, sql: bytes, *, capture: bool = False) -> subp
         defaults = Path(td) / "client.cnf"
         _write_defaults(defaults, info)
         return subprocess.run(
-            [mysql, f"--defaults-extra-file={defaults}", "--batch", "--raw", "--skip-column-names"],
+            [
+                mysql,
+                f"--defaults-extra-file={defaults}",
+                "--batch",
+                "--raw",
+                "--skip-column-names",
+                info.database,
+            ],
             input=sql,
             stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
             stderr=subprocess.PIPE,
