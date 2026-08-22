@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import struct
 import sys
 import unittest
 from pathlib import Path
@@ -25,12 +26,16 @@ class ClientPatchTests(unittest.TestCase):
         enumerate_body = payload[enumerate_start:enumerate_end]
         self.assertNotIn("CharacterCreateClassButton", enumerate_body)
 
-    def test_mpq_writer_emits_v1_archive_and_listfile(self):
+    def test_mpq_writer_emits_v1_archive_and_listfile_block(self):
         payload = build_mpq({"Interface\\GlueXML\\Test.lua": b"print('ok')\n"})
         self.assertTrue(payload.startswith(b"MPQ\x1a"))
         self.assertIn(b"print('ok')", payload)
-        self.assertIn(b"Interface\\GlueXML\\Test.lua", payload)
-        self.assertIn(b"(listfile)", payload)
+        # The raw listfile payload lists the authored file. Its own `(listfile)`
+        # hash-table name is encrypted, so validate the archive has two blocks:
+        # the authored file plus the generated listfile.
+        self.assertIn(b"Interface\\GlueXML\\Test.lua\r\n", payload)
+        header = struct.unpack_from("<4sIIHHIIII", payload, 0)
+        self.assertEqual(header[-1], 2)
 
 
 if __name__ == "__main__":
