@@ -34,6 +34,13 @@ TALENT_DBCS = (
 )
 DBC_NAMES = CLASS_DBCS + TALENT_DBCS
 
+# Native talents are one atomic client bundle. Some 3.3.5a client patch stacks
+# can resolve DBFilesClient data from the root and locale archives differently.
+# Keeping the exact same TalentTab/Talent/Spell bytes in both Z archives avoids
+# a split state where the tree exists but its cloned spell rows come from a
+# lower-priority stock Spell.dbc.
+ROOT_SHARED_DBCS = TALENT_DBCS
+
 
 class ClientError(RuntimeError):
     pass
@@ -166,6 +173,34 @@ def patch_dbc_copy(source: Path, work: Path) -> dict[str, bool]:
     return changed
 
 
+def build_archive_files(work: Path) -> tuple[dict[str, bytes], dict[str, bytes]]:
+    root_files = {
+        "Interface\\GlueXML\\CharacterCreate.lua": build_character_create_lua(),
+        **{
+            f"DBFilesClient\\{name}": (work / name).read_bytes()
+            for name in ROOT_SHARED_DBCS
+        },
+    }
+    locale_files = {
+        f"DBFilesClient\\{name}": (work / name).read_bytes()
+        for name in DBC_NAMES
+    }
+
+    shared = set(root_files) & set(locale_files)
+    expected_shared = {
+        f"DBFilesClient\\{name}" for name in ROOT_SHARED_DBCS
+    }
+    if shared != expected_shared:
+        raise ClientError(
+            "Unexpected root/locale DBC overlap: " + ", ".join(sorted(shared))
+        )
+    for internal_name in expected_shared:
+        if root_files[internal_name] != locale_files[internal_name]:
+            raise ClientError(f"Root/locale DBC payload differs for {internal_name}")
+
+    return root_files, locale_files
+
+
 def build_patch(dbc_source: Path, output: Path, locale: str = DEFAULT_LOCALE) -> dict:
     dbc_source = dbc_source.expanduser().resolve()
     output = output.expanduser().resolve()
@@ -177,13 +212,7 @@ def build_patch(dbc_source: Path, output: Path, locale: str = DEFAULT_LOCALE) ->
 
         root_patch = output / "Data" / f"patch-{PROJECT_SUFFIX}.mpq"
         locale_patch = output / "Data" / locale / f"patch-{locale}-{PROJECT_SUFFIX.lower()}.mpq"
-        root_files = {
-            "Interface\\GlueXML\\CharacterCreate.lua": build_character_create_lua(),
-        }
-        locale_files = {
-            f"DBFilesClient\\{name}": (work / name).read_bytes()
-            for name in DBC_NAMES
-        }
+        root_files, locale_files = build_archive_files(work)
         write_mpq(root_patch, root_files)
         write_mpq(locale_patch, locale_files)
 
@@ -199,6 +228,7 @@ def build_patch(dbc_source: Path, output: Path, locale: str = DEFAULT_LOCALE) ->
         "locale": locale,
         "dbc_source": str(dbc_source),
         "dbc_payload": list(DBC_NAMES),
+        "root_dbc_payload": list(ROOT_SHARED_DBCS),
         "dbc_changed": changed,
         "root_patch": str(root_patch.relative_to(output)),
         "root_sha256": sha256(root_patch),
