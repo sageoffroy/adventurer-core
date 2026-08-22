@@ -119,6 +119,12 @@ InventoryResult Player::BotCanUseItem(ItemTemplate const* proto) const
 """
 
 PLAYER = """    if (!(pProto->AllowableClass & getClassMask()) && pProto->Bonding == BIND_WHEN_PICKED_UP && !IsGameMaster())
+        0.024211f, // Warlock
+        0.0f,      // ??
+        0.056097f  // Druid
+        0.97f / 1.15f,  // Warlock (?)
+        0.0f,           // ??
+        2.00f / 1.15f   // Druid
 """
 
 LOADER = """// This is where scripts' loading functions should be declared:
@@ -163,6 +169,16 @@ class CorePatchTests(unittest.TestCase):
             self.assertIn("getClass() != CLASS_ADVENTURER && proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD", storage)
             self.assertIn("getClass() != CLASS_ADVENTURER && proto->Class == ITEM_CLASS_ARMOR", storage)
             self.assertIn("if (getClass() == CLASS_ADVENTURER)", storage)
+
+            player = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("Player.cpp"))
+            self.assertIn("0.053292f, // Adventurer", player)
+            self.assertIn("2.00f / 1.15f,  // Adventurer", player)
+
+            stat = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("StatSystem.cpp"))
+            self.assertIn("Universal ranged baseline: 95% of Hunter's native formula", stat)
+            self.assertIn("Universal melee baseline", stat)
+            self.assertIn("145.560408f,    // Adventurer", stat)
+
             for item in first:
                 target = core / item.relative_path
                 target.parent.mkdir(parents=True, exist_ok=True)
