@@ -5,7 +5,7 @@
     {"id": 5001, "key": "champion", "source_tab_id": 161, "order": 1, "enUS": "Champion", "esMX": "Campeón"},
     {"id": 5002, "key": "scholar", "source_tab_id": 382, "order": 2, "enUS": "Scholar", "esMX": "Erudito"}
   ],
-  "spell_id_base": 81000,
+  "spell_id_base": 290000,
   "talent_id_base": 5000,
   "talents": [
     {"key":"enduring_spirit","source_talent_id":1442,"row":0,"col":0,"enUS":"Enduring Spirit","esMX":"Espíritu perdurable"},
