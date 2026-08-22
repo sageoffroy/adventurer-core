@@ -7,7 +7,6 @@
   ],
   "spell_id_base": 290000,
   "talent_id_base": 5000,
-  "spell_icon_id_base": 7000,
   "talents": [
     {"key":"enduring_spirit","source_talent_id":1442,"row":0,"col":0,"enUS":"Tenacity","esMX":"Tenacidad","icon":"Ability_Butcher_Exsanguination"},
     {"key":"guardian_strength","source_talent_id":2185,"row":0,"col":2,"enUS":"Steady Hand","esMX":"Mano firme","icon":"Ability_Butcher_Heavyhanded"},
