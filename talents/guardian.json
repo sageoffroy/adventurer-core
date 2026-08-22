@@ -35,7 +35,7 @@
 
     {"key":"arcane_adaptation","source_talent_id":1997,"row":7,"col":1,"enUS":"Arcane Adaptation","esMX":"Adaptación arcana"},
     {"key":"unshakable_presence","source_talent_id":1981,"row":7,"col":2,"enUS":"Unshakable Presence","esMX":"Presencia inquebrantable"},
-    {"key":"retaliating_shield","source_talent_id":2246,"row":7,"col":3,"enUS":"Retaliating Shield","esMX":"Escudo de represalia","requires":"shield_discipline"},
+    {"key":"retaliating_shield","source_talent_id":2246,"row":7,"col":3,"enUS":"Retaliating Shield","esMX":"Escudo de represalia"},
 
     {"key":"stalwart_mind","source_talent_id":2195,"row":8,"col":0,"enUS":"Stalwart Mind","esMX":"Mente firme"},
     {"key":"mystic_ward","source_talent_id":2194,"row":8,"col":1,"enUS":"Mystic Ward","esMX":"Resguardo místico"},
