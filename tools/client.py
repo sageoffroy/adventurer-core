@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import shutil
@@ -16,6 +17,7 @@ from talents import patch_talent_directory
 
 ROOT = Path(__file__).resolve().parent.parent
 BASELINE = ROOT / "client" / "baseline" / "CharacterCreate.lua"
+ICON_DIR = ROOT / "client" / "icons"
 DEFAULT_LOCALE = "esMX"
 PROJECT_SUFFIX = "Z"
 OWNER_MANIFEST = ".adventurer-core.json"
@@ -31,14 +33,14 @@ TALENT_DBCS = (
     "TalentTab.dbc",
     "Talent.dbc",
     "Spell.dbc",
+    "SpellIcon.dbc",
 )
 DBC_NAMES = CLASS_DBCS + TALENT_DBCS
 
 # Native talents are one atomic client bundle. Some 3.3.5a client patch stacks
-# can resolve DBFilesClient data from the root and locale archives differently.
-# Keeping the exact same TalentTab/Talent/Spell bytes in both Z archives avoids
-# a split state where the tree exists but its cloned spell rows come from a
-# lower-priority stock Spell.dbc.
+# can resolve DBFilesClient data from root and locale archives differently.
+# Keeping the exact same talent DBC bytes in both Z archives avoids split state
+# where the tree exists but its cloned spell/icon rows come from stock DBCs.
 ROOT_SHARED_DBCS = TALENT_DBCS
 
 
@@ -162,6 +164,25 @@ end""",
     return text.encode("utf-8")
 
 
+def load_custom_icon_assets() -> dict[str, bytes]:
+    if not ICON_DIR.is_dir():
+        return {}
+    result: dict[str, bytes] = {}
+    for source in sorted(ICON_DIR.glob("*.blp.b64")):
+        name = source.name.removesuffix(".blp.b64")
+        try:
+            payload = base64.b64decode(source.read_text(encoding="ascii").strip(), validate=True)
+        except ValueError as exc:
+            raise ClientError(f"Invalid base64 icon asset: {source}") from exc
+        if not payload.startswith(b"BLP2"):
+            raise ClientError(f"Custom icon is not a BLP2 texture: {source}")
+        internal = f"Interface\\Icons\\{name}.blp"
+        if internal in result:
+            raise ClientError(f"Duplicate custom icon asset: {internal}")
+        result[internal] = payload
+    return result
+
+
 def patch_dbc_copy(source: Path, work: Path) -> dict[str, bool]:
     missing = [name for name in DBC_NAMES if not (source / name).is_file()]
     if missing:
@@ -174,12 +195,14 @@ def patch_dbc_copy(source: Path, work: Path) -> dict[str, bool]:
 
 
 def build_archive_files(work: Path) -> tuple[dict[str, bytes], dict[str, bytes]]:
+    icon_files = load_custom_icon_assets()
     root_files = {
         "Interface\\GlueXML\\CharacterCreate.lua": build_character_create_lua(),
         **{
             f"DBFilesClient\\{name}": (work / name).read_bytes()
             for name in ROOT_SHARED_DBCS
         },
+        **icon_files,
     }
     locale_files = {
         f"DBFilesClient\\{name}": (work / name).read_bytes()
@@ -221,6 +244,7 @@ def build_patch(dbc_source: Path, output: Path, locale: str = DEFAULT_LOCALE) ->
         for name in DBC_NAMES:
             shutil.copy2(work / name, patched_dbc_dir / name)
 
+    custom_icons = sorted(load_custom_icon_assets())
     manifest = {
         "schema": 1,
         "owner": "adventurer-core",
@@ -229,6 +253,7 @@ def build_patch(dbc_source: Path, output: Path, locale: str = DEFAULT_LOCALE) ->
         "dbc_source": str(dbc_source),
         "dbc_payload": list(DBC_NAMES),
         "root_dbc_payload": list(ROOT_SHARED_DBCS),
+        "custom_icon_payload": custom_icons,
         "dbc_changed": changed,
         "root_patch": str(root_patch.relative_to(output)),
         "root_sha256": sha256(root_patch),
@@ -258,170 +283,163 @@ def verify_owned_file(path: Path, expected_hash: str | None, label: str) -> None
     if not path.is_file():
         raise ClientError(f"{label} is not a file: {path}")
     if not expected_hash:
-        raise ClientError(f"Refusing to overwrite unowned {label}: {path}")
+        raise ClientError(f"{label} already exists but is not owned by Adventurer Core: {path}")
     actual = sha256(path)
     if actual != expected_hash:
         raise ClientError(
-            f"Refusing to overwrite modified {label}: {path}\n"
-            f"  owned sha256: {expected_hash}\n  current sha256: {actual}"
+            f"{label} was modified outside Adventurer Core: expected {expected_hash}, got {actual}"
         )
 
 
-def existing_ownership(client: Path) -> tuple[str | None, dict | None]:
-    current = load_json(client / OWNER_MANIFEST)
-    if current:
-        if current.get("owner") != "adventurer-core":
-            raise ClientError(f"Invalid Adventurer Core owner marker: {client / OWNER_MANIFEST}")
-        return "current", current
-
-    legacy = load_json(client / LEGACY_OWNER_MANIFEST)
-    if legacy:
-        if legacy.get("owner") != "Aventureros de Azeroth / SpellDraft":
-            raise ClientError(f"Refusing unknown legacy owner marker: {client / LEGACY_OWNER_MANIFEST}")
-        return "legacy", legacy
-    return None, None
+def existing_ownership(client_dir: Path) -> tuple[Path, dict | None]:
+    modern = client_dir / OWNER_MANIFEST
+    legacy = client_dir / LEGACY_OWNER_MANIFEST
+    if modern.exists():
+        return modern, load_json(modern)
+    if legacy.exists():
+        return legacy, load_json(legacy)
+    return modern, None
 
 
-def install_patch(client: Path, build: Path, locale: str = DEFAULT_LOCALE) -> dict:
-    client = client.expanduser().resolve()
-    build = build.expanduser().resolve()
-    wow = client / "Wow.exe"
+def install_patch(client_dir: Path, build_dir: Path, locale: str = DEFAULT_LOCALE) -> dict:
+    client_dir = client_dir.expanduser().resolve()
+    build_dir = build_dir.expanduser().resolve()
+    wow = client_dir / "Wow.exe"
     if not wow.is_file():
-        wow = client / "wow.exe"
+        wow = client_dir / "wow.exe"
     if not wow.is_file():
-        raise ClientError(f"Not a WoW 3.3.5a client directory: {client}")
+        raise ClientError(f"WoW 3.3.5a client not found: {client_dir}")
 
-    build_manifest = load_json(build / "manifest.json")
-    if not build_manifest or build_manifest.get("owner") != "adventurer-core":
-        raise ClientError(f"Invalid Adventurer Core build manifest: {build / 'manifest.json'}")
-    if build_manifest.get("locale") != locale:
-        raise ClientError(
-            f"Build locale {build_manifest.get('locale')!r} does not match requested {locale!r}"
-        )
+    source_root = build_dir / "Data" / f"patch-{PROJECT_SUFFIX}.mpq"
+    source_locale = build_dir / "Data" / locale / f"patch-{locale}-{PROJECT_SUFFIX.lower()}.mpq"
+    if not source_root.is_file() or not source_locale.is_file():
+        raise ClientError(f"Built patch files missing under {build_dir}")
 
-    source_root = build / build_manifest["root_patch"]
-    source_locale = build / build_manifest["locale_patch"]
-    if sha256(source_root) != build_manifest["root_sha256"]:
-        raise ClientError("Generated root MPQ does not match build manifest")
-    if sha256(source_locale) != build_manifest["locale_sha256"]:
-        raise ClientError("Generated locale MPQ does not match build manifest")
+    data_dir = client_dir / "Data"
+    locale_dir = data_dir / locale
+    locale_dir.mkdir(parents=True, exist_ok=True)
+    target_root = data_dir / source_root.name
+    target_locale = locale_dir / source_locale.name
 
-    target_root = client / "Data" / f"patch-{PROJECT_SUFFIX}.mpq"
-    target_locale = client / "Data" / locale / f"patch-{locale}-{PROJECT_SUFFIX.lower()}.mpq"
-    target_locale.parent.mkdir(parents=True, exist_ok=True)
-
-    owner_kind, owner = existing_ownership(client)
-    if owner:
-        verify_owned_file(target_root, owner.get("root_sha256"), "root Z patch")
-        old_locale_rel = owner.get("locale_patch")
-        old_locale = client / old_locale_rel if old_locale_rel else None
-        if old_locale and old_locale.exists():
-            verify_owned_file(old_locale, owner.get("locale_sha256"), "locale Z patch")
-        if old_locale != target_locale and target_locale.exists():
-            raise ClientError(f"Requested locale target is occupied: {target_locale}")
+    owner_path, old_owner = existing_ownership(client_dir)
+    old_owner = old_owner or {}
+    verify_owned_file(target_root, old_owner.get("root_sha256"), "root Z patch")
+    old_locale_rel = old_owner.get("locale_patch")
+    if old_locale_rel:
+        old_locale = client_dir / old_locale_rel
+        verify_owned_file(old_locale, old_owner.get("locale_sha256"), "locale Z patch")
+        if old_locale != target_locale and old_locale.exists():
+            old_locale.unlink()
     else:
-        verify_owned_file(target_root, None, "root Z patch")
         verify_owned_file(target_locale, None, "locale Z patch")
-        old_locale = None
-
-    backup_dir = client / ".adventurer-core-backup"
-    backup_dir.mkdir(exist_ok=True)
-    backup_records: dict[str, str] = {}
-    for target in (target_root, target_locale):
-        if target.is_file():
-            relative = target.relative_to(client).as_posix()
-            backup = backup_dir / relative
-            backup.parent.mkdir(parents=True, exist_ok=True)
-            if not backup.exists():
-                shutil.copy2(target, backup)
-            backup_records[relative] = sha256(backup)
 
     shutil.copy2(source_root, target_root)
     shutil.copy2(source_locale, target_locale)
-
-    if owner and old_locale and old_locale != target_locale and old_locale.exists():
-        old_locale.unlink()
-
-    installed = {
+    owner = {
         "schema": 1,
         "owner": "adventurer-core",
-        "locale": locale,
-        "official_patch_family": PROJECT_SUFFIX,
-        "root_patch": target_root.relative_to(client).as_posix(),
+        "root_patch": str(target_root.relative_to(client_dir)),
         "root_sha256": sha256(target_root),
-        "locale_patch": target_locale.relative_to(client).as_posix(),
+        "locale_patch": str(target_locale.relative_to(client_dir)),
         "locale_sha256": sha256(target_locale),
-        "build_manifest_sha256": sha256(build / "manifest.json"),
-        "migrated_from": owner_kind,
-        "backups": backup_records,
     }
-    (client / OWNER_MANIFEST).write_text(
-        json.dumps(installed, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    if owner_kind == "legacy":
-        (client / LEGACY_OWNER_MANIFEST).unlink(missing_ok=True)
-
-    wdb = client / "Cache" / "WDB"
-    if wdb.exists():
-        shutil.rmtree(wdb)
-    return installed
+    modern_owner = client_dir / OWNER_MANIFEST
+    modern_owner.write_text(json.dumps(owner, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    legacy_owner = client_dir / LEGACY_OWNER_MANIFEST
+    if legacy_owner.exists() and legacy_owner != modern_owner:
+        legacy_owner.unlink()
+    return owner
 
 
-def install_server_dbcs(build: Path, server_dbc_dir: Path) -> dict[str, str]:
-    build = build.expanduser().resolve()
+def install_server_dbcs(build_dir: Path, server_dbc_dir: Path) -> dict[str, str]:
+    build_dir = build_dir.expanduser().resolve()
     server_dbc_dir = server_dbc_dir.expanduser().resolve()
-    source = build / "server-dbc"
+    source = build_dir / "server-dbc"
     if not source.is_dir():
-        raise ClientError(f"Generated server DBC directory missing: {source}")
-    server_dbc_dir.mkdir(parents=True, exist_ok=True)
-
-    hashes: dict[str, str] = {}
+        raise ClientError(f"Built server DBC directory missing: {source}")
+    if not server_dbc_dir.is_dir():
+        raise ClientError(f"Server DBC directory not found: {server_dbc_dir}")
+    result: dict[str, str] = {}
     for name in DBC_NAMES:
-        src = source / name
-        if not src.is_file():
-            raise ClientError(f"Generated server DBC missing: {src}")
-        dst = server_dbc_dir / name
-        backup = dst.with_name(dst.name + ".pre-adventurer-core.bak")
-        if dst.exists() and not backup.exists():
-            shutil.copy2(dst, backup)
-        shutil.copy2(src, dst)
-        hashes[name] = sha256(dst)
-    return hashes
+        source_file = source / name
+        if not source_file.is_file():
+            raise ClientError(f"Built server DBC missing: {source_file}")
+        target = server_dbc_dir / name
+        backup = server_dbc_dir / f"{name}.adventurer-backup"
+        if target.is_file() and not backup.exists():
+            shutil.copy2(target, backup)
+        shutil.copy2(source_file, target)
+        result[name] = sha256(target)
+    return result
+
+
+def restore_server_dbcs(server_dbc_dir: Path) -> None:
+    server_dbc_dir = server_dbc_dir.expanduser().resolve()
+    for name in DBC_NAMES:
+        target = server_dbc_dir / name
+        backup = server_dbc_dir / f"{name}.adventurer-backup"
+        if backup.is_file():
+            shutil.copy2(backup, target)
+            backup.unlink()
+
+
+def remove_client_patch(client_dir: Path) -> None:
+    client_dir = client_dir.expanduser().resolve()
+    owner_path, owner = existing_ownership(client_dir)
+    if not owner:
+        return
+    root = client_dir / owner.get("root_patch", "")
+    locale = client_dir / owner.get("locale_patch", "")
+    verify_owned_file(root, owner.get("root_sha256"), "root Z patch")
+    verify_owned_file(locale, owner.get("locale_sha256"), "locale Z patch")
+    if root.is_file():
+        root.unlink()
+    if locale.is_file():
+        locale.unlink()
+    if owner_path.is_file():
+        owner_path.unlink()
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
 
-    build_parser = sub.add_parser("build")
-    build_parser.add_argument("--dbc-src", required=True, type=Path)
-    build_parser.add_argument("--output-dir", required=True, type=Path)
-    build_parser.add_argument("--locale", default=DEFAULT_LOCALE)
+    build = sub.add_parser("build")
+    build.add_argument("--dbc-src", type=Path, required=True)
+    build.add_argument("--output-dir", type=Path, required=True)
+    build.add_argument("--locale", default=DEFAULT_LOCALE)
 
-    install_parser = sub.add_parser("install")
-    install_parser.add_argument("--client-dir", required=True, type=Path)
-    install_parser.add_argument("--build-dir", required=True, type=Path)
-    install_parser.add_argument("--server-dbc-dir", required=True, type=Path)
-    install_parser.add_argument("--locale", default=DEFAULT_LOCALE)
+    install = sub.add_parser("install")
+    install.add_argument("--client-dir", type=Path, required=True)
+    install.add_argument("--build-dir", type=Path, required=True)
+    install.add_argument("--server-dbc-dir", type=Path, required=True)
+    install.add_argument("--locale", default=DEFAULT_LOCALE)
+
+    remove = sub.add_parser("remove")
+    remove.add_argument("--client-dir", type=Path, required=True)
+    remove.add_argument("--server-dbc-dir", type=Path, required=True)
 
     args = parser.parse_args()
     try:
         if args.command == "build":
             manifest = build_patch(args.dbc_src, args.output_dir, args.locale)
             print("Adventurer client/server DBC bundle built.")
-            print(f"  root MPQ sha256:   {manifest['root_sha256']}")
-            print(f"  locale MPQ sha256: {manifest['locale_sha256']}")
-        else:
+            print(f"root patch: {manifest['root_patch']}")
+            print(f"locale patch: {manifest['locale_patch']}")
+            print(f"custom icons: {len(manifest['custom_icon_payload'])}")
+        elif args.command == "install":
             install_server_dbcs(args.build_dir, args.server_dbc_dir)
-            installed = install_patch(args.client_dir, args.build_dir, args.locale)
+            owner = install_patch(args.client_dir, args.build_dir, args.locale)
             print("Adventurer client/server DBC bundle installed.")
-            print(f"  client root: {installed['root_patch']}")
-            print(f"  client locale: {installed['locale_patch']}")
-        return 0
+            print(f"client root: {owner['root_patch']}")
+            print(f"client locale: {owner['locale_patch']}")
+        elif args.command == "remove":
+            remove_client_patch(args.client_dir)
+            restore_server_dbcs(args.server_dbc_dir)
+            print("Adventurer client/server DBC bundle removed.")
     except (ClientError, DBCError, OSError) as exc:
-        print(f"ERROR: {exc}")
-        return 1
+        parser.error(str(exc))
+    return 0
 
 
 if __name__ == "__main__":
