@@ -28,8 +28,16 @@ else
 end
 
 local function IsAdventurer()
-    local _, _, classId = UnitClass("player")
-    return classId == ADVENTURER_CLASS_ID
+    local className, _, classId = UnitClass("player")
+    if classId == ADVENTURER_CLASS_ID then
+        return true
+    end
+
+    -- The numeric class id is authoritative on normal 3.3.5a clients. Keep a
+    -- localized-name fallback for clients whose UnitClass binding omits it.
+    return className == "Adventurer"
+        or className == "Aventurero"
+        or className == "Aventurera"
 end
 
 local function GetPowerColor(powerId)
