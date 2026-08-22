@@ -24,6 +24,7 @@ from adventurer import (
     load_state,
     save_state,
     sha256_bytes,
+    sha256_file,
     validate_core_root,
     validate_runtime_inputs,
     verify_state,
@@ -48,11 +49,36 @@ def state_file_map(state: dict) -> dict[str, dict]:
     return {entry["path"]: entry for entry in state.get("files", [])}
 
 
+def verify_owned_source_state(core: Path, state: dict) -> list[str]:
+    """Verify only source/package files tracked by the original transaction.
+
+    Runtime DBCs and client MPQs are generated Adventurer artifacts and may
+    legitimately have been refreshed by tools/client.py between package
+    revisions. Their own ownership manifest is validated later by
+    validate_runtime_inputs(), and the upgrade replaces them transactionally.
+    Source/core files remain strict because overwriting local source edits would
+    make rollback ownership ambiguous.
+    """
+    problems: list[str] = []
+    for entry in state.get("files", []):
+        path = core / entry["path"]
+        if not path.is_file():
+            problems.append(f"missing: {entry['path']}")
+            continue
+        actual = sha256_file(path)
+        expected = entry.get("after_sha256")
+        if actual != expected:
+            problems.append(
+                f"modified: {entry['path']} (expected {expected}, got {actual})"
+            )
+    return problems
+
+
 def validate_installed_state(core: Path, state: dict) -> None:
-    problems = verify_state(core, state)
+    problems = verify_owned_source_state(core, state)
     if problems:
         raise UpgradeError(
-            "Refusing upgrade because the installed Adventurer state is not pristine:\n  "
+            "Refusing upgrade because Adventurer-owned source/package files changed:\n  "
             + "\n  ".join(problems)
         )
 
@@ -169,6 +195,10 @@ def apply_upgrade(args) -> None:
     validate_installed_state(core, state)
     planned = plan_owned_upgrade(core, state)
 
+    # This validates the current generated client artifacts against their own
+    # Adventurer ownership manifest. It intentionally does not compare them to
+    # the older package-state hashes, because tools/client.py may have refreshed
+    # them during normal talent development.
     server_dbc, dbc_source, client_dir = validate_runtime_inputs(
         core, args, build_smoke_test=False
     )
