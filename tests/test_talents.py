@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import struct
 import sys
 import tempfile
@@ -12,10 +11,14 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from dbc import ADVENTURER_CLASS_MASK, DBC, u32, set_u32  # noqa: E402
 from talents import (  # noqa: E402
+    SPELL_EFFECT_BASEPOINT_FIELDS,
+    SPELL_ICON_FIELD,
     SPELL_NAME_START,
+    SPELLICON_PATH_FIELD,
     TALENT_RANK_FIELDS,
     TALENTTAB_CLASS_MASK_FIELD,
     TALENTTAB_ORDER_FIELD,
+    custom_icon_id,
     custom_spell_id,
     custom_talent_id,
     load_spec,
@@ -64,35 +67,55 @@ class TalentGeneratorTests(unittest.TestCase):
             }))
         write_dbc(self.dbc_dir / "TalentTab.dbc", 24, tabs)
 
-        # Give every source talent two ranks. The actual production transform
-        # copies however many stock ranks are present; this fixture deliberately
-        # exercises multi-rank cloning without embedding retail DBC data in tests.
+        # Give ordinary source talents two ranks. Cicatrization deliberately gets
+        # three because its authored 5/10/15 progression must match production.
         talent_rows = []
         spell_rows = []
         next_native_spell = 10000
         for definition in self.spec["talents"]:
             source_talent = int(definition["source_talent_id"])
-            first_spell = next_native_spell
-            second_spell = next_native_spell + 1
-            next_native_spell += 2
-            talent_rows.append(row(23, {
+            rank_count = 3 if definition.get("spell_source_id") else 2
+            rank_ids = list(range(next_native_spell, next_native_spell + rank_count))
+            next_native_spell += rank_count
+            values = {
                 0: source_talent,
                 1: 999,
                 2: 9,
                 3: 3,
-                4: first_spell,
-                5: second_spell,
                 13: 1234,  # prove inherited prerequisite is removed
                 16: 4,
                 20: 5678,  # prove inherited required spell is removed
                 21: 99,
                 22: 88,
-            }))
-            spell_rows.append(row(234, {0: first_spell, 4: 0x11, 225: 1}))
-            spell_rows.append(row(234, {0: second_spell, 4: 0x22, 225: 1}))
+            }
+            for rank_index, spell_id in enumerate(rank_ids):
+                values[4 + rank_index] = spell_id
+                spell_rows.append(row(234, {0: spell_id, 4: 0x11 + rank_index, 133: 1, 225: 1}))
+            talent_rows.append(row(23, values))
+
+        # Racial Troll Regeneration (20555) fixture: two passive aura effects,
+        # both with displayed value 10 (Spell.dbc BasePoints stores value - 1).
+        spell_rows.append(row(234, {
+            0: 20555,
+            4: 0x33,
+            71: 6,
+            72: 6,
+            80: 9,
+            81: 9,
+            95: 88,
+            96: 89,
+            133: 1,
+            225: 1,
+        }))
 
         write_dbc(self.dbc_dir / "Talent.dbc", 23, talent_rows)
         write_dbc(self.dbc_dir / "Spell.dbc", 234, spell_rows)
+        write_dbc(
+            self.dbc_dir / "SpellIcon.dbc",
+            2,
+            [row(2, {0: 1, 1: 1})],
+            b"\0Interface\\Icons\\INV_Misc_QuestionMark\0",
+        )
 
     def tearDown(self) -> None:
         self.tmp.cleanup()
@@ -124,12 +147,46 @@ class TalentGeneratorTests(unittest.TestCase):
         self.assertEqual(rank_ids, [custom_spell_id(self.spec, 0, 0), custom_spell_id(self.spec, 0, 1)])
 
         spell = next(r for r in spells.records if u32(r, 0) == rank_ids[0])
-        self.assertEqual(dbc_string(spells, u32(spell, SPELL_NAME_START)), first["enUS"])
-        self.assertEqual(dbc_string(spells, u32(spell, SPELL_NAME_START + 7)), first["esMX"])
+        self.assertEqual(dbc_string(spells, u32(spell, SPELL_NAME_START)), "Tenacity")
+        self.assertEqual(dbc_string(spells, u32(spell, SPELL_NAME_START + 7)), "Tenacidad")
 
-        # Mechanical data survives the clone.
+        # Mechanical data survives an ordinary clone.
         self.assertEqual(u32(spell, 4), 0x11)
         self.assertEqual(u32(spell, 225), 1)
+
+    def test_authored_icons_and_cicatrization_mechanics(self) -> None:
+        patch_talent_directory(self.dbc_dir)
+        talents = DBC.read(self.dbc_dir / "Talent.dbc")
+        spells = DBC.read(self.dbc_dir / "Spell.dbc")
+        icons = DBC.read(self.dbc_dir / "SpellIcon.dbc")
+
+        expected_icons = (
+            "Ability_Butcher_Exsanguination",
+            "Ability_Butcher_Heavyhanded",
+            "Ability_Butcher_GushingWounds",
+        )
+        for index, name in enumerate(expected_icons):
+            icon_id = custom_icon_id(self.spec, index)
+            icon = next(r for r in icons.records if u32(r, 0) == icon_id)
+            self.assertEqual(
+                dbc_string(icons, u32(icon, SPELLICON_PATH_FIELD)),
+                f"Interface\\Icons\\{name}",
+            )
+            talent = next(r for r in talents.records if u32(r, 0) == custom_talent_id(self.spec, index))
+            rank_ids = [u32(talent, f) for f in TALENT_RANK_FIELDS if u32(talent, f)]
+            for spell_id in rank_ids:
+                spell = next(r for r in spells.records if u32(r, 0) == spell_id)
+                self.assertEqual(u32(spell, SPELL_ICON_FIELD), icon_id)
+
+        cicatrization = next(r for r in talents.records if u32(r, 0) == custom_talent_id(self.spec, 2))
+        rank_ids = [u32(cicatrization, f) for f in TALENT_RANK_FIELDS if u32(cicatrization, f)]
+        self.assertEqual(rank_ids, [290020, 290021, 290022])
+        for rank_index, (spell_id, displayed_value) in enumerate(zip(rank_ids, (5, 10, 15))):
+            spell = next(r for r in spells.records if u32(r, 0) == spell_id)
+            self.assertEqual(u32(spell, 4), 0x33)  # cloned from racial 20555, not Stoicism
+            self.assertEqual(u32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), displayed_value - 1)
+            self.assertEqual(u32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[1]), displayed_value - 1)
+            self.assertEqual(dbc_string(spells, u32(spell, SPELL_NAME_START + 7)), "Cicatrización")
 
     def test_replaces_stock_prerequisites_with_adventurer_prerequisites(self) -> None:
         patch_talent_directory(self.dbc_dir)
@@ -144,7 +201,7 @@ class TalentGeneratorTests(unittest.TestCase):
             else:
                 required_index = key_to_index[definition["requires"]]
                 self.assertEqual(u32(generated, 13), custom_talent_id(self.spec, required_index))
-                # The fixture has two ranks, so requiring a fully ranked parent is rank index 1.
+                # The fixture has two ranks for prerequisite parents in the current spec.
                 self.assertEqual(u32(generated, 16), 1)
             self.assertEqual(u32(generated, 20), 0)
             self.assertEqual(u32(generated, 21), 0)
@@ -155,7 +212,7 @@ class TalentGeneratorTests(unittest.TestCase):
         self.assertTrue(all(first.values()))
         snapshots = {
             name: (self.dbc_dir / name).read_bytes()
-            for name in ("TalentTab.dbc", "Talent.dbc", "Spell.dbc")
+            for name in ("TalentTab.dbc", "Talent.dbc", "Spell.dbc", "SpellIcon.dbc")
         }
 
         second = patch_talent_directory(self.dbc_dir)
@@ -163,6 +220,7 @@ class TalentGeneratorTests(unittest.TestCase):
             "TalentTab.dbc": False,
             "Talent.dbc": False,
             "Spell.dbc": False,
+            "SpellIcon.dbc": False,
         })
         for name, before in snapshots.items():
             self.assertEqual((self.dbc_dir / name).read_bytes(), before)
