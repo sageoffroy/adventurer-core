@@ -31,10 +31,14 @@ TALENTTAB_CLASS_MASK_FIELD = 20
 TALENTTAB_PET_MASK_FIELD = 21
 TALENTTAB_ORDER_FIELD = 22
 
+SPELL_EFFECT_FIELDS = (71, 72, 73)
 SPELL_EFFECT_BASEPOINT_FIELDS = (80, 81, 82)
+SPELL_EFFECT_APPLY_AURA_FIELDS = (95, 96, 97)
+SPELL_EFFECT_TRIGGER_SPELL_FIELDS = (116, 117, 118)
 SPELL_ICON_FIELD = 133
 SPELL_NAME_START = 136
 SPELL_RANK_START = 153
+SPELL_DESCRIPTION_START = 170
 SPELLICON_PATH_FIELD = 1
 
 
@@ -160,6 +164,27 @@ def apply_authored_effect_values(spell: bytearray, definition: dict, rank_index:
         set_u32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[slot], value - 1)
 
 
+def apply_authored_disabled_effects(spell: bytearray, definition: dict) -> None:
+    for raw_slot in definition.get("disable_effects", []):
+        slot = int(raw_slot)
+        if not 0 <= slot < len(SPELL_EFFECT_FIELDS):
+            raise DBCError(f"Disabled effect slot {slot} out of range for {definition['key']}")
+        set_u32(spell, SPELL_EFFECT_FIELDS[slot], 0)
+        set_u32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[slot], 0)
+        set_u32(spell, SPELL_EFFECT_APPLY_AURA_FIELDS[slot], 0)
+        set_u32(spell, SPELL_EFFECT_TRIGGER_SPELL_FIELDS[slot], 0)
+
+
+def apply_authored_description(spells: DBC, spell: bytearray, definition: dict) -> None:
+    en_us = definition.get("description_enUS")
+    es_mx = definition.get("description_esMX")
+    if en_us is None and es_mx is None:
+        return
+    if en_us is None or es_mx is None:
+        raise DBCError(f"Talent {definition['key']} must define both description_enUS and description_esMX")
+    set_localized_block(spells, spell, SPELL_DESCRIPTION_START, str(en_us), str(es_mx))
+
+
 def patch_talents_and_spells(
     talent_path: Path,
     spell_path: Path,
@@ -234,9 +259,11 @@ def patch_talents_and_spells(
                 f"Rank {rank_index + 1}",
                 f"Rango {rank_index + 1}",
             )
+            apply_authored_description(spells, cloned_spell, definition)
             if index in icon_ids:
                 set_u32(cloned_spell, SPELL_ICON_FIELD, icon_ids[index])
             apply_authored_effect_values(cloned_spell, definition, rank_index)
+            apply_authored_disabled_effects(cloned_spell, definition)
             spells.records.append(cloned_spell)
             set_u32(source, field, new_spell_id)
 
@@ -312,6 +339,14 @@ def validate_talents(dbc_dir: Path, spec: dict | None = None) -> None:
                     raise DBCError(
                         f"Talent {definition['key']} rank {rank_index + 1} effect {slot} expected {expected}, got {actual}"
                     )
+            for raw_slot in definition.get("disable_effects", []):
+                slot = int(raw_slot)
+                if u32(spell, SPELL_EFFECT_FIELDS[slot]) != 0:
+                    raise DBCError(f"Talent {definition['key']} rank {rank_index + 1} effect {slot} was not disabled")
+                if u32(spell, SPELL_EFFECT_APPLY_AURA_FIELDS[slot]) != 0:
+                    raise DBCError(f"Talent {definition['key']} rank {rank_index + 1} aura {slot} was not disabled")
+                if u32(spell, SPELL_EFFECT_TRIGGER_SPELL_FIELDS[slot]) != 0:
+                    raise DBCError(f"Talent {definition['key']} rank {rank_index + 1} trigger {slot} was not disabled")
 
 
 def patch_talent_directory(dbc_dir: Path, spec_path: Path = SPEC_PATH) -> dict[str, bool]:
