@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -30,6 +31,25 @@ class DatabaseRollbackTests(unittest.TestCase):
             public = json.dumps(info.public())
             self.assertNotIn("very-secret", public)
             self.assertNotIn("acore;", public)
+
+    def test_defaults_file_omits_database_for_mysqldump_compatibility(self):
+        info = DatabaseInfo("127.0.0.1", 3306, "acore", "secret", "acore_world")
+        with tempfile.TemporaryDirectory() as td:
+            defaults = Path(td) / "client.cnf"
+            database._write_defaults(defaults, info)
+            text = defaults.read_text(encoding="utf-8")
+        self.assertNotIn("database=", text)
+        self.assertIn("host=127.0.0.1", text)
+        self.assertIn("user=acore", text)
+
+    @patch.object(database.subprocess, "run")
+    @patch.object(database, "find_program", return_value="/usr/bin/mysql")
+    def test_mysql_selects_database_positionally(self, _find_program, run):
+        info = DatabaseInfo("127.0.0.1", 3306, "acore", "secret", "acore_world")
+        run.return_value = subprocess.CompletedProcess([], 0, stdout=b"", stderr=b"")
+        database._run_mysql(info, b"SELECT 1;\n", capture=True)
+        args = run.call_args.args[0]
+        self.assertEqual(args[-1], "acore_world")
 
     @patch.object(database, "_dump_scope")
     @patch.object(database, "count_scope")
