@@ -57,13 +57,30 @@ class AdventurerResourceTests(unittest.TestCase):
             "playerClass == CLASS_DEATH_KNIGHT && context == CLASS_CONTEXT_INIT",
             self.source,
         )
-        self.assertNotIn("CLASS_CONTEXT_QUEST)", self.source)
-        self.assertNotIn("CLASS_CONTEXT_TAXI)", self.source)
+        self.assertNotIn("CLASS_CONTEXT_QUEST", self.source)
+        self.assertNotIn("CLASS_CONTEXT_TAXI", self.source)
 
     def test_new_adventurer_starts_energy_full_and_generated_powers_empty(self) -> None:
         self.assertIn("SetPower(POWER_RAGE, 0)", self.source)
         self.assertIn("SetPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY)", self.source)
         self.assertIn("SetPower(POWER_RUNIC_POWER, 0)", self.source)
+
+    def test_combo_points_are_mirrored_to_frame_xml_without_reimplementing_backend(self) -> None:
+        self.assertIn("PLAYERHOOK_ON_UPDATE", self.source)
+        self.assertIn("OnPlayerUpdate(Player* player, uint32 diff)", self.source)
+        self.assertIn("ADVENTURER_COMBO_SYNC_INTERVAL_MS = 100", self.source)
+        self.assertIn('ADVENTURER_COMBO_PREFIX[] = "AdventurerCP"', self.source)
+        self.assertIn("player->GetComboPoints(selectedTarget)", self.source)
+        self.assertIn("CHAT_MSG_WHISPER", self.source)
+        self.assertIn("LANG_ADDON", self.source)
+        self.assertIn('std::string(ADVENTURER_COMBO_PREFIX) + "\\t"', self.source)
+        self.assertIn("player->SendDirectMessage(&data)", self.source)
+        self.assertNotIn("AddComboPoints(", self.source)
+
+    def test_combo_sync_state_is_removed_on_logout(self) -> None:
+        self.assertIn("PLAYERHOOK_ON_LOGOUT", self.source)
+        self.assertIn("OnPlayerLogout(Player* player)", self.source)
+        self.assertIn("comboSyncStates.erase(player->GetGUID().GetRawValue())", self.source)
 
 
 if __name__ == "__main__":
