@@ -17,4 +17,4 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
       - name: Check shell entry points
-        run: bash -n apply.sh preflight.sh verify.sh rollback.sh
+        run: bash -n apply.sh preflight.sh verify.sh rollback.sh update.sh
