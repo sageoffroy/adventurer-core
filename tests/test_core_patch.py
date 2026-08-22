@@ -119,12 +119,78 @@ InventoryResult Player::BotCanUseItem(ItemTemplate const* proto) const
 """
 
 PLAYER = """    if (!(pProto->AllowableClass & getClassMask()) && pProto->Bonding == BIND_WHEN_PICKED_UP && !IsGameMaster())
+
+float Player::GetMeleeCritFromAgility()
+{
+    uint8 level = GetLevel();
+    uint32 pclass = getClass();
+
+    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+    GtChanceToMeleeCritBaseEntry const* critBase  = sGtChanceToMeleeCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToMeleeCritEntry     const* critRatio = sGtChanceToMeleeCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);
+    if (!critBase || !critRatio)
+        return 0.0f;
+    return (critBase->base + GetStat(STAT_AGILITY) * critRatio->ratio) * 100.0f;
+}
+
+void Player::GetDodgeFromAgility(float& diminishing, float& nondiminishing)
+{
+    const float dodge_base[MAX_CLASSES] =
+    {
+        0.036640f, // Warrior
+        0.034943f, // Paladin
+        -0.040873f, // Hunter
+        0.020957f, // Rogue
+        0.034178f, // Priest
+        0.036640f, // DK
+        0.021080f, // Shaman
+        0.036587f, // Mage
         0.024211f, // Warlock
         0.0f,      // ??
         0.056097f  // Druid
+    };
+    const float crit_to_dodge[MAX_CLASSES] =
+    {
+        0.85f / 1.15f,  // Warrior
+        1.00f / 1.15f,  // Paladin
+        1.11f / 1.15f,  // Hunter
+        2.00f / 1.15f,  // Rogue
+        1.00f / 1.15f,  // Priest
+        0.85f / 1.15f,  // DK
+        1.60f / 1.15f,  // Shaman
+        1.00f / 1.15f,  // Mage
         0.97f / 1.15f,  // Warlock (?)
         0.0f,           // ??
         2.00f / 1.15f   // Druid
+    };
+    uint8 level = GetLevel();
+    uint32 pclass = getClass();
+    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+    GtChanceToMeleeCritEntry const* dodgeRatio = sGtChanceToMeleeCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);
+    if (!dodgeRatio || pclass > MAX_CLASSES)
+        return;
+    float base_agility = GetCreateStat(STAT_AGILITY) * GetPctModifierValue(UnitMods(UNIT_MOD_STAT_START + AsUnderlyingType(STAT_AGILITY)), BASE_PCT);
+    float bonus_agility = GetStat(STAT_AGILITY) - base_agility;
+    // calculate diminishing (green in char screen) and non-diminishing (white) contribution
+    diminishing = 100.0f * bonus_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1];
+    nondiminishing = 100.0f * (dodge_base[pclass - 1] + base_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1]);
+}
+
+float Player::GetSpellCritFromIntellect()
+{
+    uint8 level = GetLevel();
+    uint32 pclass = getClass();
+
+    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+    GtChanceToSpellCritBaseEntry const* critBase  = sGtChanceToSpellCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToSpellCritEntry     const* critRatio = sGtChanceToSpellCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);
+    if (!critBase || !critRatio)
+        return 0.0f;
+    return (critBase->base + GetStat(STAT_INTELLECT) * critRatio->ratio) * 100.0f;
+}
 """
 
 LOADER = """// This is where scripts' loading functions should be declared:
@@ -171,8 +237,14 @@ class CorePatchTests(unittest.TestCase):
             self.assertIn("if (getClass() == CLASS_ADVENTURER)", storage)
 
             player = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("Player.cpp"))
-            self.assertIn("0.053292f, // Adventurer", player)
-            self.assertIn("2.00f / 1.15f,  // Adventurer", player)
+            self.assertIn("runtime compares complete native formulas", player)
+            self.assertIn("for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)", player)
+            self.assertIn("nativeBase->base + GetStat(STAT_AGILITY) * nativeRatio->ratio", player)
+            self.assertIn("nativeBase->base + GetStat(STAT_INTELLECT) * nativeRatio->ratio", player)
+            self.assertIn("candidateTotal = candidateDiminishing + candidateNondiminishing", player)
+            self.assertGreaterEqual(player.count("bestCrit * 0.95f"), 2)
+            self.assertIn("bestDiminishing * 0.95f", player)
+            self.assertIn("bestNondiminishing * 0.95f", player)
 
             stat = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("StatSystem.cpp"))
             self.assertIn("Universal ranged baseline: 95% of Hunter's native formula", stat)
@@ -187,6 +259,27 @@ class CorePatchTests(unittest.TestCase):
             second = plan(core, payload)
             for item in second:
                 self.assertEqual(item.original, item.patched, item.relative_path)
+
+    def test_accepts_previous_adventurer_dodge_table_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            core = Path(td)
+            payload = self.make_tree(core)
+            path = core / "src/server/game/Entities/Player/Player.cpp"
+            text = path.read_text(encoding="utf-8")
+            text = text.replace(
+                "        0.024211f, // Warlock\n        0.0f,      // ??\n        0.056097f  // Druid",
+                "        0.024211f, // Warlock\n        0.053292f, // Adventurer: 95% of Druid's strongest native base dodge\n        0.056097f  // Druid",
+            )
+            text = text.replace(
+                "        0.97f / 1.15f,  // Warlock (?)\n        0.0f,           // ??\n        2.00f / 1.15f   // Druid",
+                "        0.97f / 1.15f,  // Warlock (?)\n        2.00f / 1.15f,  // Adventurer; its class-10 crit curve already carries the 95% scale\n        2.00f / 1.15f   // Druid",
+            )
+            path.write_text(text, encoding="utf-8")
+
+            planned = plan(core, payload)
+            player = next(item.patched.decode("utf-8") for item in planned if item.relative_path.endswith("Player.cpp"))
+            self.assertIn("runtime compares complete native formulas", player)
+            self.assertIn("runtime branch keeps native formulas intact", player)
 
     def test_partial_allowable_class_patch_is_rejected(self):
         with tempfile.TemporaryDirectory() as td:
