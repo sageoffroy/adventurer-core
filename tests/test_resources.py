@@ -60,15 +60,16 @@ class AdventurerResourceTests(unittest.TestCase):
         self.assertNotIn("CLASS_CONTEXT_QUEST", self.source)
         self.assertNotIn("CLASS_CONTEXT_TAXI", self.source)
 
-    def test_rune_cooldown_completion_notifies_the_native_client(self) -> None:
+    def test_rune_cooldown_completion_resyncs_the_native_client(self) -> None:
         self.assertIn("PLAYERHOOK_ON_AFTER_UPDATE", self.source)
         self.assertIn("OnPlayerAfterUpdate(Player* player", self.source)
         self.assertIn("GetRuneReadyMask(Player const* player)", self.source)
         self.assertIn("player->GetRuneCooldown(index) == 0", self.source)
         self.assertIn("readyMask & ~state.readyMask", self.source)
-        self.assertIn("player->AddRunePower(index)", self.source)
+        self.assertIn("if (newlyReady != 0)", self.source)
+        self.assertIn("player->ResyncRunes(MAX_RUNES)", self.source)
+        self.assertNotIn("player->AddRunePower(index)", self.source)
         self.assertIn("runeSyncStates.erase(key)", self.source)
-        self.assertNotIn("player->ResyncRunes(MAX_RUNES)", self.source)
 
     def test_new_adventurer_starts_energy_full_and_generated_powers_empty(self) -> None:
         self.assertIn("SetPower(POWER_RAGE, 0)", self.source)
