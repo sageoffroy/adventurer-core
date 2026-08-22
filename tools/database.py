@@ -8,15 +8,16 @@ by the class-10 bootstrap, and produces a deterministic rollback SQL file.
 
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass
 import hashlib
 import json
-import os
 from pathlib import Path
 import re
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 
 
@@ -25,6 +26,13 @@ class DatabaseError(RuntimeError):
 
 
 MIGRATION_NAME = "rev_1787358000000000000.sql"
+STATE_DIR_NAME = ".adventurer-core"
+STATE_FILE = "state.json"
+STAGE_DIR_NAME = ".adventurer-core-db-stage"
+ATTACHED_DIR_NAME = "database"
+METADATA_FILE = "metadata.json"
+SNAPSHOT_FILE = "world-before.sql"
+DEFAULT_CONF_RELATIVE = "env/dist/etc/worldserver.conf"
 
 # Every world-DB row range touched by sql/world/001_adventurer.sql, plus the
 # AzerothCore updater marker it creates after applying that pending update.
@@ -113,8 +121,6 @@ def find_program(candidates: tuple[str, ...]) -> str:
 
 
 def _write_defaults(path: Path, info: DatabaseInfo) -> None:
-    # Quotes in MySQL option files are parsed as value delimiters, not shell
-    # syntax. Escape the two characters that can alter the line itself.
     password = info.password.replace("\\", "\\\\").replace("\n", "\\n")
     text = (
         "[client]\n"
@@ -287,8 +293,6 @@ def restore_world_snapshot(info: DatabaseInfo, path: Path, metadata: dict) -> No
 
 def adventurer_character_count(info: DatabaseInfo) -> int:
     validate_connection(info)
-    # Include soft-deleted characters as well. Removing class-10 support while a
-    # recoverable class-10 row exists makes a later restore unsafe.
     raw = query_scalar(info, "SELECT COUNT(*) FROM `characters` WHERE `class` = 10")
     try:
         return int(raw)
@@ -298,3 +302,226 @@ def adventurer_character_count(info: DatabaseInfo) -> int:
 
 def database_metadata_json(metadata: dict) -> str:
     return json.dumps(metadata, indent=2, sort_keys=True) + "\n"
+
+
+def resolve_conf(core: Path, explicit: Path | None) -> Path:
+    return (explicit.expanduser().resolve() if explicit else (core / DEFAULT_CONF_RELATIVE).resolve())
+
+
+def state_dir(core: Path) -> Path:
+    return core / STATE_DIR_NAME
+
+
+def stage_dir(core: Path) -> Path:
+    return core / STAGE_DIR_NAME
+
+
+def attached_dir(core: Path) -> Path:
+    return state_dir(core) / ATTACHED_DIR_NAME
+
+
+def load_metadata(directory: Path) -> dict:
+    path = directory / METADATA_FILE
+    if not path.is_file():
+        raise DatabaseError(f"Database rollback metadata missing: {path}")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise DatabaseError(f"Invalid database rollback metadata: {exc}") from exc
+
+
+def ensure_excluded(core: Path) -> None:
+    result = subprocess.run(
+        ["git", "-C", str(core), "rev-parse", "--git-path", "info/exclude"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+    )
+    path = Path(result.stdout.strip())
+    if not path.is_absolute():
+        path = core / path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    entry = f"/{STAGE_DIR_NAME}/"
+    if entry not in text.splitlines():
+        with path.open("a", encoding="utf-8") as handle:
+            if text and not text.endswith("\n"):
+                handle.write("\n")
+            handle.write(entry + "\n")
+
+
+def resolve_databases(core: Path, conf_arg: Path | None) -> tuple[Path, DatabaseInfo, DatabaseInfo]:
+    conf = resolve_conf(core, conf_arg)
+    world = read_database_info(conf, "WorldDatabaseInfo")
+    characters = read_database_info(conf, "CharacterDatabaseInfo")
+    return conf, world, characters
+
+
+def validate_character_baseline(characters: DatabaseInfo) -> None:
+    count = adventurer_character_count(characters)
+    if count:
+        raise DatabaseError(
+            f"Found {count} existing class-10 character row(s) before installation. "
+            "Refusing to create a rollback baseline over an already contaminated character DB."
+        )
+
+
+def cmd_preflight(args) -> None:
+    core = args.core_dir.expanduser().resolve()
+    conf, world, characters = resolve_databases(core, args.worldserver_conf)
+    validate_connection(world)
+    validate_connection(characters)
+    validate_character_baseline(characters)
+    find_program(("mysql", "mariadb"))
+    find_program(("mysqldump", "mariadb-dump"))
+    with tempfile.TemporaryDirectory(prefix="adventurer-db-preflight-") as td:
+        metadata = create_world_snapshot(world, Path(td) / SNAPSHOT_FILE)
+    print("Database rollback preflight OK")
+    print(f"  config:      {conf}")
+    print(f"  world DB:    {world.database}")
+    print(f"  character DB:{characters.database}")
+    print(f"  scopes:      {len(metadata['scopes'])}")
+    print("  no database rows changed")
+
+
+def cmd_prepare(args) -> None:
+    core = args.core_dir.expanduser().resolve()
+    if state_dir(core).exists():
+        raise DatabaseError(
+            f"Adventurer Core state already exists: {state_dir(core)}. Verify or rollback first."
+        )
+    stage = stage_dir(core)
+    if stage.exists():
+        raise DatabaseError(
+            f"Interrupted database snapshot stage already exists: {stage}. "
+            "Do not delete it blindly; finalize/inspect the interrupted install first."
+        )
+
+    conf, world, characters = resolve_databases(core, args.worldserver_conf)
+    validate_connection(world)
+    validate_connection(characters)
+    validate_character_baseline(characters)
+    ensure_excluded(core)
+    stage.mkdir(parents=True)
+    try:
+        metadata = create_world_snapshot(world, stage / SNAPSHOT_FILE)
+        metadata["worldserver_conf"] = str(conf)
+        metadata["characters_database"] = characters.public()
+        metadata["initial_adventurer_character_rows"] = 0
+        (stage / METADATA_FILE).write_text(database_metadata_json(metadata), encoding="utf-8")
+    except Exception:
+        shutil.rmtree(stage, ignore_errors=True)
+        raise
+    print("Database rollback snapshot prepared.")
+    print(f"  snapshot sha256: {metadata['snapshot_sha256']}")
+
+
+def cmd_finalize(args) -> None:
+    core = args.core_dir.expanduser().resolve()
+    stage = stage_dir(core)
+    if not stage.exists():
+        return
+    state = state_dir(core)
+    if not (state / STATE_FILE).is_file():
+        shutil.rmtree(stage)
+        print("Install did not create Adventurer state; temporary DB snapshot removed.")
+        return
+    target = attached_dir(core)
+    if target.exists():
+        raise DatabaseError(f"Database rollback snapshot target already exists: {target}")
+    shutil.move(str(stage), str(target))
+    print(f"Database rollback snapshot attached to {target}")
+
+
+def _load_attached(core: Path) -> tuple[Path, dict, DatabaseInfo, DatabaseInfo]:
+    directory = attached_dir(core)
+    metadata = load_metadata(directory)
+    snapshot = directory / metadata.get("snapshot_file", SNAPSHOT_FILE)
+    validate_snapshot(snapshot, metadata)
+
+    conf_raw = metadata.get("worldserver_conf")
+    if not conf_raw:
+        raise DatabaseError("Rollback metadata does not contain worldserver.conf path")
+    conf = Path(conf_raw)
+    world = read_database_info(conf, "WorldDatabaseInfo")
+    characters = read_database_info(conf, "CharacterDatabaseInfo")
+    assert_same_database(world, metadata)
+    expected_characters = metadata.get("characters_database")
+    if characters.public() != expected_characters:
+        raise DatabaseError(
+            "worldserver.conf now points at a different character database; refusing rollback. "
+            f"snapshot={expected_characters}, current={characters.public()}"
+        )
+    return snapshot, metadata, world, characters
+
+
+def cmd_verify(args) -> None:
+    core = args.core_dir.expanduser().resolve()
+    snapshot, metadata, world, characters = _load_attached(core)
+    validate_connection(world)
+    validate_connection(characters)
+    print("Database rollback snapshot verifies cleanly.")
+    print(f"  snapshot:     {snapshot}")
+    print(f"  world DB:     {world.database}")
+    print(f"  character DB: {characters.database}")
+    print(f"  sha256:       {metadata['snapshot_sha256']}")
+
+
+def cmd_can_rollback(args) -> None:
+    core = args.core_dir.expanduser().resolve()
+    _, _, world, characters = _load_attached(core)
+    validate_connection(world)
+    count = adventurer_character_count(characters)
+    if count:
+        raise DatabaseError(
+            f"Rollback blocked: {count} class-10 character row(s) still exist in "
+            f"{characters.database}. Delete/purge the Adventurer test character(s) first; "
+            "the core will not be removed underneath recoverable class-10 characters."
+        )
+    print("Database rollback guard OK: no class-10 character rows remain.")
+
+
+def cmd_restore(args) -> None:
+    core = args.core_dir.expanduser().resolve()
+    snapshot, metadata, world, characters = _load_attached(core)
+    count = adventurer_character_count(characters)
+    if count:
+        raise DatabaseError(
+            f"Rollback blocked: {count} class-10 character row(s) still exist in {characters.database}."
+        )
+    restore_world_snapshot(world, snapshot, metadata)
+    print("World database restored to the exact pre-Adventurer row set.")
+
+
+def parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="database.py")
+    sub = parser.add_subparsers(dest="command", required=True)
+    for name, func in (
+        ("preflight", cmd_preflight),
+        ("prepare", cmd_prepare),
+        ("finalize", cmd_finalize),
+        ("verify", cmd_verify),
+        ("can-rollback", cmd_can_rollback),
+        ("restore", cmd_restore),
+    ):
+        command = sub.add_parser(name)
+        command.add_argument("--core-dir", required=True, type=Path)
+        if name in {"preflight", "prepare"}:
+            command.add_argument("--worldserver-conf", type=Path)
+        command.set_defaults(func=func)
+    return parser
+
+
+def main() -> int:
+    args, _unknown = parser().parse_known_args()
+    try:
+        args.func(args)
+        return 0
+    except (DatabaseError, OSError, subprocess.CalledProcessError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
