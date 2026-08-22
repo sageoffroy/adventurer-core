@@ -39,7 +39,14 @@ struct ComboSyncState
     uint8 points = 0xFF; // impossible sentinel: force the first sync
 };
 
+struct RuneSyncState
+{
+    bool initialized = false;
+    uint8 readyMask = 0;
+};
+
 std::unordered_map<uint64, ComboSyncState> comboSyncStates;
+std::unordered_map<uint64, RuneSyncState> runeSyncStates;
 
 constexpr uint32 UNIVERSAL_SKILLS[] =
 {
@@ -122,6 +129,46 @@ void UpdateComboPointSync(Player* player, uint32 diff)
     state.selectedTarget = selectedTarget;
     state.points = visiblePoints;
     SendVisibleComboPoints(player, visiblePoints);
+}
+
+uint8 GetRuneReadyMask(Player const* player)
+{
+    uint8 mask = 0;
+    for (uint8 index = 0; index < MAX_RUNES; ++index)
+        if (player->GetRuneCooldown(index) == 0)
+            mask |= uint8(1u << index);
+    return mask;
+}
+
+void UpdateRuneClientSync(Player* player)
+{
+    if (!IsAdventurer(player) || !player->IsInWorld())
+        return;
+
+    uint64 key = player->GetGUID().GetRawValue();
+    RuneSyncState& state = runeSyncStates[key];
+    uint8 readyMask = GetRuneReadyMask(player);
+
+    if (!state.initialized)
+    {
+        state.initialized = true;
+        state.readyMask = readyMask;
+        return;
+    }
+
+    uint8 newlyReady = uint8(readyMask & ~state.readyMask);
+    state.readyMask = readyMask;
+
+    // Native Death Knights do not need a server packet when a rune cooldown
+    // reaches zero: the 3.3.5a client advances that state locally. Class 10
+    // renders the native RuneFrame but does not perform the hidden DK-only
+    // usability transition. SMSG_ADD_RUNE_POWER is Blizzard's native packet for
+    // telling the client that a rune is available, so send it only on the exact
+    // 0->ready transition. This updates the client's real spell-usability cache,
+    // not merely the visual RuneFrame.
+    for (uint8 index = 0; index < MAX_RUNES; ++index)
+        if (newlyReady & uint8(1u << index))
+            player->AddRunePower(index);
 }
 
 void LearnMissingSpells(Player* player, uint32 const* spells, uint32 count)
@@ -268,6 +315,7 @@ public:
         PLAYERHOOK_ON_LOGOUT,
         PLAYERHOOK_ON_LEVEL_CHANGED,
         PLAYERHOOK_ON_UPDATE,
+        PLAYERHOOK_ON_AFTER_UPDATE,
         PLAYERHOOK_ON_AFTER_UPDATE_MAX_POWER,
         PLAYERHOOK_ON_PLAYER_HAS_ACTIVE_POWER_TYPE,
         PLAYERHOOK_ON_PLAYER_IS_CLASS
@@ -283,18 +331,27 @@ public:
         if (IsAdventurer(player))
         {
             ApplyRuntimeCapabilities(player);
-            comboSyncStates.erase(player->GetGUID().GetRawValue());
+            uint64 key = player->GetGUID().GetRawValue();
+            comboSyncStates.erase(key);
+            runeSyncStates.erase(key);
         }
     }
 
     void OnPlayerLogout(Player* player) override
     {
-        comboSyncStates.erase(player->GetGUID().GetRawValue());
+        uint64 key = player->GetGUID().GetRawValue();
+        comboSyncStates.erase(key);
+        runeSyncStates.erase(key);
     }
 
     void OnPlayerUpdate(Player* player, uint32 diff) override
     {
         UpdateComboPointSync(player, diff);
+    }
+
+    void OnPlayerAfterUpdate(Player* player, uint32 /*diff*/) override
+    {
+        UpdateRuneClientSync(player);
     }
 
     void OnPlayerLevelChanged(Player* player, uint8 /*oldLevel*/) override
