@@ -127,6 +127,7 @@ float Player::GetMeleeCritFromAgility()
 
     if (level > GT_MAX_LEVEL)
         level = GT_MAX_LEVEL;
+
     GtChanceToMeleeCritBaseEntry const* critBase  = sGtChanceToMeleeCritBaseStore.LookupEntry(pclass - 1);
     GtChanceToMeleeCritEntry     const* critRatio = sGtChanceToMeleeCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);
     if (!critBase || !critRatio)
@@ -173,6 +174,7 @@ void Player::GetDodgeFromAgility(float& diminishing, float& nondiminishing)
         return;
     float base_agility = GetCreateStat(STAT_AGILITY) * GetPctModifierValue(UnitMods(UNIT_MOD_STAT_START + AsUnderlyingType(STAT_AGILITY)), BASE_PCT);
     float bonus_agility = GetStat(STAT_AGILITY) - base_agility;
+
     // calculate diminishing (green in char screen) and non-diminishing (white) contribution
     diminishing = 100.0f * bonus_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1];
     nondiminishing = 100.0f * (dodge_base[pclass - 1] + base_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1]);
@@ -185,6 +187,7 @@ float Player::GetSpellCritFromIntellect()
 
     if (level > GT_MAX_LEVEL)
         level = GT_MAX_LEVEL;
+
     GtChanceToSpellCritBaseEntry const* critBase  = sGtChanceToSpellCritBaseStore.LookupEntry(pclass - 1);
     GtChanceToSpellCritEntry     const* critRatio = sGtChanceToSpellCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);
     if (!critBase || !critRatio)
