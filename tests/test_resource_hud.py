@@ -59,13 +59,13 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertNotIn("SpellDraftCP", lua)
         self.assertNotIn("SpellDraft", lua)
 
-    def test_rune_ready_mask_refreshes_native_action_button_usability(self) -> None:
+    def test_rune_usability_stays_native_in_frame_xml(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
-        self.assertIn('RegisterEvent("RUNE_POWER_UPDATE")', lua)
-        self.assertIn('GetRuneCooldown(index)', lua)
-        self.assertIn('RefreshRuneActionUsability()', lua)
-        self.assertIn('ActionButton_UpdateUsable(button)', lua)
-        self.assertIn('lastRuneReadyMask', lua)
+        self.assertIn('RuneButton_Update(button, button:GetID(), true)', lua)
+        self.assertNotIn('ActionButton_UpdateUsable', lua)
+        self.assertNotIn('GetRuneReadyMask', lua)
+        self.assertNotIn('lastRuneReadyMask', lua)
+        self.assertNotIn('RegisterEvent("RUNE_POWER_UPDATE")', lua)
 
     def test_resource_hud_uses_native_class_id(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
