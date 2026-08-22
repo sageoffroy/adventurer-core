@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import struct
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from client import build_character_create_lua  # noqa: E402
+from client import DBC_NAMES, ROOT_SHARED_DBCS, build_archive_files, build_character_create_lua  # noqa: E402
 from mpq import build_mpq  # noqa: E402
 
 
@@ -25,6 +26,26 @@ class ClientPatchTests(unittest.TestCase):
         enumerate_end = payload.index("function SetCharacterRace(id)", enumerate_start)
         enumerate_body = payload[enumerate_start:enumerate_end]
         self.assertNotIn("CharacterCreateClassButton", enumerate_body)
+
+    def test_native_talent_bundle_is_identical_in_root_and_locale_archives(self):
+        with tempfile.TemporaryDirectory() as tmp_name:
+            work = Path(tmp_name)
+            for index, name in enumerate(DBC_NAMES):
+                (work / name).write_bytes(f"dbc-{index}-{name}".encode("utf-8"))
+
+            root_files, locale_files = build_archive_files(work)
+            shared = set(root_files) & set(locale_files)
+            expected = {
+                f"DBFilesClient\\{name}" for name in ROOT_SHARED_DBCS
+            }
+
+            self.assertEqual(shared, expected)
+            self.assertEqual(
+                ROOT_SHARED_DBCS,
+                ("TalentTab.dbc", "Talent.dbc", "Spell.dbc"),
+            )
+            for internal_name in expected:
+                self.assertEqual(root_files[internal_name], locale_files[internal_name])
 
     def test_mpq_writer_emits_v1_archive_and_listfile_block(self):
         payload = build_mpq({"Interface\\GlueXML\\Test.lua": b"print('ok')\n"})
