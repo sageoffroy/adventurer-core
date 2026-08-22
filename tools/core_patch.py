@@ -316,14 +316,151 @@ def patch_player_cpp(text: str) -> str:
     text = replace_once(
         text,
         "        0.024211f, // Warlock\n        0.0f,      // ??\n        0.056097f  // Druid",
-        "        0.024211f, // Warlock\n        0.053292f, // Adventurer: 95% of Druid's strongest native base dodge\n        0.056097f  // Druid",
+        "        0.024211f, // Warlock\n        0.053292f, // Adventurer: fallback only; runtime compares complete native formulas\n        0.056097f  // Druid",
         "Player Adventurer base dodge",
     )
-    return replace_once(
+    text = replace_once(
         text,
         "        0.97f / 1.15f,  // Warlock (?)\n        0.0f,           // ??\n        2.00f / 1.15f   // Druid",
-        "        0.97f / 1.15f,  // Warlock (?)\n        2.00f / 1.15f,  // Adventurer; its class-10 crit curve already carries the 95% scale\n        2.00f / 1.15f   // Druid",
+        "        0.97f / 1.15f,  // Warlock (?)\n        2.00f / 1.15f,  // Adventurer fallback; runtime branch does not mix class ingredients\n        2.00f / 1.15f   // Druid",
         "Player Adventurer agility-to-dodge coefficient",
+    )
+
+    melee_anchor = """    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+    GtChanceToMeleeCritBaseEntry const* critBase  = sGtChanceToMeleeCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToMeleeCritEntry     const* critRatio = sGtChanceToMeleeCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
+    melee_runtime = """    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+
+    if (pclass == CLASS_ADVENTURER)
+    {
+        // Compare each native class as a complete formula. Do not combine the
+        // best base from one class with the best Agility coefficient of another.
+        float bestCrit = 0.0f;
+        bool found = false;
+        for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
+        {
+            if (nativeClass == CLASS_ADVENTURER)
+                continue;
+
+            GtChanceToMeleeCritBaseEntry const* nativeBase = sGtChanceToMeleeCritBaseStore.LookupEntry(nativeClass - 1);
+            GtChanceToMeleeCritEntry const* nativeRatio = sGtChanceToMeleeCritStore.LookupEntry((nativeClass - 1) * GT_MAX_LEVEL + level - 1);
+            if (!nativeBase || !nativeRatio)
+                continue;
+
+            float candidate = nativeBase->base + GetStat(STAT_AGILITY) * nativeRatio->ratio;
+            if (!found || candidate > bestCrit)
+            {
+                bestCrit = candidate;
+                found = true;
+            }
+        }
+        return (found ? bestCrit * 0.95f : 0.0f) * 100.0f;
+    }
+
+    GtChanceToMeleeCritBaseEntry const* critBase  = sGtChanceToMeleeCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToMeleeCritEntry     const* critRatio = sGtChanceToMeleeCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
+    text = replace_once(
+        text,
+        melee_anchor,
+        melee_runtime,
+        "Player Adventurer complete melee crit formula",
+    )
+
+    dodge_anchor = """    float base_agility = GetCreateStat(STAT_AGILITY) * GetPctModifierValue(UnitMods(UNIT_MOD_STAT_START + AsUnderlyingType(STAT_AGILITY)), BASE_PCT);
+    float bonus_agility = GetStat(STAT_AGILITY) - base_agility;
+    // calculate diminishing (green in char screen) and non-diminishing (white) contribution
+    diminishing = 100.0f * bonus_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1];
+    nondiminishing = 100.0f * (dodge_base[pclass - 1] + base_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1]);"""
+    dodge_runtime = """    float base_agility = GetCreateStat(STAT_AGILITY) * GetPctModifierValue(UnitMods(UNIT_MOD_STAT_START + AsUnderlyingType(STAT_AGILITY)), BASE_PCT);
+    float bonus_agility = GetStat(STAT_AGILITY) - base_agility;
+
+    if (pclass == CLASS_ADVENTURER)
+    {
+        // Keep each native dodge model intact (base dodge + its own Agility
+        // coefficient). Pick the strongest complete model for the current
+        // character and then apply the Adventurer's 5% chassis penalty.
+        float bestDiminishing = 0.0f;
+        float bestNondiminishing = 0.0f;
+        float bestTotal = 0.0f;
+        bool found = false;
+        for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
+        {
+            if (nativeClass == CLASS_ADVENTURER)
+                continue;
+
+            GtChanceToMeleeCritEntry const* nativeRatio = sGtChanceToMeleeCritStore.LookupEntry((nativeClass - 1) * GT_MAX_LEVEL + level - 1);
+            if (!nativeRatio)
+                continue;
+
+            float candidateDiminishing = 100.0f * bonus_agility * nativeRatio->ratio * crit_to_dodge[nativeClass - 1];
+            float candidateNondiminishing = 100.0f * (dodge_base[nativeClass - 1] + base_agility * nativeRatio->ratio * crit_to_dodge[nativeClass - 1]);
+            float candidateTotal = candidateDiminishing + candidateNondiminishing;
+            if (!found || candidateTotal > bestTotal)
+            {
+                bestDiminishing = candidateDiminishing;
+                bestNondiminishing = candidateNondiminishing;
+                bestTotal = candidateTotal;
+                found = true;
+            }
+        }
+
+        diminishing = found ? bestDiminishing * 0.95f : 0.0f;
+        nondiminishing = found ? bestNondiminishing * 0.95f : 0.0f;
+        return;
+    }
+
+    // calculate diminishing (green in char screen) and non-diminishing (white) contribution
+    diminishing = 100.0f * bonus_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1];
+    nondiminishing = 100.0f * (dodge_base[pclass - 1] + base_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1]);"""
+    text = replace_once(
+        text,
+        dodge_anchor,
+        dodge_runtime,
+        "Player Adventurer complete dodge formula",
+    )
+
+    spell_anchor = """    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+    GtChanceToSpellCritBaseEntry const* critBase  = sGtChanceToSpellCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToSpellCritEntry     const* critRatio = sGtChanceToSpellCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
+    spell_runtime = """    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+
+    if (pclass == CLASS_ADVENTURER)
+    {
+        // Same rule as melee crit: compare complete native class formulas with
+        // the Adventurer's current Intellect, then keep 95% of the best result.
+        float bestCrit = 0.0f;
+        bool found = false;
+        for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
+        {
+            if (nativeClass == CLASS_ADVENTURER)
+                continue;
+
+            GtChanceToSpellCritBaseEntry const* nativeBase = sGtChanceToSpellCritBaseStore.LookupEntry(nativeClass - 1);
+            GtChanceToSpellCritEntry const* nativeRatio = sGtChanceToSpellCritStore.LookupEntry((nativeClass - 1) * GT_MAX_LEVEL + level - 1);
+            if (!nativeBase || !nativeRatio)
+                continue;
+
+            float candidate = nativeBase->base + GetStat(STAT_INTELLECT) * nativeRatio->ratio;
+            if (!found || candidate > bestCrit)
+            {
+                bestCrit = candidate;
+                found = true;
+            }
+        }
+        return (found ? bestCrit * 0.95f : 0.0f) * 100.0f;
+    }
+
+    GtChanceToSpellCritBaseEntry const* critBase  = sGtChanceToSpellCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToSpellCritEntry     const* critRatio = sGtChanceToSpellCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
+    return replace_once(
+        text,
+        spell_anchor,
+        spell_runtime,
+        "Player Adventurer complete spell crit formula",
     )
 
 
