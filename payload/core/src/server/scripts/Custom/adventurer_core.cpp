@@ -9,6 +9,7 @@ namespace
 constexpr uint32 SKILL_RIDING = 762;
 constexpr uint32 SPELL_APPRENTICE_RIDING = 33388;
 constexpr uint32 SPELL_BROWN_HORSE = 458;
+constexpr uint32 SPELL_DUAL_WIELD = 674;
 constexpr uint32 APPRENTICE_RIDING_VALUE = 75;
 
 constexpr uint32 UNIVERSAL_SKILLS[] =
@@ -22,6 +23,7 @@ constexpr uint32 UNIVERSAL_SPELLS[] =
     81,    // Dodge (Passive)
     107,   // Block
     3127,  // Parry (Passive)
+    SPELL_DUAL_WIELD,
 
     9078, 9077, 8737, 750, // Cloth, Leather, Mail, Plate
 
