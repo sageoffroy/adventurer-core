@@ -17,6 +17,8 @@ TALENTTAB_FIELDS = 24
 TALENTTAB_RECORD_SIZE = TALENTTAB_FIELDS * 4
 SPELL_FIELDS = 234
 SPELL_RECORD_SIZE = SPELL_FIELDS * 4
+SPELLICON_FIELDS = 2
+SPELLICON_RECORD_SIZE = SPELLICON_FIELDS * 4
 
 TALENT_RANK_FIELDS = tuple(range(4, 13))
 TALENT_PREREQ_TALENT_FIELDS = (13, 14, 15)
@@ -33,8 +35,11 @@ TALENTTAB_PET_MASK_FIELD = 21
 TALENTTAB_ORDER_FIELD = 22
 TALENTTAB_BACKGROUND_FIELD = 23
 
+SPELL_EFFECT_BASEPOINT_FIELDS = (80, 81, 82)
+SPELL_ICON_FIELD = 133
 SPELL_NAME_START = 136
 SPELL_RANK_START = 153
+SPELLICON_PATH_FIELD = 1
 
 
 def load_spec(path: Path = SPEC_PATH) -> dict:
@@ -94,8 +99,63 @@ def custom_talent_id(spec: dict, talent_index: int) -> int:
     return int(spec["talent_id_base"]) + talent_index
 
 
+def custom_icon_id(spec: dict, talent_index: int) -> int:
+    return int(spec["spell_icon_id_base"]) + talent_index
+
+
 def talent_rank_count(row: bytearray) -> int:
     return sum(1 for field in TALENT_RANK_FIELDS if u32(row, field) != 0)
+
+
+def patch_spell_icons(path: Path, spec: dict) -> bool:
+    icons = DBC.read(path)
+    if icons.fields != SPELLICON_FIELDS or icons.record_size != SPELLICON_RECORD_SIZE:
+        raise DBCError(f"{path}: unexpected SpellIcon layout {icons.fields}/{icons.record_size}")
+
+    before = icons.to_bytes()
+    authored = [
+        (index, definition)
+        for index, definition in enumerate(spec["talents"])
+        if definition.get("icon")
+    ]
+    owned_ids = {custom_icon_id(spec, index) for index, _ in authored}
+    icons.records = [row for row in icons.records if u32(row, 0) not in owned_ids]
+
+    for index, definition in authored:
+        row = bytearray(SPELLICON_RECORD_SIZE)
+        set_u32(row, 0, custom_icon_id(spec, index))
+        icon_path = f"Interface\\Icons\\{definition['icon']}"
+        set_u32(row, SPELLICON_PATH_FIELD, icons.append_string(icon_path))
+        icons.records.append(row)
+
+    icons.records.sort(key=lambda row: u32(row, 0))
+    after = icons.to_bytes()
+    if after != before:
+        path.write_bytes(after)
+    return after != before
+
+
+def apply_authored_effect_values(spell: bytearray, definition: dict, rank_index: int) -> None:
+    effect_values = definition.get("effect_values")
+    if not effect_values:
+        return
+
+    for raw_slot, values in effect_values.items():
+        try:
+            slot = int(raw_slot)
+        except (TypeError, ValueError) as exc:
+            raise DBCError(f"Invalid effect slot {raw_slot!r} for {definition['key']}") from exc
+        if not 0 <= slot < len(SPELL_EFFECT_BASEPOINT_FIELDS):
+            raise DBCError(f"Effect slot {slot} out of range for {definition['key']}")
+        if rank_index >= len(values):
+            raise DBCError(
+                f"Missing authored effect value for {definition['key']} rank {rank_index + 1} slot {slot}"
+            )
+        value = int(values[rank_index])
+        if value <= 0:
+            raise DBCError(f"Authored effect values must be positive for {definition['key']}")
+        # Spell.dbc stores the displayed scalar as BasePoints + 1.
+        set_u32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[slot], value - 1)
 
 
 def patch_talents_and_spells(talent_path: Path, spell_path: Path, spec: dict) -> tuple[bool, bool]:
@@ -141,14 +201,23 @@ def patch_talents_and_spells(talent_path: Path, spell_path: Path, spec: dict) ->
         set_u32(source, 3, int(definition["col"]))
 
         source_rank_ids = [u32(source, field) for field in TALENT_RANK_FIELDS]
+        rank_count = sum(1 for spell_id in source_rank_ids if spell_id)
+        effect_values = definition.get("effect_values", {})
+        for raw_slot, values in effect_values.items():
+            if len(values) != rank_count:
+                raise DBCError(
+                    f"{definition['key']} effect slot {raw_slot} has {len(values)} values for {rank_count} talent ranks"
+                )
+
         for rank_index, field in enumerate(TALENT_RANK_FIELDS):
-            native_spell_id = source_rank_ids[rank_index]
-            if not native_spell_id:
+            native_rank_spell_id = source_rank_ids[rank_index]
+            if not native_rank_spell_id:
                 set_u32(source, field, 0)
                 continue
-            native_spell = source_spells.get(native_spell_id)
+            mechanic_spell_id = int(definition.get("spell_source_id", native_rank_spell_id))
+            native_spell = source_spells.get(mechanic_spell_id)
             if native_spell is None:
-                raise DBCError(f"Spell.dbc: talent source spell {native_spell_id} not found")
+                raise DBCError(f"Spell.dbc: talent source spell {mechanic_spell_id} not found")
             new_spell_id = custom_spell_id(spec, index, rank_index)
             cloned_spell = bytearray(native_spell)
             set_u32(cloned_spell, 0, new_spell_id)
@@ -160,6 +229,9 @@ def patch_talents_and_spells(talent_path: Path, spell_path: Path, spec: dict) ->
                 f"Rank {rank_index + 1}",
                 f"Rango {rank_index + 1}",
             )
+            if definition.get("icon"):
+                set_u32(cloned_spell, SPELL_ICON_FIELD, custom_icon_id(spec, index))
+            apply_authored_effect_values(cloned_spell, definition, rank_index)
             spells.records.append(cloned_spell)
             set_u32(source, field, new_spell_id)
 
@@ -199,6 +271,7 @@ def validate_talents(dbc_dir: Path, spec: dict | None = None) -> None:
     tabs = DBC.read(dbc_dir / "TalentTab.dbc")
     talents = DBC.read(dbc_dir / "Talent.dbc")
     spells = DBC.read(dbc_dir / "Spell.dbc")
+    icons = DBC.read(dbc_dir / "SpellIcon.dbc")
 
     for tab in spec["tabs"]:
         row = record_by_id(tabs, int(tab["id"]), "TalentTab.dbc")
@@ -220,17 +293,34 @@ def validate_talents(dbc_dir: Path, spec: dict | None = None) -> None:
         rank_ids = [u32(row, field) for field in TALENT_RANK_FIELDS if u32(row, field)]
         if not rank_ids:
             raise DBCError(f"Talent {definition['key']} has no ranks")
-        for spell_id in rank_ids:
-            record_by_id(spells, spell_id, "Spell.dbc")
+
+        expected_icon_id = None
+        if definition.get("icon"):
+            expected_icon_id = custom_icon_id(spec, index)
+            record_by_id(icons, expected_icon_id, "SpellIcon.dbc")
+
+        for rank_index, spell_id in enumerate(rank_ids):
+            spell = record_by_id(spells, spell_id, "Spell.dbc")
+            if expected_icon_id is not None and u32(spell, SPELL_ICON_FIELD) != expected_icon_id:
+                raise DBCError(f"Talent {definition['key']} rank {rank_index + 1} has wrong icon")
+            for raw_slot, values in definition.get("effect_values", {}).items():
+                slot = int(raw_slot)
+                expected = int(values[rank_index]) - 1
+                actual = u32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[slot])
+                if actual != expected:
+                    raise DBCError(
+                        f"Talent {definition['key']} rank {rank_index + 1} effect {slot} expected {expected}, got {actual}"
+                    )
 
 
 def patch_talent_directory(dbc_dir: Path, spec_path: Path = SPEC_PATH) -> dict[str, bool]:
-    required = ("TalentTab.dbc", "Talent.dbc", "Spell.dbc")
+    required = ("TalentTab.dbc", "Talent.dbc", "Spell.dbc", "SpellIcon.dbc")
     missing = [name for name in required if not (dbc_dir / name).is_file()]
     if missing:
         raise DBCError("Missing talent DBC(s): " + ", ".join(missing))
     spec = load_spec(spec_path)
     tab_changed = patch_talent_tabs(dbc_dir / "TalentTab.dbc", spec)
+    icon_changed = patch_spell_icons(dbc_dir / "SpellIcon.dbc", spec)
     talent_changed, spell_changed = patch_talents_and_spells(
         dbc_dir / "Talent.dbc", dbc_dir / "Spell.dbc", spec
     )
@@ -239,6 +329,7 @@ def patch_talent_directory(dbc_dir: Path, spec_path: Path = SPEC_PATH) -> dict[s
         "TalentTab.dbc": tab_changed,
         "Talent.dbc": talent_changed,
         "Spell.dbc": spell_changed,
+        "SpellIcon.dbc": icon_changed,
     }
 
 
