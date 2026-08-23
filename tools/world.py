@@ -35,6 +35,10 @@ WORLD_UPDATES: tuple[WorldUpdate, ...] = (
         ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
         "rev_1787446800000000001.sql",
     ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "004_guardian_talents.sql",
+        "rev_1787446800000000002.sql",
+    ),
 )
 
 # Kept as aliases for older callers/tests that referenced the single-update API.
@@ -121,13 +125,7 @@ def remove(core: Path) -> list[tuple[Path, bool]]:
 
 
 def cleanup_database(core: Path, conf: Path | None = None) -> None:
-    """Remove only DB rows uniquely owned by maintenance updates 002+.
-
-    The main database rollback snapshot already restores every class-10 stat
-    range touched by 001/003. This cleanup covers the extra Last Bastion script
-    binding and the AzerothCore update markers, which older snapshots could not
-    have known about when they were created.
-    """
+    """Remove only DB rows uniquely owned by maintenance updates 002+."""
     core = validate_core(core)
     conf = (
         conf.expanduser().resolve()
@@ -138,8 +136,12 @@ def cleanup_database(core: Path, conf: Path | None = None) -> None:
     names = ", ".join("'" + update.name.replace("'", "''") + "'" for update in WORLD_UPDATES)
     sql = f"""
 DELETE FROM `spell_script_names`
-WHERE `spell_id` = 290050
-  AND `ScriptName` = 'spell_warr_last_stand';
+WHERE (`spell_id` = 290050 AND `ScriptName` = 'spell_warr_last_stand')
+   OR (`spell_id` = 290090 AND `ScriptName` = 'spell_warr_last_stand')
+   OR (`spell_id` = 290180 AND `ScriptName` = 'spell_warr_sweeping_strikes');
+
+DELETE FROM `spell_bonus_data`
+WHERE `entry` = 290240;
 
 DELETE FROM `updates`
 WHERE `name` IN ({names});
@@ -148,17 +150,23 @@ WHERE `name` IN ({names});
 
     binding_count = int(query_scalar(
         db,
-        "SELECT COUNT(*) FROM `spell_script_names` "
-        "WHERE `spell_id`=290050 AND `ScriptName`='spell_warr_last_stand'",
+        "SELECT COUNT(*) FROM `spell_script_names` WHERE "
+        "(`spell_id`=290050 AND `ScriptName`='spell_warr_last_stand') OR "
+        "(`spell_id`=290090 AND `ScriptName`='spell_warr_last_stand') OR "
+        "(`spell_id`=290180 AND `ScriptName`='spell_warr_sweeping_strikes')",
+    ))
+    bonus_count = int(query_scalar(
+        db,
+        "SELECT COUNT(*) FROM `spell_bonus_data` WHERE `entry`=290240",
     ))
     marker_count = int(query_scalar(
         db,
         f"SELECT COUNT(*) FROM `updates` WHERE `name` IN ({names})",
     ))
-    if binding_count or marker_count:
+    if binding_count or bonus_count or marker_count:
         raise WorldUpdateError(
             "Maintenance DB cleanup did not converge: "
-            f"binding={binding_count}, update_markers={marker_count}"
+            f"binding={binding_count}, bonus={bonus_count}, update_markers={marker_count}"
         )
 
 

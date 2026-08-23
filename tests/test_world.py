@@ -22,13 +22,15 @@ class WorldUpdateTests(unittest.TestCase):
             core = self.make_core(Path(td) / "core")
             results = world.install(core)
 
-            self.assertEqual(len(results), 2)
+            self.assertEqual(len(results), 3)
             self.assertTrue(all(changed for _target, changed in results))
 
             bastion = core / world.WORLD_UPDATES[0].relative
             chassis = core / world.WORLD_UPDATES[1].relative
+            guardian = core / world.WORLD_UPDATES[2].relative
             self.assertTrue(bastion.is_file())
             self.assertTrue(chassis.is_file())
+            self.assertTrue(guardian.is_file())
 
             bastion_sql = bastion.read_text(encoding="utf-8")
             self.assertIn("290050", bastion_sql)
@@ -42,18 +44,26 @@ class WorldUpdateTests(unittest.TestCase):
             self.assertIn("gtoctclasscombatratingscalar_dbc", chassis_sql)
             self.assertIn("gtregenmpperspt_dbc", chassis_sql)
 
+            guardian_sql = guardian.read_text(encoding="utf-8")
+            self.assertIn("290240", guardian_sql)
+            self.assertIn("spell_bonus_data", guardian_sql)
+            self.assertIn("0.24", guardian_sql)
+            self.assertIn("290050", guardian_sql)
+            self.assertIn("spell_warr_last_stand", guardian_sql)
+
             results_again = world.install(core)
-            self.assertEqual(len(results_again), 2)
+            self.assertEqual(len(results_again), 3)
             self.assertTrue(all(not changed for _target, changed in results_again))
 
             verified = world.verify(core)
-            self.assertEqual(verified, [bastion, chassis])
+            self.assertEqual(verified, [bastion, chassis, guardian])
 
             removed = world.remove(core)
-            self.assertEqual(len(removed), 2)
+            self.assertEqual(len(removed), 3)
             self.assertTrue(all(was_removed for _target, was_removed in removed))
             self.assertFalse(bastion.exists())
             self.assertFalse(chassis.exists())
+            self.assertFalse(guardian.exists())
 
     def test_refuses_to_overwrite_or_remove_different_pending_update(self):
         with tempfile.TemporaryDirectory() as td:
