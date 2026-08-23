@@ -2,16 +2,13 @@
 --
 -- The server owns the actual pools. This file arranges Blizzard's native
 -- PlayerFrame around the Adventurer frame art: Rage above Health, Mana below
--- Health, Energy below Mana, Runic Power vertically at the right, and native
--- Death Knight runes below the frame. Blizzard's native ComboFrame remains
--- attached to TargetFrame.
+-- Health, and Energy below Mana. Blizzard's native ComboFrame remains attached
+-- to TargetFrame.
 
 local ADVENTURER_CLASS_ID = 10
 local POWER_RAGE = 1
 local POWER_ENERGY = 3
-local POWER_RUNIC_POWER = 6
 local COMBO_PREFIX = "AdventurerCP"
-local MAX_RUNES = 6
 
 local locale = GetLocale()
 local labels
@@ -46,13 +43,6 @@ local MANA_TOP = 45
 local MANA_HEIGHT = 5
 local ENERGY_TOP = 56
 local ENERGY_HEIGHT = 6
-local RUNIC_LEFT = 225
-local RUNIC_TOP = 15
-local RUNIC_WIDTH = 16
-local RUNIC_HEIGHT = 46
-local RUNES_LEFT = 126
-local RUNES_TOP = 79
-local RUNES_SCALE = 0.90
 
 local function IsAdventurer()
     local className, classToken, classId = UnitClass("player")
@@ -115,7 +105,6 @@ end
 
 local rageBar = CreateResourceBar("AdventurerRageBar", POWER_RAGE)
 local energyBar = CreateResourceBar("AdventurerEnergyBar", POWER_ENERGY)
-local runicBar = CreateResourceBar("AdventurerRunicPowerBar", POWER_RUNIC_POWER)
 
 local frameArtOverlay = CreateFrame("Frame", "AdventurerPlayerFrameArtOverlay", UIParent)
 frameArtOverlay:SetWidth(ADVENTURER_FRAME_WIDTH)
@@ -153,12 +142,7 @@ local function UpdateBar(bar)
 
     bar:SetMinMaxValues(0, maximum)
     bar:SetValue(current)
-
-    if bar.powerId == POWER_RUNIC_POWER then
-        bar.valueText:SetText(current .. " / " .. maximum)
-    else
-        bar.valueText:SetText(labels[bar.powerId] .. " " .. current .. " / " .. maximum)
-    end
+    bar.valueText:SetText(labels[bar.powerId] .. " " .. current .. " / " .. maximum)
 end
 
 local function ApplyAdventurerPlayerFrameArt()
@@ -241,12 +225,6 @@ local function PositionAuxiliaryBars()
     energyBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", BAR_LEFT, -ENERGY_TOP)
     energyBar:SetWidth(BAR_WIDTH)
     energyBar:SetHeight(ENERGY_HEIGHT)
-
-    runicBar:ClearAllPoints()
-    runicBar:SetOrientation("VERTICAL")
-    runicBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RUNIC_LEFT, -RUNIC_TOP)
-    runicBar:SetWidth(RUNIC_WIDTH)
-    runicBar:SetHeight(RUNIC_HEIGHT)
 end
 
 local function PositionBars()
@@ -255,30 +233,9 @@ local function PositionBars()
     ApplyAdventurerPlayerFrameArt()
 end
 
-local function RefreshRunes()
-    if not RuneFrame or not PlayerFrame then
-        return
-    end
-
-    RuneFrame:ClearAllPoints()
-    RuneFrame:SetScale(RUNES_SCALE)
-    RuneFrame:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RUNES_LEFT, -RUNES_TOP)
-    RuneFrame:Show()
-
-    if RuneButton_Update then
-        for index = 1, MAX_RUNES do
-            local button = _G["RuneButtonIndividual" .. index]
-            if button then
-                RuneButton_Update(button, button:GetID(), true)
-            end
-        end
-    end
-end
-
 local function HideAdventurerResources()
     rageBar:Hide()
     energyBar:Hide()
-    runicBar:Hide()
     adventurerLevelText:Hide()
     frameArtOverlay:Hide()
 
@@ -287,10 +244,6 @@ local function HideAdventurerResources()
     end
     if PlayerLevelText then
         PlayerLevelText:Show()
-    end
-
-    if RuneFrame then
-        RuneFrame:Hide()
     end
 end
 
@@ -324,56 +277,6 @@ local function SetVisibleComboPoints(points)
     end
 end
 
--- ---------------------------------------------------------------------------
--- Rune usability
--- ---------------------------------------------------------------------------
-local lastRuneReadyMask = -1
-
-local function GetRuneReadyMask()
-    local mask = 0
-    for index = 1, MAX_RUNES do
-        local _, _, ready = GetRuneCooldown(index)
-        if ready then
-            mask = mask + (2 ^ (index - 1))
-        end
-    end
-    return mask
-end
-
-local actionButtonPrefixes = {
-    "ActionButton",
-    "MultiBarBottomLeftButton",
-    "MultiBarBottomRightButton",
-    "MultiBarRightButton",
-    "MultiBarLeftButton",
-    "BonusActionButton",
-}
-
-local function RefreshActionButtonUsability()
-    if not ActionButton_UpdateUsable then
-        return
-    end
-
-    for _, prefix in ipairs(actionButtonPrefixes) do
-        for index = 1, 12 do
-            local button = _G[prefix .. index]
-            if button and button.action and HasAction(button.action) then
-                ActionButton_UpdateUsable(button)
-            end
-        end
-    end
-end
-
-local function RefreshRuneActionUsability()
-    local mask = GetRuneReadyMask()
-    if mask == lastRuneReadyMask then
-        return
-    end
-
-    lastRuneReadyMask = mask
-    RefreshActionButtonUsability()
-end
-
 local function RefreshAdventurerResources()
     if not IsAdventurer() then
         return
@@ -387,13 +290,9 @@ local function RefreshAdventurerResources()
     PositionBars()
     UpdateBar(rageBar)
     UpdateBar(energyBar)
-    UpdateBar(runicBar)
 
     rageBar:Show()
     energyBar:Show()
-    runicBar:Show()
-    RefreshRunes()
-    RefreshRuneActionUsability()
 
     if ComboFrame_Update then
         ComboFrame_Update()
@@ -409,7 +308,6 @@ AdventurerResourceFrame:RegisterEvent("UNIT_ENTERED_VEHICLE")
 AdventurerResourceFrame:RegisterEvent("UNIT_EXITED_VEHICLE")
 AdventurerResourceFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 AdventurerResourceFrame:RegisterEvent("CHAT_MSG_ADDON")
-AdventurerResourceFrame:RegisterEvent("RUNE_POWER_UPDATE")
 
 AdventurerResourceFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "CHAT_MSG_ADDON" then
@@ -425,11 +323,8 @@ AdventurerResourceFrame:SetScript("OnEvent", function(self, event, ...)
             RegisterAddonMessagePrefix(COMBO_PREFIX)
         end
         SetVisibleComboPoints(0)
-        lastRuneReadyMask = -1
     elseif event == "PLAYER_TARGET_CHANGED" then
         SetVisibleComboPoints(0)
-    elseif event == "RUNE_POWER_UPDATE" then
-        RefreshRuneActionUsability()
     else
         local unit = ...
         if unit and unit ~= "player" then
@@ -458,17 +353,10 @@ AdventurerResourceFrame:SetScript("OnUpdate", function(self, elapsed)
 
     UpdateBar(rageBar)
     UpdateBar(energyBar)
-    UpdateBar(runicBar)
-
     PositionBars()
-    RefreshRuneActionUsability()
 
     if not rageBar:IsShown() then
         rageBar:Show()
         energyBar:Show()
-        runicBar:Show()
-    end
-    if RuneFrame and not RuneFrame:IsShown() then
-        RefreshRunes()
     end
 end)
