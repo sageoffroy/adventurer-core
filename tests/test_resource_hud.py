@@ -68,12 +68,12 @@ class AdventurerResourceHudTests(unittest.TestCase):
     def test_native_player_frame_measurements_match_reference_layout(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
         expected = (
-            'FRAME_ART_X_SHIFT = 3',
-            'RESOURCE_X_SHIFT = -3',
+            'FRAME_ART_X_SHIFT = 6',
+            'RESOURCE_X_SHIFT = 0',
             'PORTRAIT_X_SHIFT = -3',
-            'LEVEL_X_SHIFT = -5',
-            'MANA_X_SHIFT = -5',
-            'ENERGY_X_SHIFT = -5',
+            'LEVEL_X_SHIFT = -2',
+            'MANA_X_SHIFT = -2',
+            'ENERGY_X_SHIFT = -2',
             'BACKGROUND_X_SHIFT = -5',
             'NAME_X_SHIFT = 1',
             'FLASH_X_SHIFT = 0',
