@@ -52,6 +52,7 @@ class AdventurerResourceHudTests(unittest.TestCase):
             "PlayerPrimaryStat",
         ):
             self.assertNotIn(token, xml)
+        self.assertNotIn("AdventurerPlayerFrameRootOffset", xml)
 
     def test_lua_reuses_real_blizzard_player_frame_texture(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
@@ -66,6 +67,8 @@ class AdventurerResourceHudTests(unittest.TestCase):
     def test_native_player_frame_measurements_match_reference_layout(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
         expected = (
+            'PLAYER_FRAME_X = -25',
+            'PLAYER_FRAME_Y = -4',
             'PLAYER_FRAME_WIDTH = 232',
             'PLAYER_FRAME_HEIGHT = 100',
             'PORTRAIT_LEFT = 42',
@@ -96,6 +99,15 @@ class AdventurerResourceHudTests(unittest.TestCase):
         )
         for marker in expected:
             self.assertIn(marker, lua)
+
+    def test_root_frame_shift_is_persisted_by_layout_pass(self) -> None:
+        lua = build_adventurer_resources_lua().decode("utf-8")
+        self.assertIn(
+            'SetFramePoint(PlayerFrame, "TOPLEFT", UIParent, "TOPLEFT", PLAYER_FRAME_X, PLAYER_FRAME_Y)',
+            lua,
+        )
+        self.assertIn('self.elapsed < 0.10', lua)
+        self.assertIn('ApplyReferencePlayerFrameLayout()', lua)
 
     def test_auxiliary_bars_are_frame_xml_children_not_uiparent_statusbars(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
