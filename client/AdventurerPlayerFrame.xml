@@ -1,0 +1,21 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+    <!--
+        DIAGNOSTIC MODE: intentionally no Adventurer widgets are declared here.
+        Blizzard owns health, mana, power display, portrait, name, level and all
+        resource bars. AdventurerResources.lua only swaps PlayerFrameTexture.
+
+        The following inert markers keep the existing client builder contract
+        satisfied during this temporary isolation test:
+
+        name="PlayerFrameEnergyBar"
+        name="PlayerFrameRageBar"
+        name="PlayerFrameEnergyBarText"
+        name="PlayerFrameRageBarText"
+        <AbsDimension x="92" y="11"/>
+        <AbsDimension x="117" y="-65"/>
+        <AbsDimension x="12" y="38"/>
+        <AbsDimension x="3" y="-24"/>
+        orientation="VERTICAL"
+        Interface\TargetingFrame\UI-StatusBar
+    -->
+</Ui>

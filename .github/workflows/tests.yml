@@ -1,0 +1,55 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Python tools
+        run: python -m py_compile tools/*.py
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Check shell entry points
+        run: bash -n apply.sh preflight.sh verify.sh rollback.sh update.sh
+      - name: Require executable shell entry points
+        run: test -x apply.sh && test -x preflight.sh && test -x verify.sh && test -x rollback.sh && test -x update.sh
+      - name: Checkout supported Playerbots core baseline
+        uses: actions/checkout@v4
+        with:
+          repository: mod-playerbots/azerothcore-wotlk
+          ref: 9fb906bb7296212ff42fc95ff73a92aaf8554f0d
+          path: _supported-core
+          fetch-depth: 1
+      - name: Smoke-test clean core source patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / "tools"))
+          from core_patch import plan
+
+          core = (root / "_supported-core").resolve()
+          payload = (root / "payload" / "core").resolve()
+          planned = plan(core, payload)
+          runtime_rel = "src/server/scripts/Custom/adventurer_core.cpp"
+          runtime = next(item for item in planned if item.relative_path == runtime_rel)
+
+          assert len(planned) == 7
+          assert runtime.original is None
+          assert runtime.patched == (payload / runtime_rel).read_bytes()
+          text = runtime.patched.decode("utf-8")
+          assert "player->ResyncRunes(MAX_RUNES)" in text
+          assert "player->AddRunePower(index)" in text
+          assert "previousReadyMask & ~readyMask" in text
+          assert "readyMask & ~previousReadyMask" in text
+          print("Supported clean-core source patch smoke test OK")
+          PY

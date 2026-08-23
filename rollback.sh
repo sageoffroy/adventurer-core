@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+core_dir=""
+args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+    case "${args[$i]}" in
+        --core-dir)
+            if (( i + 1 < ${#args[@]} )); then
+                core_dir="${args[$((i + 1))]}"
+            fi
+            ;;
+        --core-dir=*)
+            core_dir="${args[$i]#*=}"
+            ;;
+    esac
+done
+
+if [[ -z "$core_dir" ]]; then
+    printf '%s\n' "ERROR: --core-dir is required" >&2
+    exit 2
+fi
+
+# Refuse before touching anything if the snapshot is damaged, the configured
+# databases changed, recoverable class-10 characters still exist, or an owned
+# file was edited outside Adventurer Core.
+python3 "$ROOT/tools/database.py" can-rollback "$@"
+# adventurer.py verify owns only package/source state and accepts --core-dir.
+# Do not forward runtime/client/locale arguments intended for the DB wrapper.
+python3 "$ROOT/tools/adventurer.py" verify --core-dir "$core_dir"
+
+# Restore class-10 world rows first while the original snapshot is still
+# attached to .adventurer-core.
+python3 "$ROOT/tools/database.py" restore "$@"
+
+# Updates 002+ were introduced after some existing rollback snapshots had
+# already been created. Their identifiers are package-owned, so clean them
+# explicitly and deterministically.
+python3 "$ROOT/tools/world.py" cleanup-db --core-dir "$core_dir"
+python3 "$ROOT/tools/world.py" remove --core-dir "$core_dir"
+
+# Restore original source, DBCs and client patches. This understands both the
+# original .adventurer-backup DBC suffix and the current package state.
+python3 "$ROOT/tools/package_rollback.py" "$@"
+
+printf '%s\n' "Adventurer Core fully rolled back: source, DBC, client patch, world updates, and world DB restored."
