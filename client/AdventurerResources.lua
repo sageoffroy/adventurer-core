@@ -13,6 +13,22 @@ local POWER_RUNIC_POWER = 6
 local COMBO_PREFIX = "AdventurerCP"
 local MAX_RUNES = 6
 
+local locale = GetLocale()
+local labels
+if locale == "esES" or locale == "esMX" then
+    labels = {
+        [POWER_RAGE] = "Ira",
+        [POWER_ENERGY] = "Energía",
+        [POWER_RUNIC_POWER] = "Poder rúnico",
+    }
+else
+    labels = {
+        [POWER_RAGE] = "Rage",
+        [POWER_ENERGY] = "Energy",
+        [POWER_RUNIC_POWER] = "Runic Power",
+    }
+end
+
 local ADVENTURER_FRAME_TEXTURE = "Interface\\Adventurer\\UI-AdventurerFrame"
 local ADVENTURER_FRAME_WIDTH = 248
 local ADVENTURER_FRAME_HEIGHT = 100
