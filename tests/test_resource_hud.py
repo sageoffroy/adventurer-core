@@ -30,7 +30,6 @@ class AdventurerResourceHudTests(unittest.TestCase):
     def test_resource_hud_uses_custom_adventurer_player_frame_layout(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
         self.assertIn('ADVENTURER_FRAME_TEXTURE = "Interface\\\\Adventurer\\\\UI-AdventurerFrame"', lua)
-        self.assertIn('PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)', lua)
         self.assertIn('ADVENTURER_FRAME_WIDTH = 248', lua)
         self.assertIn('ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125', lua)
         self.assertIn('BAR_LEFT = 112', lua)
@@ -38,14 +37,14 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('RAGE_LEFT = 100', lua)
         self.assertIn('RAGE_WIDTH = 125', lua)
         self.assertIn('RAGE_TOP = 15', lua)
-        self.assertIn('RAGE_HEIGHT = 5', lua)
+        self.assertIn('RAGE_HEIGHT = 7', lua)
         self.assertIn('HEALTH_TOP = 26', lua)
         self.assertIn('MANA_TOP = 45', lua)
         self.assertIn('ENERGY_TOP = 56', lua)
-        self.assertIn('RUNIC_LEFT = 231', lua)
-        self.assertIn('RUNIC_TOP = 16', lua)
-        self.assertIn('RUNIC_WIDTH = 9', lua)
-        self.assertIn('RUNIC_HEIGHT = 43', lua)
+        self.assertIn('RUNIC_LEFT = 230', lua)
+        self.assertIn('RUNIC_TOP = 15', lua)
+        self.assertIn('RUNIC_WIDTH = 11', lua)
+        self.assertIn('RUNIC_HEIGHT = 44', lua)
         self.assertIn('RUNES_LEFT = 128', lua)
         self.assertIn('RUNES_TOP = 82', lua)
         self.assertIn('RUNES_SCALE = 0.90', lua)
@@ -69,6 +68,20 @@ class AdventurerResourceHudTests(unittest.TestCase):
             'RuneFrame:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RUNES_LEFT, -RUNES_TOP)',
             lua,
         )
+
+    def test_frame_art_is_rendered_above_all_resource_bars(self) -> None:
+        lua = build_adventurer_resources_lua().decode("utf-8")
+        self.assertIn('AdventurerPlayerFrameArtOverlay', lua)
+        self.assertIn('frameArtTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)', lua)
+        self.assertIn('frameArtOverlay:EnableMouse(false)', lua)
+        self.assertIn('PlayerFrameTexture:SetAlpha(0)', lua)
+        self.assertIn(
+            'frameArtOverlay:SetFrameLevel(PlayerFrame:GetFrameLevel() + ADVENTURER_FRAME_LEVEL_OFFSET)',
+            lua,
+        )
+        self.assertIn('frameArtOverlay:Show()', lua)
+        self.assertIn('frameArtOverlay:Hide()', lua)
+        self.assertIn('PlayerFrameTexture:SetAlpha(1)', lua)
 
     def test_auxiliary_resources_still_read_native_power_pools(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
