@@ -17,11 +17,18 @@ Adventurer Core owns:
 - neutral level/stat rows in the world DB;
 - all playable race/class-10 creation rows;
 - universal weapon/armor baseline, dodge/parry/block, languages and racials;
+- native Mana plus auxiliary Rage and Energy resource pools;
+- the narrow class-10 combo-point bridge needed by the 3.3.5a client;
 - classless item-use compatibility where stock `AllowableClass` masks would
   otherwise reject class 10;
 - class-10 DBC rows used by both worldserver and the WotLK client;
 - enUS `Adventurer` and esMX `Aventurero` player-visible class naming;
 - the client creation patch needed to expose exactly one class per playable race.
+
+The Adventurer does **not** impersonate a Death Knight. Adventurer Core must not
+attach DK ability-class context, rune state, RuneFrame handling, or Runic Power
+to class 10. Individual DK-origin abilities may later be adapted by gameplay
+content to use Adventurer resources without changing this chassis rule.
 
 Adventurer Core does **not** own:
 
