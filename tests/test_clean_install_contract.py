@@ -21,12 +21,15 @@ class CleanInstallContractTests(unittest.TestCase):
         self.assertTrue(runtime.is_file())
 
         source = runtime.read_text(encoding="utf-8")
-        self.assertIn("ADVENTURER_MAX_RAGE = 1000", source)
-        self.assertIn("ADVENTURER_MAX_ENERGY = 100", source)
-        self.assertIn("SetMaxPower(POWER_RAGE, ADVENTURER_MAX_RAGE)", source)
-        self.assertIn("SetMaxPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY)", source)
+        self.assertIn("Mana is the Adventurer's only active power pool", source)
         self.assertIn('ADVENTURER_COMBO_PREFIX[] = "AdventurerCP"', source)
         for token in (
+            "ADVENTURER_MAX_RAGE",
+            "ADVENTURER_MAX_ENERGY",
+            "SetMaxPower(POWER_RAGE",
+            "SetMaxPower(POWER_ENERGY",
+            "PLAYERHOOK_ON_PLAYER_HAS_ACTIVE_POWER_TYPE",
+            "PLAYERHOOK_ON_AFTER_UPDATE_MAX_POWER",
             "CLASS_DEATH_KNIGHT",
             "POWER_RUNIC_POWER",
             "POWER_RUNE",
