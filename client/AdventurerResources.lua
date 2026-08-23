@@ -16,15 +16,17 @@ local ADVENTURER_FRAME_TEX_TOP = 0
 local ADVENTURER_FRAME_TEX_BOTTOM = 0.78125
 
 -- Internal PlayerFrame measurements copied from the reference PlayerFrame.xml.
--- Stock WotLK anchors PlayerFrame at x=-19. Shift the whole Adventurer frame
--- left by half the 12px Rage bar width: -19 - 6 = -25.
-local PLAYER_FRAME_X = -25
-local PLAYER_FRAME_Y = -4
 local PLAYER_FRAME_WIDTH = 232
 local PLAYER_FRAME_HEIGHT = 100
 local PORTRAIT_LEFT = 42
 local PORTRAIT_TOP = 12
 local PORTRAIT_SIZE = 64
+
+-- The supplied Adventurer BLP places the resource wells 6px left of the
+-- classless reference coordinates. Keep the art/portrait fixed and shift only
+-- the resource stack so the bars line up with the wells in the texture.
+local RESOURCE_X_SHIFT = -6
+
 local BACKGROUND_LEFT = 106
 local BACKGROUND_TOP = 22
 local BACKGROUND_WIDTH = 116
@@ -93,16 +95,16 @@ end
 
 local function PositionNativeText()
     if PlayerFrameHealthBarText then
-        SetFramePoint(PlayerFrameHealthBarText, "CENTER", PlayerFrame, "CENTER", 50, 3)
+        SetFramePoint(PlayerFrameHealthBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, 3)
     end
     if PlayerFrameManaBarText then
-        SetFramePoint(PlayerFrameManaBarText, "CENTER", PlayerFrame, "CENTER", 50, -8)
+        SetFramePoint(PlayerFrameManaBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, -8)
     end
     if PlayerFrameEnergyBarText then
-        SetFramePoint(PlayerFrameEnergyBarText, "CENTER", PlayerFrame, "CENTER", 50, -22)
+        SetFramePoint(PlayerFrameEnergyBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, -22)
     end
     if PlayerFrameRageBarText then
-        SetFramePoint(PlayerFrameRageBarText, "CENTER", PlayerFrame, "TOPRIGHT", -2, -42)
+        SetFramePoint(PlayerFrameRageBarText, "CENTER", PlayerFrame, "TOPRIGHT", -2 + RESOURCE_X_SHIFT, -42)
     end
 end
 
@@ -111,10 +113,6 @@ local function ApplyReferencePlayerFrameLayout()
         return
     end
 
-    -- Keep the root frame itself at the Adventurer offset. Blizzard can restore
-    -- the stock PlayerFrame anchor after login/vehicle transitions, so this must
-    -- live in the stable layout pass rather than a one-shot XML OnLoad.
-    SetFramePoint(PlayerFrame, "TOPLEFT", UIParent, "TOPLEFT", PLAYER_FRAME_X, PLAYER_FRAME_Y)
     PlayerFrame:SetWidth(PLAYER_FRAME_WIDTH)
     PlayerFrame:SetHeight(PLAYER_FRAME_HEIGHT)
 
@@ -127,7 +125,7 @@ local function ApplyReferencePlayerFrameLayout()
     if PlayerFrameBackground then
         PlayerFrameBackground:SetWidth(BACKGROUND_WIDTH)
         PlayerFrameBackground:SetHeight(BACKGROUND_HEIGHT)
-        SetFramePoint(PlayerFrameBackground, "TOPLEFT", PlayerFrame, "TOPLEFT", BACKGROUND_LEFT, -BACKGROUND_TOP)
+        SetFramePoint(PlayerFrameBackground, "TOPLEFT", PlayerFrame, "TOPLEFT", BACKGROUND_LEFT + RESOURCE_X_SHIFT, -BACKGROUND_TOP)
     end
 
     if PlayerFrameTexture then
@@ -163,23 +161,23 @@ local function ApplyReferencePlayerFrameLayout()
 
     PlayerFrameHealthBar:SetWidth(HEALTH_WIDTH)
     PlayerFrameHealthBar:SetHeight(HEALTH_HEIGHT)
-    SetFramePoint(PlayerFrameHealthBar, "TOPLEFT", PlayerFrame, "TOPLEFT", HEALTH_LEFT, -HEALTH_TOP)
+    SetFramePoint(PlayerFrameHealthBar, "TOPLEFT", PlayerFrame, "TOPLEFT", HEALTH_LEFT + RESOURCE_X_SHIFT, -HEALTH_TOP)
 
     PlayerFrameManaBar:SetWidth(MANA_WIDTH)
     PlayerFrameManaBar:SetHeight(MANA_HEIGHT)
-    SetFramePoint(PlayerFrameManaBar, "TOPLEFT", PlayerFrame, "TOPLEFT", MANA_LEFT, -MANA_TOP)
+    SetFramePoint(PlayerFrameManaBar, "TOPLEFT", PlayerFrame, "TOPLEFT", MANA_LEFT + RESOURCE_X_SHIFT, -MANA_TOP)
 
     if PlayerFrameEnergyBar then
         PlayerFrameEnergyBar:SetWidth(ENERGY_WIDTH)
         PlayerFrameEnergyBar:SetHeight(ENERGY_HEIGHT)
-        SetFramePoint(PlayerFrameEnergyBar, "TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT, -ENERGY_TOP)
+        SetFramePoint(PlayerFrameEnergyBar, "TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT + RESOURCE_X_SHIFT, -ENERGY_TOP)
     end
 
     if PlayerFrameRageBar then
         PlayerFrameRageBar:SetOrientation("VERTICAL")
         PlayerFrameRageBar:SetWidth(RAGE_WIDTH)
         PlayerFrameRageBar:SetHeight(RAGE_HEIGHT)
-        SetFramePoint(PlayerFrameRageBar, "TOPRIGHT", PlayerFrame, "TOPRIGHT", RAGE_RIGHT, -RAGE_TOP)
+        SetFramePoint(PlayerFrameRageBar, "TOPRIGHT", PlayerFrame, "TOPRIGHT", RAGE_RIGHT + RESOURCE_X_SHIFT, -RAGE_TOP)
     end
 
     PositionNativeText()
