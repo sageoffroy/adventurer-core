@@ -34,15 +34,17 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125', lua)
         self.assertIn('BAR_LEFT = 112', lua)
         self.assertIn('BAR_WIDTH = 113', lua)
+        self.assertIn('HEALTH_LEFT = 110', lua)
+        self.assertIn('ENERGY_LEFT = 110', lua)
         self.assertIn('RAGE_LEFT = 90', lua)
         self.assertIn('RAGE_WIDTH = 135', lua)
-        self.assertIn('RAGE_TOP = 15', lua)
-        self.assertIn('RAGE_HEIGHT = 12', lua)
+        self.assertIn('RAGE_TOP = 12', lua)
+        self.assertIn('RAGE_HEIGHT = 10', lua)
         self.assertIn('HEALTH_TOP = 26', lua)
         self.assertIn('MANA_TOP = 45', lua)
         self.assertIn('ENERGY_TOP = 56', lua)
         self.assertIn('RUNIC_LEFT = 225', lua)
-        self.assertIn('RUNIC_TOP = 17', lua)
+        self.assertIn('RUNIC_TOP = 15', lua)
         self.assertIn('RUNIC_WIDTH = 16', lua)
         self.assertIn('RUNIC_HEIGHT = 46', lua)
         self.assertIn('RUNES_LEFT = 128', lua)
@@ -56,7 +58,7 @@ class AdventurerResourceHudTests(unittest.TestCase):
             lua,
         )
         self.assertIn(
-            'energyBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", BAR_LEFT, -ENERGY_TOP)',
+            'energyBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT, -ENERGY_TOP)',
             lua,
         )
         self.assertIn(
@@ -95,9 +97,10 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('PlayerFrameManaBarText:SetPoint("CENTER", PlayerFrameManaBar, "CENTER", 0, 0)', lua)
         self.assertIn('bar:EnableMouse(true)', lua)
         self.assertIn('bar.valueText:SetText(labels[bar.powerId] .. " " .. current .. " / " .. maximum)', lua)
+        self.assertIn('bar.valueText:SetText(current .. " / " .. maximum)', lua)
         self.assertIn('[POWER_RAGE] = "Ira"', lua)
         self.assertIn('[POWER_ENERGY] = "Energía"', lua)
-        self.assertIn('[POWER_RUNIC_POWER] = "Poder rúnico"', lua)
+        self.assertNotIn('[POWER_RUNIC_POWER] = "Poder rúnico"', lua)
         self.assertIn('bar:SetScript("OnEnter"', lua)
         self.assertIn('bar:SetScript("OnLeave"', lua)
         self.assertIn('self.valueText:Show()', lua)
