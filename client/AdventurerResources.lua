@@ -22,21 +22,18 @@ local PORTRAIT_LEFT = 42
 local PORTRAIT_TOP = 12
 local PORTRAIT_SIZE = 64
 
--- Alignment corrections for the supplied Adventurer BLP.
--- This pass moves only the BLP, resource bars/text, and level another 3px right.
--- Portrait, name block/text, and combat-only overlays stay exactly where they were.
-local FRAME_ART_X_SHIFT = 6
+-- Final horizontal alignment: only the custom Adventurer BLP is offset.
+-- Every native PlayerFrame child stays at its reference coordinate.
+local FRAME_ART_X_SHIFT = 8
 local RESOURCE_X_SHIFT = 0
-local PORTRAIT_X_SHIFT = -3
-local LEVEL_X_SHIFT = -2
-local MANA_X_SHIFT = -2
-local ENERGY_X_SHIFT = -2
-local BACKGROUND_X_SHIFT = -5
-local NAME_X_SHIFT = 1
-
--- Combat overlays intentionally remain at their current positions.
+local PORTRAIT_X_SHIFT = 0
+local LEVEL_X_SHIFT = 0
+local MANA_X_SHIFT = 0
+local ENERGY_X_SHIFT = 0
+local BACKGROUND_X_SHIFT = 0
+local NAME_X_SHIFT = 0
 local FLASH_X_SHIFT = 0
-local STATUS_X_SHIFT = 5
+local STATUS_X_SHIFT = 0
 
 local BACKGROUND_LEFT = 106
 local BACKGROUND_TOP = 22
