@@ -17,12 +17,10 @@ constexpr uint32 SPELL_BROWN_HORSE = 458;
 constexpr uint32 SPELL_DUAL_WIELD = 674;
 constexpr uint32 APPRENTICE_RIDING_VALUE = 75;
 
-// Rage and Runic Power are stored at ten times the value shown by the 3.3.5a
-// client. Energy is stored 1:1. These are the same native pool sizes used by
-// SpellDraft's proven classless-resource implementation.
+// Rage is stored at ten times the value shown by the 3.3.5a client. Energy is
+// stored 1:1. Mana remains the Adventurer's native primary pool.
 constexpr uint32 ADVENTURER_MAX_RAGE = 1000;
 constexpr uint32 ADVENTURER_MAX_ENERGY = 100;
-constexpr uint32 ADVENTURER_MAX_RUNIC_POWER = 1000;
 
 // The 3.3.5a client refuses to expose combo points through GetComboPoints for a
 // non-Rogue/non-Druid class even though AzerothCore's Unit combo-point backend
@@ -39,14 +37,7 @@ struct ComboSyncState
     uint8 points = 0xFF; // impossible sentinel: force the first sync
 };
 
-struct RuneSyncState
-{
-    bool initialized = false;
-    uint8 readyMask = 0;
-};
-
 std::unordered_map<uint64, ComboSyncState> comboSyncStates;
-std::unordered_map<uint64, RuneSyncState> runeSyncStates;
 
 constexpr uint32 UNIVERSAL_SKILLS[] =
 {
@@ -91,10 +82,6 @@ bool IsAdventurer(Player const* player)
 
 void SendVisibleComboPoints(Player* player, uint8 points)
 {
-    // This is the same 3.3.5a packet shape that the old SpellDraft classless
-    // implementation used successfully: CHAT_MSG_ADDON (0), LANG_ADDON, self
-    // sender/receiver and a "prefix\tpayload" message. Keeping that proven wire
-    // format avoids depending on the client's normal class-filtered combo API.
     std::string message = std::string(ADVENTURER_COMBO_PREFIX) + "\t" + std::to_string(points);
 
     WorldPacket data(SMSG_MESSAGECHAT, 100);
@@ -129,44 +116,6 @@ void UpdateComboPointSync(Player* player, uint32 diff)
     state.selectedTarget = selectedTarget;
     state.points = visiblePoints;
     SendVisibleComboPoints(player, visiblePoints);
-}
-
-uint8 GetRuneReadyMask(Player const* player)
-{
-    uint8 mask = 0;
-    for (uint8 index = 0; index < MAX_RUNES; ++index)
-        if (player->GetRuneCooldown(index) == 0)
-            mask |= uint8(1u << index);
-    return mask;
-}
-
-void UpdateRuneClientSync(Player* player)
-{
-    if (!IsAdventurer(player) || !player->IsInWorld())
-        return;
-
-    uint64 key = player->GetGUID().GetRawValue();
-    RuneSyncState& state = runeSyncStates[key];
-    uint8 readyMask = GetRuneReadyMask(player);
-
-    if (!state.initialized)
-    {
-        state.initialized = true;
-        state.readyMask = readyMask;
-        return;
-    }
-
-    uint8 newlyReady = uint8(readyMask & ~state.readyMask);
-    state.readyMask = readyMask;
-
-    // A native DK advances rune cooldowns locally in the 3.3.5a client, but
-    // class 10 does not run that hidden DK-only usability transition. The
-    // decisive clue is that relogging fixes the stale action immediately:
-    // SMSG_RESYNC_RUNES replaces the client's complete rune state (type plus
-    // remaining cooldown). Re-send that authoritative snapshot only when at
-    // least one server rune actually crosses cooldown -> ready.
-    if (newlyReady != 0)
-        player->ResyncRunes(MAX_RUNES);
 }
 
 void LearnMissingSpells(Player* player, uint32 const* spells, uint32 count)
@@ -249,21 +198,17 @@ void ApplyUniversalResources(Player* player, bool initializeCurrent = false)
     if (!IsAdventurer(player))
         return;
 
-    // Mana remains the Adventurer's native primary pool and therefore keeps
-    // AzerothCore's normal class/stat scaling. Auxiliary pools are always
-    // available so abilities from every native class can spend/generate them.
+    // Mana remains native. Rage and Energy are the only auxiliary resource
+    // pools owned by Adventurer Core.
     if (player->GetMaxPower(POWER_RAGE) < ADVENTURER_MAX_RAGE)
         player->SetMaxPower(POWER_RAGE, ADVENTURER_MAX_RAGE);
     if (player->GetMaxPower(POWER_ENERGY) < ADVENTURER_MAX_ENERGY)
         player->SetMaxPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY);
-    if (player->GetMaxPower(POWER_RUNIC_POWER) < ADVENTURER_MAX_RUNIC_POWER)
-        player->SetMaxPower(POWER_RUNIC_POWER, ADVENTURER_MAX_RUNIC_POWER);
 
     if (initializeCurrent)
     {
         player->SetPower(POWER_RAGE, 0);
         player->SetPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY);
-        player->SetPower(POWER_RUNIC_POWER, 0);
     }
 }
 
@@ -313,10 +258,8 @@ public:
         PLAYERHOOK_ON_LOGOUT,
         PLAYERHOOK_ON_LEVEL_CHANGED,
         PLAYERHOOK_ON_UPDATE,
-        PLAYERHOOK_ON_AFTER_UPDATE,
         PLAYERHOOK_ON_AFTER_UPDATE_MAX_POWER,
-        PLAYERHOOK_ON_PLAYER_HAS_ACTIVE_POWER_TYPE,
-        PLAYERHOOK_ON_PLAYER_IS_CLASS
+        PLAYERHOOK_ON_PLAYER_HAS_ACTIVE_POWER_TYPE
     }) { }
 
     void OnPlayerCreate(Player* player) override
@@ -329,27 +272,18 @@ public:
         if (IsAdventurer(player))
         {
             ApplyRuntimeCapabilities(player);
-            uint64 key = player->GetGUID().GetRawValue();
-            comboSyncStates.erase(key);
-            runeSyncStates.erase(key);
+            comboSyncStates.erase(player->GetGUID().GetRawValue());
         }
     }
 
     void OnPlayerLogout(Player* player) override
     {
-        uint64 key = player->GetGUID().GetRawValue();
-        comboSyncStates.erase(key);
-        runeSyncStates.erase(key);
+        comboSyncStates.erase(player->GetGUID().GetRawValue());
     }
 
     void OnPlayerUpdate(Player* player, uint32 diff) override
     {
         UpdateComboPointSync(player, diff);
-    }
-
-    void OnPlayerAfterUpdate(Player* player, uint32 /*diff*/) override
-    {
-        UpdateRuneClientSync(player);
     }
 
     void OnPlayerLevelChanged(Player* player, uint8 /*oldLevel*/) override
@@ -363,8 +297,8 @@ public:
         if (!IsAdventurer(player))
             return;
 
-        // Preserve a native-sized floor for every auxiliary pool while still
-        // allowing talents/auras to increase that pool above the baseline.
+        // Preserve native-sized floors for the two auxiliary pools while still
+        // allowing talents/auras to increase them above the baseline.
         switch (power)
         {
             case POWER_RAGE:
@@ -372,9 +306,6 @@ public:
                 break;
             case POWER_ENERGY:
                 value = std::max(value, static_cast<float>(ADVENTURER_MAX_ENERGY));
-                break;
-            case POWER_RUNIC_POWER:
-                value = std::max(value, static_cast<float>(ADVENTURER_MAX_RUNIC_POWER));
                 break;
             default:
                 break;
@@ -392,27 +323,10 @@ public:
         {
             case POWER_RAGE:
             case POWER_ENERGY:
-            case POWER_RUNIC_POWER:
                 return player->GetMaxPower(power) > 0;
             default:
                 return false;
         }
-    }
-
-    Optional<bool> OnPlayerIsClass(Player const* player, Classes playerClass, ClassContext context) override
-    {
-        if (!IsAdventurer(player))
-            return std::nullopt;
-
-        // AzerothCore already routes rune initialization, rune-cost checks,
-        // cooldown regeneration and Runic Power decay through this ABILITY
-        // context. Treating Adventurer as DK only there gives it the complete
-        // native rune economy without inheriting DK starting levels, quests,
-        // taxis, etc.
-        if (playerClass == CLASS_DEATH_KNIGHT && context == CLASS_CONTEXT_ABILITY)
-            return true;
-
-        return std::nullopt;
     }
 };
 

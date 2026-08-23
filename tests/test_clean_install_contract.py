@@ -21,12 +21,22 @@ class CleanInstallContractTests(unittest.TestCase):
         self.assertTrue(runtime.is_file())
 
         source = runtime.read_text(encoding="utf-8")
-        self.assertIn("player->ResyncRunes(MAX_RUNES)", source)
-        self.assertNotIn("player->AddRunePower(index)", source)
-        self.assertIn(
-            "playerClass == CLASS_DEATH_KNIGHT && context == CLASS_CONTEXT_ABILITY",
-            source,
-        )
+        self.assertIn("ADVENTURER_MAX_RAGE = 1000", source)
+        self.assertIn("ADVENTURER_MAX_ENERGY = 100", source)
+        self.assertIn("SetMaxPower(POWER_RAGE, ADVENTURER_MAX_RAGE)", source)
+        self.assertIn("SetMaxPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY)", source)
+        self.assertIn('ADVENTURER_COMBO_PREFIX[] = "AdventurerCP"', source)
+        for token in (
+            "CLASS_DEATH_KNIGHT",
+            "POWER_RUNIC_POWER",
+            "POWER_RUNE",
+            "MAX_RUNES",
+            "GetRuneCooldown",
+            "ResyncRunes",
+            "AddRunePower",
+            "PLAYERHOOK_ON_PLAYER_IS_CLASS",
+        ):
+            self.assertNotIn(token, source)
 
     def test_core_patch_copies_packaged_runtime_verbatim(self) -> None:
         source = inspect.getsource(core_patch.plan)

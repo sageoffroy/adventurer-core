@@ -1,30 +1,78 @@
--- Adventurer Core: universal resource HUD for the native class-10 Adventurer.
+-- Adventurer Core: native PlayerFrame resource layout for class 10.
 --
--- The server owns the actual pools. This file exposes them together in the
--- stock 3.3.5a UI: Mana remains the normal PlayerFrame bar; Rage, Energy and
--- Runic Power are stacked below it; the native Death Knight RuneFrame is reused
--- below the stack. Blizzard's native ComboFrame remains attached to TargetFrame.
+-- The frame art, Health and Mana stay on Blizzard's real PlayerFrame. Rage and
+-- Energy are StatusBar children declared in AdventurerPlayerFrame.xml using
+-- the same dimensions/anchors as the supplied classless reference layout.
 
 local ADVENTURER_CLASS_ID = 10
 local POWER_RAGE = 1
 local POWER_ENERGY = 3
-local POWER_RUNIC_POWER = 6
 local COMBO_PREFIX = "AdventurerCP"
-local MAX_RUNES = 6
+
+local ADVENTURER_FRAME_TEXTURE = "Interface\\Adventurer\\UI-AdventurerFrame"
+local ADVENTURER_FRAME_TEX_LEFT = 1.0
+local ADVENTURER_FRAME_TEX_RIGHT = 0.07421875
+local ADVENTURER_FRAME_TEX_TOP = 0
+local ADVENTURER_FRAME_TEX_BOTTOM = 0.78125
+
+-- Internal PlayerFrame measurements copied from the reference PlayerFrame.xml.
+local PLAYER_FRAME_WIDTH = 232
+local PLAYER_FRAME_HEIGHT = 100
+local PORTRAIT_LEFT = 42
+local PORTRAIT_TOP = 12
+local PORTRAIT_SIZE = 64
+
+-- Final horizontal alignment: only the custom Adventurer BLP is offset.
+-- Every native PlayerFrame child stays at its reference coordinate.
+local FRAME_ART_X_SHIFT = 8
+local RESOURCE_X_SHIFT = 0
+local PORTRAIT_X_SHIFT = 0
+local LEVEL_X_SHIFT = 0
+local MANA_X_SHIFT = 0
+local ENERGY_X_SHIFT = 0
+local BACKGROUND_X_SHIFT = 0
+local NAME_X_SHIFT = 0
+local FLASH_X_SHIFT = 0
+local STATUS_X_SHIFT = 0
+
+local BACKGROUND_LEFT = 106
+local BACKGROUND_TOP = 22
+local BACKGROUND_WIDTH = 116
+local BACKGROUND_HEIGHT = 41
+local HEALTH_LEFT = 106
+local HEALTH_TOP = 41
+local HEALTH_WIDTH = 116
+local HEALTH_HEIGHT = 12
+local MANA_LEFT = 106
+local MANA_TOP = 52
+local MANA_WIDTH = 116
+local MANA_HEIGHT = 12
+local ENERGY_LEFT = 117
+local ENERGY_TOP = 65
+local ENERGY_WIDTH = 92
+local ENERGY_HEIGHT = 11
+local RAGE_RIGHT = 3
+local RAGE_TOP = 24
+local RAGE_WIDTH = 12
+local RAGE_HEIGHT = 38
+local FLASH_LEFT = 13
+local FLASH_TOP = 0
+local FLASH_WIDTH = 238
+local FLASH_HEIGHT = 93
+local STATUS_LEFT = 35
+local STATUS_TOP = 8
+local STATUS_WIDTH = 187
+local STATUS_HEIGHT = 66
 
 local locale = GetLocale()
 local labels
 if locale == "esES" or locale == "esMX" then
     labels = {
-        [POWER_RAGE] = "Ira",
         [POWER_ENERGY] = "Energía",
-        [POWER_RUNIC_POWER] = "Poder rúnico",
     }
 else
     labels = {
-        [POWER_RAGE] = "Rage",
         [POWER_ENERGY] = "Energy",
-        [POWER_RUNIC_POWER] = "Runic Power",
     }
 end
 
@@ -34,140 +82,166 @@ local function IsAdventurer()
         return true
     end
 
-    -- The numeric class id is authoritative on normal 3.3.5a clients. Keep a
-    -- localized-name fallback for clients whose UnitClass binding omits it.
     return className == "Adventurer"
         or className == "Aventurero"
         or className == "Aventurera"
-end
-
-local function GetPowerColor(powerId)
-    if PowerBarColor and PowerBarColor[powerId] then
-        local color = PowerBarColor[powerId]
-        return color.r, color.g, color.b
-    end
-
-    if powerId == POWER_RAGE then
-        return 1.0, 0.0, 0.0
-    elseif powerId == POWER_ENERGY then
-        return 1.0, 1.0, 0.0
-    end
-
-    return 0.0, 0.82, 1.0
-end
-
-local function CreateResourceBar(name, powerId)
-    local bar = CreateFrame("StatusBar", name, UIParent)
-    bar.powerId = powerId
-    bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    bar:SetFrameStrata("LOW")
-    bar:SetHeight(11)
-    bar:SetWidth(119)
-
-    local r, g, b = GetPowerColor(powerId)
-    bar:SetStatusBarColor(r, g, b)
-
-    local background = bar:CreateTexture(nil, "BACKGROUND")
-    background:SetAllPoints(bar)
-    background:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    background:SetVertexColor(0.08, 0.08, 0.08, 0.85)
-
-    local label = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    label:SetPoint("LEFT", bar, "LEFT", 3, 0)
-    label:SetJustifyH("LEFT")
-    label:SetText(labels[powerId])
-    bar.label = label
-
-    local value = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    value:SetPoint("RIGHT", bar, "RIGHT", -3, 0)
-    value:SetJustifyH("RIGHT")
-    bar.valueText = value
-
-    bar:Hide()
-    return bar
-end
-
-local rageBar = CreateResourceBar("AdventurerRageBar", POWER_RAGE)
-local energyBar = CreateResourceBar("AdventurerEnergyBar", POWER_ENERGY)
-local runicBar = CreateResourceBar("AdventurerRunicPowerBar", POWER_RUNIC_POWER)
-
-local function UpdateBar(bar)
-    local current = UnitPower("player", bar.powerId) or 0
-    local maximum = UnitPowerMax("player", bar.powerId) or 0
-
-    if maximum <= 0 then
-        maximum = 1
-    end
-
-    bar:SetMinMaxValues(0, maximum)
-    bar:SetValue(current)
-    bar.valueText:SetText(current .. " / " .. maximum)
-end
-
-local function PositionBars()
-    if not PlayerFrameManaBar then
-        return
-    end
-
-    local width = PlayerFrameManaBar:GetWidth()
-    if width and width > 0 then
-        rageBar:SetWidth(width)
-        energyBar:SetWidth(width)
-        runicBar:SetWidth(width)
-    end
-
-    rageBar:ClearAllPoints()
-    rageBar:SetPoint("TOPLEFT", PlayerFrameManaBar, "BOTTOMLEFT", 0, -2)
-
-    energyBar:ClearAllPoints()
-    energyBar:SetPoint("TOPLEFT", rageBar, "BOTTOMLEFT", 0, -2)
-
-    runicBar:ClearAllPoints()
-    runicBar:SetPoint("TOPLEFT", energyBar, "BOTTOMLEFT", 0, -2)
-end
-
-local function RefreshRunes()
-    if not RuneFrame then
-        return
-    end
-
-    RuneFrame:ClearAllPoints()
-    RuneFrame:SetScale(0.85)
-    RuneFrame:SetPoint("TOPLEFT", runicBar, "BOTTOMLEFT", 2, -6)
-    RuneFrame:Show()
-
-    if RuneButton_Update then
-        for index = 1, MAX_RUNES do
-            local button = _G["RuneButtonIndividual" .. index]
-            if button then
-                RuneButton_Update(button, button:GetID(), true)
-            end
-        end
-    end
-end
-
-local function HideAdventurerResources()
-    rageBar:Hide()
-    energyBar:Hide()
-    runicBar:Hide()
-
-    if RuneFrame then
-        RuneFrame:Hide()
-    end
 end
 
 local function PlayerIsUsingVehicleUI()
     return UnitHasVehicleUI and UnitHasVehicleUI("player")
 end
 
+local function SetFramePoint(frame, point, relativeTo, relativePoint, x, y)
+    if not frame then
+        return
+    end
+    frame:ClearAllPoints()
+    frame:SetPoint(point, relativeTo, relativePoint, x, y)
+end
+
+local function PositionNativeText()
+    if PlayerFrameHealthBarText then
+        SetFramePoint(PlayerFrameHealthBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, 3)
+    end
+    if PlayerFrameManaBarText then
+        SetFramePoint(PlayerFrameManaBarText, "CENTER", PlayerFrame, "CENTER", 50 + MANA_X_SHIFT, -8)
+    end
+    if PlayerFrameEnergyBarText then
+        SetFramePoint(PlayerFrameEnergyBarText, "CENTER", PlayerFrame, "CENTER", 50 + ENERGY_X_SHIFT, -22)
+    end
+end
+
+local function ApplyReferencePlayerFrameLayout()
+    if not PlayerFrame or not PlayerFrameHealthBar or not PlayerFrameManaBar then
+        return
+    end
+
+    PlayerFrame:SetWidth(PLAYER_FRAME_WIDTH)
+    PlayerFrame:SetHeight(PLAYER_FRAME_HEIGHT)
+
+    if PlayerPortrait then
+        PlayerPortrait:SetWidth(PORTRAIT_SIZE)
+        PlayerPortrait:SetHeight(PORTRAIT_SIZE)
+        SetFramePoint(PlayerPortrait, "TOPLEFT", PlayerFrame, "TOPLEFT", PORTRAIT_LEFT + PORTRAIT_X_SHIFT, -PORTRAIT_TOP)
+    end
+
+    if PlayerFrameBackground then
+        PlayerFrameBackground:SetWidth(BACKGROUND_WIDTH)
+        PlayerFrameBackground:SetHeight(BACKGROUND_HEIGHT)
+        SetFramePoint(PlayerFrameBackground, "TOPLEFT", PlayerFrame, "TOPLEFT", BACKGROUND_LEFT + BACKGROUND_X_SHIFT, -BACKGROUND_TOP)
+    end
+
+    if PlayerFrameTexture then
+        PlayerFrameTexture:ClearAllPoints()
+        PlayerFrameTexture:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", FRAME_ART_X_SHIFT, 0)
+        PlayerFrameTexture:SetPoint("BOTTOMRIGHT", PlayerFrame, "BOTTOMRIGHT", FRAME_ART_X_SHIFT, 0)
+        PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)
+        PlayerFrameTexture:SetTexCoord(
+            ADVENTURER_FRAME_TEX_LEFT,
+            ADVENTURER_FRAME_TEX_RIGHT,
+            ADVENTURER_FRAME_TEX_TOP,
+            ADVENTURER_FRAME_TEX_BOTTOM
+        )
+        PlayerFrameTexture:Show()
+    end
+
+    if PlayerFrameFlash then
+        PlayerFrameFlash:SetWidth(FLASH_WIDTH)
+        PlayerFrameFlash:SetHeight(FLASH_HEIGHT)
+        SetFramePoint(PlayerFrameFlash, "TOPLEFT", PlayerFrame, "TOPLEFT", FLASH_LEFT + FLASH_X_SHIFT, -FLASH_TOP)
+    end
+
+    if PlayerStatusTexture then
+        PlayerStatusTexture:SetWidth(STATUS_WIDTH)
+        PlayerStatusTexture:SetHeight(STATUS_HEIGHT)
+        SetFramePoint(PlayerStatusTexture, "TOPLEFT", PlayerFrame, "TOPLEFT", STATUS_LEFT + STATUS_X_SHIFT, -STATUS_TOP)
+    end
+
+    if PlayerName then
+        SetFramePoint(PlayerName, "CENTER", PlayerFrame, "CENTER", 50 + NAME_X_SHIFT, 19)
+    end
+    if PlayerLevelText then
+        SetFramePoint(PlayerLevelText, "CENTER", PlayerFrame, "CENTER", -63 + LEVEL_X_SHIFT, -16)
+        PlayerLevelText:Show()
+    end
+
+    PlayerFrameHealthBar:SetWidth(HEALTH_WIDTH)
+    PlayerFrameHealthBar:SetHeight(HEALTH_HEIGHT)
+    SetFramePoint(PlayerFrameHealthBar, "TOPLEFT", PlayerFrame, "TOPLEFT", HEALTH_LEFT + RESOURCE_X_SHIFT, -HEALTH_TOP)
+
+    PlayerFrameManaBar:SetWidth(MANA_WIDTH)
+    PlayerFrameManaBar:SetHeight(MANA_HEIGHT)
+    SetFramePoint(PlayerFrameManaBar, "TOPLEFT", PlayerFrame, "TOPLEFT", MANA_LEFT + MANA_X_SHIFT, -MANA_TOP)
+
+    if PlayerFrameEnergyBar then
+        PlayerFrameEnergyBar:SetWidth(ENERGY_WIDTH)
+        PlayerFrameEnergyBar:SetHeight(ENERGY_HEIGHT)
+        SetFramePoint(PlayerFrameEnergyBar, "TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT + ENERGY_X_SHIFT, -ENERGY_TOP)
+    end
+
+    if PlayerFrameRageBar then
+        PlayerFrameRageBar:SetOrientation("VERTICAL")
+        PlayerFrameRageBar:SetWidth(RAGE_WIDTH)
+        PlayerFrameRageBar:SetHeight(RAGE_HEIGHT)
+        SetFramePoint(PlayerFrameRageBar, "TOPRIGHT", PlayerFrame, "TOPRIGHT", RAGE_RIGHT + RESOURCE_X_SHIFT, -RAGE_TOP)
+    end
+
+    PositionNativeText()
+end
+
+local function UpdateAuxiliaryBar(bar, powerId, valueText)
+    if not bar then
+        return
+    end
+
+    local current = UnitPower("player", powerId) or 0
+    local maximum = UnitPowerMax("player", powerId) or 0
+    if maximum <= 0 then
+        maximum = 1
+    end
+
+    bar:SetMinMaxValues(0, maximum)
+    bar:SetValue(current)
+
+    if valueText then
+        valueText:SetText(labels[powerId] .. " " .. current .. " / " .. maximum)
+    end
+end
+
+local function ConfigureAuxiliaryMouse(bar, valueText)
+    if not bar or bar.adventurerMouseConfigured then
+        return
+    end
+
+    bar.adventurerMouseConfigured = true
+    bar:EnableMouse(true)
+    bar:SetScript("OnEnter", function()
+        if valueText then
+            valueText:Show()
+        end
+    end)
+    bar:SetScript("OnLeave", function()
+        if valueText then
+            valueText:Hide()
+        end
+    end)
+end
+
+local function HideAdventurerResources()
+    if PlayerFrameEnergyBar then
+        PlayerFrameEnergyBar:Hide()
+    end
+    if PlayerFrameRageBar then
+        PlayerFrameRageBar:Hide()
+    end
+    if PlayerFrameEnergyBarText then
+        PlayerFrameEnergyBarText:Hide()
+    end
+end
+
 -- ---------------------------------------------------------------------------
 -- Combo points
 -- ---------------------------------------------------------------------------
--- The 3.3.5a client deliberately returns zero from GetComboPoints for classes
--- other than Rogue/Druid. AzerothCore still tracks combo points for Adventurer,
--- so the server mirrors the visible count through AdventurerCP. We only replace
--- the player->target query used by Blizzard's own ComboFrame; every other call
--- continues to use the original API.
 local nativeGetComboPoints = GetComboPoints
 local adventurerComboPoints = 0
 
@@ -191,63 +265,9 @@ local function SetVisibleComboPoints(points)
     end
 end
 
--- ---------------------------------------------------------------------------
--- Rune usability
--- ---------------------------------------------------------------------------
--- RuneFrame polls GetRuneCooldown itself, so its cooldown sweep can finish even
--- when the action bar never receives ACTIONBAR_UPDATE_USABLE for class 10. The
--- server now sends the native SMSG_ADD_RUNE_POWER transition when a rune becomes
--- ready; this small refresh keeps Blizzard's buttons visually in lockstep with
--- the native client cache after that packet arrives.
-local lastRuneReadyMask = -1
-
-local function GetRuneReadyMask()
-    local mask = 0
-    for index = 1, MAX_RUNES do
-        local _, _, ready = GetRuneCooldown(index)
-        if ready then
-            mask = mask + (2 ^ (index - 1))
-        end
-    end
-    return mask
-end
-
-local actionButtonPrefixes = {
-    "ActionButton",
-    "MultiBarBottomLeftButton",
-    "MultiBarBottomRightButton",
-    "MultiBarRightButton",
-    "MultiBarLeftButton",
-    "BonusActionButton",
-}
-
-local function RefreshActionButtonUsability()
-    if not ActionButton_UpdateUsable then
-        return
-    end
-
-    for _, prefix in ipairs(actionButtonPrefixes) do
-        for index = 1, 12 do
-            local button = _G[prefix .. index]
-            if button and button.action and HasAction(button.action) then
-                ActionButton_UpdateUsable(button)
-            end
-        end
-    end
-end
-
-local function RefreshRuneActionUsability()
-    local mask = GetRuneReadyMask()
-    if mask == lastRuneReadyMask then
-        return
-    end
-
-    lastRuneReadyMask = mask
-    RefreshActionButtonUsability()
-end
-
 local function RefreshAdventurerResources()
     if not IsAdventurer() then
+        HideAdventurerResources()
         return
     end
 
@@ -256,20 +276,35 @@ local function RefreshAdventurerResources()
         return
     end
 
-    PositionBars()
-    UpdateBar(rageBar)
-    UpdateBar(energyBar)
-    UpdateBar(runicBar)
+    ApplyReferencePlayerFrameLayout()
 
-    rageBar:Show()
-    energyBar:Show()
-    runicBar:Show()
-    RefreshRunes()
-    RefreshRuneActionUsability()
+    ConfigureAuxiliaryMouse(PlayerFrameEnergyBar, PlayerFrameEnergyBarText)
+
+    UpdateAuxiliaryBar(PlayerFrameEnergyBar, POWER_ENERGY, PlayerFrameEnergyBarText)
+    UpdateAuxiliaryBar(PlayerFrameRageBar, POWER_RAGE, nil)
+
+    if PlayerFrameEnergyBar then
+        PlayerFrameEnergyBar:Show()
+    end
+    if PlayerFrameRageBar then
+        PlayerFrameRageBar:Show()
+    end
 
     if ComboFrame_Update then
         ComboFrame_Update()
     end
+end
+
+-- Blizzard's PlayerFrame_ToPlayerArt reapplies the stock 119px bar widths after
+-- vehicle transitions and PLAYER_ENTERING_WORLD. Reapply the Adventurer layout
+-- immediately after the native function instead of fighting it with a separate
+-- art overlay.
+if hooksecurefunc and PlayerFrame_ToPlayerArt then
+    hooksecurefunc("PlayerFrame_ToPlayerArt", function()
+        if IsAdventurer() and not PlayerIsUsingVehicleUI() then
+            ApplyReferencePlayerFrameLayout()
+        end
+    end)
 end
 
 local AdventurerResourceFrame = CreateFrame("Frame", "AdventurerResourceFrame", UIParent)
@@ -281,7 +316,6 @@ AdventurerResourceFrame:RegisterEvent("UNIT_ENTERED_VEHICLE")
 AdventurerResourceFrame:RegisterEvent("UNIT_EXITED_VEHICLE")
 AdventurerResourceFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 AdventurerResourceFrame:RegisterEvent("CHAT_MSG_ADDON")
-AdventurerResourceFrame:RegisterEvent("RUNE_POWER_UPDATE")
 
 AdventurerResourceFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "CHAT_MSG_ADDON" then
@@ -297,13 +331,8 @@ AdventurerResourceFrame:SetScript("OnEvent", function(self, event, ...)
             RegisterAddonMessagePrefix(COMBO_PREFIX)
         end
         SetVisibleComboPoints(0)
-        lastRuneReadyMask = -1
     elseif event == "PLAYER_TARGET_CHANGED" then
-        -- Hide stale points immediately; the server sends the correct count for
-        -- the new selected target on its next 100 ms sync tick.
         SetVisibleComboPoints(0)
-    elseif event == "RUNE_POWER_UPDATE" then
-        RefreshRuneActionUsability()
     else
         local unit = ...
         if unit and unit ~= "player" then
@@ -330,21 +359,16 @@ AdventurerResourceFrame:SetScript("OnUpdate", function(self, elapsed)
         return
     end
 
-    UpdateBar(rageBar)
-    UpdateBar(energyBar)
-    UpdateBar(runicBar)
+    UpdateAuxiliaryBar(PlayerFrameEnergyBar, POWER_ENERGY, PlayerFrameEnergyBarText)
+    UpdateAuxiliaryBar(PlayerFrameRageBar, POWER_RAGE, nil)
 
-    -- PlayerFrame can change width/anchors when vehicle or other Blizzard art
-    -- changes. Reassert the stack without replacing any stock texture.
-    PositionBars()
-    RefreshRuneActionUsability()
+    -- Keep exact geometry stable if another stock PlayerFrame transition ran.
+    ApplyReferencePlayerFrameLayout()
 
-    if not rageBar:IsShown() then
-        rageBar:Show()
-        energyBar:Show()
-        runicBar:Show()
+    if PlayerFrameEnergyBar and not PlayerFrameEnergyBar:IsShown() then
+        PlayerFrameEnergyBar:Show()
     end
-    if RuneFrame and not RuneFrame:IsShown() then
-        RefreshRunes()
+    if PlayerFrameRageBar and not PlayerFrameRageBar:IsShown() then
+        PlayerFrameRageBar:Show()
     end
 end)

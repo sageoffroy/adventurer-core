@@ -48,6 +48,8 @@ jobs:
           assert runtime.patched == (payload / runtime_rel).read_bytes()
           text = runtime.patched.decode("utf-8")
           assert "player->ResyncRunes(MAX_RUNES)" in text
-          assert "player->AddRunePower(index)" not in text
+          assert "player->AddRunePower(index)" in text
+          assert "previousReadyMask & ~readyMask" in text
+          assert "readyMask & ~previousReadyMask" in text
           print("Supported clean-core source patch smoke test OK")
           PY

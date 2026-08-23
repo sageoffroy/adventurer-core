@@ -22,6 +22,9 @@ if [[ -z "$core_dir" ]]; then
     exit 2
 fi
 
+# Database verification needs the runtime/config arguments supplied by the
+# caller. The package-state verifier only accepts --core-dir, so do not forward
+# unrelated client/server-data/locale options to it.
 python3 "$ROOT/tools/database.py" verify "$@"
-python3 "$ROOT/tools/adventurer.py" verify "$@"
+python3 "$ROOT/tools/adventurer.py" verify --core-dir "$core_dir"
 python3 "$ROOT/tools/world.py" verify --core-dir "$core_dir"
