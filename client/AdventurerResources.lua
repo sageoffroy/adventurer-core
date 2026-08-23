@@ -35,10 +35,8 @@ local ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125
 -- The source art is a 256x128 extension of Blizzard's UI-TargetingFrame atlas.
 -- All resource bars render on lower strata; a dedicated frame-art overlay lives
 -- on HIGH strata so the painted frame always masks the rectangular StatusBars.
-local BAR_LEFT = 112
-local BAR_WIDTH = 113
-local HEALTH_LEFT = 110
-local ENERGY_LEFT = 110
+local BAR_LEFT = 110
+local BAR_WIDTH = 115
 local RAGE_LEFT = 90
 local RAGE_WIDTH = 135
 local RAGE_TOP = 12
@@ -194,7 +192,7 @@ local function PositionNativeBars()
         "TOPLEFT",
         PlayerFrame,
         "TOPLEFT",
-        HEALTH_LEFT,
+        BAR_LEFT,
         -HEALTH_TOP
     )
     PlayerFrameHealthBar:SetWidth(BAR_WIDTH)
@@ -227,7 +225,7 @@ local function PositionAuxiliaryBars()
 
     energyBar:ClearAllPoints()
     energyBar:SetOrientation("HORIZONTAL")
-    energyBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT, -ENERGY_TOP)
+    energyBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", BAR_LEFT, -ENERGY_TOP)
     energyBar:SetWidth(BAR_WIDTH)
     energyBar:SetHeight(ENERGY_HEIGHT)
 
