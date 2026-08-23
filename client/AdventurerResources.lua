@@ -1,7 +1,7 @@
 -- Adventurer Core: native PlayerFrame resource layout for class 10.
 --
 -- The frame art, Health and Mana stay on Blizzard's real PlayerFrame. Rage and
--- Energy are StatusBar children declared in AdventurerPlayerFrame.xml using
+-- Energy are TextStatusBar children declared in AdventurerPlayerFrame.xml using
 -- the same dimensions/anchors as the supplied classless reference layout.
 
 local ADVENTURER_CLASS_ID = 10
@@ -68,10 +68,12 @@ local locale = GetLocale()
 local labels
 if locale == "esES" or locale == "esMX" then
     labels = {
+        [POWER_RAGE] = "Ira",
         [POWER_ENERGY] = "Energía",
     }
 else
     labels = {
+        [POWER_RAGE] = "Rage",
         [POWER_ENERGY] = "Energy",
     }
 end
@@ -108,6 +110,9 @@ local function PositionNativeText()
     end
     if PlayerFrameEnergyBarText then
         SetFramePoint(PlayerFrameEnergyBarText, "CENTER", PlayerFrame, "CENTER", 50 + ENERGY_X_SHIFT, -22)
+    end
+    if PlayerFrameRageBarText then
+        SetFramePoint(PlayerFrameRageBarText, "CENTER", PlayerFrame, "TOPRIGHT", -2 + RESOURCE_X_SHIFT, -42)
     end
 end
 
@@ -237,6 +242,9 @@ local function HideAdventurerResources()
     if PlayerFrameEnergyBarText then
         PlayerFrameEnergyBarText:Hide()
     end
+    if PlayerFrameRageBarText then
+        PlayerFrameRageBarText:Hide()
+    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -279,9 +287,10 @@ local function RefreshAdventurerResources()
     ApplyReferencePlayerFrameLayout()
 
     ConfigureAuxiliaryMouse(PlayerFrameEnergyBar, PlayerFrameEnergyBarText)
+    ConfigureAuxiliaryMouse(PlayerFrameRageBar, PlayerFrameRageBarText)
 
     UpdateAuxiliaryBar(PlayerFrameEnergyBar, POWER_ENERGY, PlayerFrameEnergyBarText)
-    UpdateAuxiliaryBar(PlayerFrameRageBar, POWER_RAGE, nil)
+    UpdateAuxiliaryBar(PlayerFrameRageBar, POWER_RAGE, PlayerFrameRageBarText)
 
     if PlayerFrameEnergyBar then
         PlayerFrameEnergyBar:Show()
@@ -360,7 +369,7 @@ AdventurerResourceFrame:SetScript("OnUpdate", function(self, elapsed)
     end
 
     UpdateAuxiliaryBar(PlayerFrameEnergyBar, POWER_ENERGY, PlayerFrameEnergyBarText)
-    UpdateAuxiliaryBar(PlayerFrameRageBar, POWER_RAGE, nil)
+    UpdateAuxiliaryBar(PlayerFrameRageBar, POWER_RAGE, PlayerFrameRageBarText)
 
     -- Keep exact geometry stable if another stock PlayerFrame transition ran.
     ApplyReferencePlayerFrameLayout()
