@@ -22,19 +22,19 @@ local PORTRAIT_LEFT = 42
 local PORTRAIT_TOP = 12
 local PORTRAIT_SIZE = 64
 
--- Alignment corrections for the supplied Adventurer BLP.
--- The BLP itself is the fixed reference and is never repositioned.
-local RESOURCE_X_SHIFT = -6
-local PORTRAIT_X_SHIFT = -6
-local LEVEL_X_SHIFT = -8
-local MANA_X_SHIFT = -8
-local ENERGY_X_SHIFT = -8
-local BACKGROUND_X_SHIFT = -8
-local NAME_X_SHIFT = -2
+-- Final normal-HUD alignment pass: move the Adventurer BLP and all normal
+-- PlayerFrame contents 3px to the right from their previously tuned positions.
+-- Combat-only overlays (red status/flash textures and combat icons) stay fixed.
+local FRAME_ART_X_SHIFT = 3
+local RESOURCE_X_SHIFT = -3
+local PORTRAIT_X_SHIFT = -3
+local LEVEL_X_SHIFT = -5
+local MANA_X_SHIFT = -5
+local ENERGY_X_SHIFT = -5
+local BACKGROUND_X_SHIFT = -5
+local NAME_X_SHIFT = 1
 
--- PlayerFrameFlash is not the persistent red combat border. That border is
--- PlayerStatusTexture (UI-Player-Status), which Blizzard tints red in combat.
--- Keep the flash at its reference location and align the status texture itself.
+-- Combat overlays intentionally remain at their current positions.
 local FLASH_X_SHIFT = 0
 local STATUS_X_SHIFT = 5
 
@@ -140,6 +140,9 @@ local function ApplyReferencePlayerFrameLayout()
     end
 
     if PlayerFrameTexture then
+        PlayerFrameTexture:ClearAllPoints()
+        PlayerFrameTexture:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", FRAME_ART_X_SHIFT, 0)
+        PlayerFrameTexture:SetPoint("BOTTOMRIGHT", PlayerFrame, "BOTTOMRIGHT", FRAME_ART_X_SHIFT, 0)
         PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)
         PlayerFrameTexture:SetTexCoord(
             ADVENTURER_FRAME_TEX_LEFT,
