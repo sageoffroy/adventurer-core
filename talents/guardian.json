@@ -144,7 +144,7 @@
       "col": 1,
       "enUS": "Steady Footing",
       "esMX": "Paso firme",
-      "icon": "inv_boots_plate_04",
+      "icon": "ability_warstomp",
       "spell_source_ids": [17002, 17002],
       "effect_values": {"0": [15, 30], "1": [2, 4], "2": [2, 4]},
       "spell_u32_values": {
