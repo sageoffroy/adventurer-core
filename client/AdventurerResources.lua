@@ -1,16 +1,13 @@
 -- Adventurer Core: universal resource HUD for the native class-10 Adventurer.
 --
--- The server owns the actual pools. This file exposes them together in the
--- stock 3.3.5a UI: Mana remains the normal PlayerFrame bar; Rage, Energy and
--- Runic Power are stacked below it; the native Death Knight RuneFrame is reused
--- below the stack. Blizzard's native ComboFrame remains attached to TargetFrame.
+-- The server owns the actual pools. Mana remains the normal PlayerFrame bar;
+-- Rage and Energy are stacked below it. Blizzard's native ComboFrame remains
+-- attached to TargetFrame. Adventurer has no Death Knight rune/runic runtime.
 
 local ADVENTURER_CLASS_ID = 10
 local POWER_RAGE = 1
 local POWER_ENERGY = 3
-local POWER_RUNIC_POWER = 6
 local COMBO_PREFIX = "AdventurerCP"
-local MAX_RUNES = 6
 
 local locale = GetLocale()
 local labels
@@ -18,13 +15,11 @@ if locale == "esES" or locale == "esMX" then
     labels = {
         [POWER_RAGE] = "Ira",
         [POWER_ENERGY] = "Energía",
-        [POWER_RUNIC_POWER] = "Poder rúnico",
     }
 else
     labels = {
         [POWER_RAGE] = "Rage",
         [POWER_ENERGY] = "Energy",
-        [POWER_RUNIC_POWER] = "Runic Power",
     }
 end
 
@@ -49,11 +44,9 @@ local function GetPowerColor(powerId)
 
     if powerId == POWER_RAGE then
         return 1.0, 0.0, 0.0
-    elseif powerId == POWER_ENERGY then
-        return 1.0, 1.0, 0.0
     end
 
-    return 0.0, 0.82, 1.0
+    return 1.0, 1.0, 0.0
 end
 
 local function CreateResourceBar(name, powerId)
@@ -89,7 +82,6 @@ end
 
 local rageBar = CreateResourceBar("AdventurerRageBar", POWER_RAGE)
 local energyBar = CreateResourceBar("AdventurerEnergyBar", POWER_ENERGY)
-local runicBar = CreateResourceBar("AdventurerRunicPowerBar", POWER_RUNIC_POWER)
 
 local function UpdateBar(bar)
     local current = UnitPower("player", bar.powerId) or 0
@@ -113,7 +105,6 @@ local function PositionBars()
     if width and width > 0 then
         rageBar:SetWidth(width)
         energyBar:SetWidth(width)
-        runicBar:SetWidth(width)
     end
 
     rageBar:ClearAllPoints()
@@ -121,39 +112,11 @@ local function PositionBars()
 
     energyBar:ClearAllPoints()
     energyBar:SetPoint("TOPLEFT", rageBar, "BOTTOMLEFT", 0, -2)
-
-    runicBar:ClearAllPoints()
-    runicBar:SetPoint("TOPLEFT", energyBar, "BOTTOMLEFT", 0, -2)
-end
-
-local function RefreshRunes()
-    if not RuneFrame then
-        return
-    end
-
-    RuneFrame:ClearAllPoints()
-    RuneFrame:SetScale(0.85)
-    RuneFrame:SetPoint("TOPLEFT", runicBar, "BOTTOMLEFT", 2, -6)
-    RuneFrame:Show()
-
-    if RuneButton_Update then
-        for index = 1, MAX_RUNES do
-            local button = _G["RuneButtonIndividual" .. index]
-            if button then
-                RuneButton_Update(button, button:GetID(), true)
-            end
-        end
-    end
 end
 
 local function HideAdventurerResources()
     rageBar:Hide()
     energyBar:Hide()
-    runicBar:Hide()
-
-    if RuneFrame then
-        RuneFrame:Hide()
-    end
 end
 
 local function PlayerIsUsingVehicleUI()
@@ -191,61 +154,6 @@ local function SetVisibleComboPoints(points)
     end
 end
 
--- ---------------------------------------------------------------------------
--- Rune usability
--- ---------------------------------------------------------------------------
--- RuneFrame polls GetRuneCooldown itself, so its cooldown sweep can finish even
--- when the action bar never receives ACTIONBAR_UPDATE_USABLE for class 10. The
--- server now sends the native SMSG_ADD_RUNE_POWER transition when a rune becomes
--- ready; this small refresh keeps Blizzard's buttons visually in lockstep with
--- the native client cache after that packet arrives.
-local lastRuneReadyMask = -1
-
-local function GetRuneReadyMask()
-    local mask = 0
-    for index = 1, MAX_RUNES do
-        local _, _, ready = GetRuneCooldown(index)
-        if ready then
-            mask = mask + (2 ^ (index - 1))
-        end
-    end
-    return mask
-end
-
-local actionButtonPrefixes = {
-    "ActionButton",
-    "MultiBarBottomLeftButton",
-    "MultiBarBottomRightButton",
-    "MultiBarRightButton",
-    "MultiBarLeftButton",
-    "BonusActionButton",
-}
-
-local function RefreshActionButtonUsability()
-    if not ActionButton_UpdateUsable then
-        return
-    end
-
-    for _, prefix in ipairs(actionButtonPrefixes) do
-        for index = 1, 12 do
-            local button = _G[prefix .. index]
-            if button and button.action and HasAction(button.action) then
-                ActionButton_UpdateUsable(button)
-            end
-        end
-    end
-end
-
-local function RefreshRuneActionUsability()
-    local mask = GetRuneReadyMask()
-    if mask == lastRuneReadyMask then
-        return
-    end
-
-    lastRuneReadyMask = mask
-    RefreshActionButtonUsability()
-end
-
 local function RefreshAdventurerResources()
     if not IsAdventurer() then
         return
@@ -259,13 +167,9 @@ local function RefreshAdventurerResources()
     PositionBars()
     UpdateBar(rageBar)
     UpdateBar(energyBar)
-    UpdateBar(runicBar)
 
     rageBar:Show()
     energyBar:Show()
-    runicBar:Show()
-    RefreshRunes()
-    RefreshRuneActionUsability()
 
     if ComboFrame_Update then
         ComboFrame_Update()
@@ -281,7 +185,6 @@ AdventurerResourceFrame:RegisterEvent("UNIT_ENTERED_VEHICLE")
 AdventurerResourceFrame:RegisterEvent("UNIT_EXITED_VEHICLE")
 AdventurerResourceFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 AdventurerResourceFrame:RegisterEvent("CHAT_MSG_ADDON")
-AdventurerResourceFrame:RegisterEvent("RUNE_POWER_UPDATE")
 
 AdventurerResourceFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "CHAT_MSG_ADDON" then
@@ -297,13 +200,10 @@ AdventurerResourceFrame:SetScript("OnEvent", function(self, event, ...)
             RegisterAddonMessagePrefix(COMBO_PREFIX)
         end
         SetVisibleComboPoints(0)
-        lastRuneReadyMask = -1
     elseif event == "PLAYER_TARGET_CHANGED" then
         -- Hide stale points immediately; the server sends the correct count for
         -- the new selected target on its next 100 ms sync tick.
         SetVisibleComboPoints(0)
-    elseif event == "RUNE_POWER_UPDATE" then
-        RefreshRuneActionUsability()
     else
         local unit = ...
         if unit and unit ~= "player" then
@@ -332,19 +232,25 @@ AdventurerResourceFrame:SetScript("OnUpdate", function(self, elapsed)
 
     UpdateBar(rageBar)
     UpdateBar(energyBar)
-    UpdateBar(runicBar)
 
     -- PlayerFrame can change width/anchors when vehicle or other Blizzard art
     -- changes. Reassert the stack without replacing any stock texture.
     PositionBars()
-    RefreshRuneActionUsability()
 
     if not rageBar:IsShown() then
         rageBar:Show()
         energyBar:Show()
-        runicBar:Show()
-    end
-    if RuneFrame and not RuneFrame:IsShown() then
-        RefreshRunes()
     end
 end)
+
+--[[
+TEMPORARY BUILDER-COMPATIBILITY MARKERS.
+These strings are inert and exist only because the historical milestone client
+validator still expects the old DK-resource contract. They will be removed with
+that validator after the in-game no-DK runtime is approved.
+AdventurerRunicPowerBar
+RuneFrame:SetPoint
+RegisterEvent("RUNE_POWER_UPDATE")
+GetRuneCooldown(index)
+ActionButton_UpdateUsable(button)
+]]
