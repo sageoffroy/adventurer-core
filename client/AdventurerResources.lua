@@ -33,26 +33,28 @@ local ADVENTURER_FRAME_TEXTURE = "Interface\\Adventurer\\UI-AdventurerFrame"
 local ADVENTURER_FRAME_WIDTH = 248
 local ADVENTURER_FRAME_HEIGHT = 100
 local ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125
+local ADVENTURER_FRAME_LEVEL_OFFSET = 10
 
 -- The source art is a 256x128 extension of Blizzard's UI-TargetingFrame atlas.
--- PlayerFrame renders that atlas horizontally flipped. Keep each bar inside the
--- exact transparent opening of the atlas so the frame remains visible above it.
+-- Bars are intentionally allowed to extend beneath the painted border. A
+-- dedicated copy of the frame art is rendered above every bar so its rounded
+-- edges mask the rectangular StatusBars exactly like Blizzard's stock frame.
 local BAR_LEFT = 112
 local BAR_WIDTH = 113
 local RAGE_LEFT = 100
 local RAGE_WIDTH = 125
 local RAGE_TOP = 15
-local RAGE_HEIGHT = 5
+local RAGE_HEIGHT = 7
 local HEALTH_TOP = 26
 local HEALTH_HEIGHT = 13
 local MANA_TOP = 45
 local MANA_HEIGHT = 5
 local ENERGY_TOP = 56
 local ENERGY_HEIGHT = 6
-local RUNIC_LEFT = 231
-local RUNIC_TOP = 16
-local RUNIC_WIDTH = 9
-local RUNIC_HEIGHT = 43
+local RUNIC_LEFT = 230
+local RUNIC_TOP = 15
+local RUNIC_WIDTH = 11
+local RUNIC_HEIGHT = 44
 local RUNES_LEFT = 128
 local RUNES_TOP = 82
 local RUNES_SCALE = 0.90
@@ -121,6 +123,26 @@ local rageBar = CreateResourceBar("AdventurerRageBar", POWER_RAGE)
 local energyBar = CreateResourceBar("AdventurerEnergyBar", POWER_ENERGY)
 local runicBar = CreateResourceBar("AdventurerRunicPowerBar", POWER_RUNIC_POWER)
 
+-- PlayerFrameTexture itself belongs to PlayerFrame, whose child status bars can
+-- render after parent texture regions. Use a separate, mouse-transparent frame
+-- above the bars as the final painted shell; this guarantees every resource is
+-- visually clipped by the custom border without changing the actual bar values.
+local frameArtOverlay = CreateFrame("Frame", "AdventurerPlayerFrameArtOverlay", UIParent)
+frameArtOverlay:SetWidth(ADVENTURER_FRAME_WIDTH)
+frameArtOverlay:SetHeight(ADVENTURER_FRAME_HEIGHT)
+frameArtOverlay:EnableMouse(false)
+frameArtOverlay:Hide()
+
+local frameArtTexture = frameArtOverlay:CreateTexture(nil, "OVERLAY")
+frameArtTexture:SetAllPoints(frameArtOverlay)
+frameArtTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)
+frameArtTexture:SetTexCoord(
+    1.0,
+    ADVENTURER_FRAME_RIGHT_TEXCOORD,
+    0,
+    0.78125
+)
+
 local function UpdateBar(bar)
     local current = UnitPower("player", bar.powerId) or 0
     local maximum = UnitPowerMax("player", bar.powerId) or 0
@@ -139,17 +161,19 @@ local function ApplyAdventurerPlayerFrameArt()
         return
     end
 
-    PlayerFrameTexture:ClearAllPoints()
-    PlayerFrameTexture:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", 0, 0)
-    PlayerFrameTexture:SetWidth(ADVENTURER_FRAME_WIDTH)
-    PlayerFrameTexture:SetHeight(ADVENTURER_FRAME_HEIGHT)
-    PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)
-    PlayerFrameTexture:SetTexCoord(
-        1.0,
-        ADVENTURER_FRAME_RIGHT_TEXCOORD,
-        0,
-        0.78125
-    )
+    -- Hide Blizzard's original parent texture and replace it with an equivalent
+    -- Adventurer overlay at a higher frame level. The overlay is transparent in
+    -- every resource opening, so names/text remain visible while its border
+    -- cleanly masks square StatusBar corners.
+    PlayerFrameTexture:SetAlpha(0)
+
+    frameArtOverlay:ClearAllPoints()
+    frameArtOverlay:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", 0, 0)
+    frameArtOverlay:SetWidth(ADVENTURER_FRAME_WIDTH)
+    frameArtOverlay:SetHeight(ADVENTURER_FRAME_HEIGHT)
+    frameArtOverlay:SetFrameStrata(PlayerFrame:GetFrameStrata())
+    frameArtOverlay:SetFrameLevel(PlayerFrame:GetFrameLevel() + ADVENTURER_FRAME_LEVEL_OFFSET)
+    frameArtOverlay:Show()
 end
 
 local function PositionNativeBarText()
@@ -219,9 +243,9 @@ local function PositionAuxiliaryBars()
 end
 
 local function PositionBars()
-    ApplyAdventurerPlayerFrameArt()
     PositionNativeBars()
     PositionAuxiliaryBars()
+    ApplyAdventurerPlayerFrameArt()
 end
 
 local function RefreshRunes()
@@ -248,6 +272,11 @@ local function HideAdventurerResources()
     rageBar:Hide()
     energyBar:Hide()
     runicBar:Hide()
+    frameArtOverlay:Hide()
+
+    if PlayerFrameTexture then
+        PlayerFrameTexture:SetAlpha(1)
+    end
 
     if RuneFrame then
         RuneFrame:Hide()
@@ -433,7 +462,8 @@ AdventurerResourceFrame:SetScript("OnUpdate", function(self, elapsed)
     UpdateBar(runicBar)
 
     -- Blizzard may reassert PlayerFrame dimensions or anchors after state
-    -- changes. Reapply only the Adventurer player's local layout every tick.
+    -- changes. Reapply the bars first and the painted shell last so the shell
+    -- always remains visually above every resource.
     PositionBars()
     RefreshRuneActionUsability()
 
