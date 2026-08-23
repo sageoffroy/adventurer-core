@@ -32,12 +32,11 @@ local ADVENTURER_FRAME_WIDTH = 248
 local ADVENTURER_FRAME_HEIGHT = 100
 local ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125
 
--- The source art is a 256x128 extension of Blizzard's UI-TargetingFrame atlas.
--- All resource bars render on lower strata; a dedicated frame-art overlay lives
--- on HIGH strata so the painted frame always masks the rectangular StatusBars.
+-- All resource bars stay behind the painted shell. Blizzard's level text lives
+-- on PlayerFrame, so we mirror it on the HIGH-strata overlay to keep it visible.
 local BAR_LEFT = 110
 local BAR_WIDTH = 115
-local RAGE_LEFT = 90
+local RAGE_LEFT = 91
 local RAGE_WIDTH = 135
 local RAGE_TOP = 12
 local RAGE_HEIGHT = 10
@@ -51,8 +50,8 @@ local RUNIC_LEFT = 225
 local RUNIC_TOP = 15
 local RUNIC_WIDTH = 16
 local RUNIC_HEIGHT = 46
-local RUNES_LEFT = 128
-local RUNES_TOP = 82
+local RUNES_LEFT = 126
+local RUNES_TOP = 79
 local RUNES_SCALE = 0.90
 
 local function IsAdventurer()
@@ -126,7 +125,7 @@ frameArtOverlay:SetFrameLevel(1)
 frameArtOverlay:EnableMouse(false)
 frameArtOverlay:Hide()
 
-local frameArtTexture = frameArtOverlay:CreateTexture(nil, "OVERLAY")
+local frameArtTexture = frameArtOverlay:CreateTexture(nil, "ARTWORK")
 frameArtTexture:SetAllPoints(frameArtOverlay)
 frameArtTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)
 frameArtTexture:SetTexCoord(
@@ -135,6 +134,14 @@ frameArtTexture:SetTexCoord(
     0,
     0.78125
 )
+
+local adventurerLevelText = frameArtOverlay:CreateFontString(
+    "AdventurerPlayerLevelText",
+    "OVERLAY",
+    "GameFontNormalSmall"
+)
+adventurerLevelText:SetPoint("CENTER", PlayerFrame, "CENTER", -63, -16)
+adventurerLevelText:Hide()
 
 local function UpdateBar(bar)
     local current = UnitPower("player", bar.powerId) or 0
@@ -160,6 +167,9 @@ local function ApplyAdventurerPlayerFrameArt()
     end
 
     PlayerFrameTexture:SetAlpha(0)
+    if PlayerLevelText then
+        PlayerLevelText:Hide()
+    end
 
     frameArtOverlay:ClearAllPoints()
     frameArtOverlay:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", 0, 0)
@@ -167,6 +177,9 @@ local function ApplyAdventurerPlayerFrameArt()
     frameArtOverlay:SetHeight(ADVENTURER_FRAME_HEIGHT)
     frameArtOverlay:SetFrameStrata("HIGH")
     frameArtOverlay:SetFrameLevel(1)
+
+    adventurerLevelText:SetText(UnitLevel("player") or "")
+    adventurerLevelText:Show()
     frameArtOverlay:Show()
 end
 
@@ -266,10 +279,14 @@ local function HideAdventurerResources()
     rageBar:Hide()
     energyBar:Hide()
     runicBar:Hide()
+    adventurerLevelText:Hide()
     frameArtOverlay:Hide()
 
     if PlayerFrameTexture then
         PlayerFrameTexture:SetAlpha(1)
+    end
+    if PlayerLevelText then
+        PlayerLevelText:Show()
     end
 
     if RuneFrame then
