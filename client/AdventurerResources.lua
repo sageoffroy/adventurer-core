@@ -31,7 +31,12 @@ local MANA_X_SHIFT = -8
 local ENERGY_X_SHIFT = -8
 local BACKGROUND_X_SHIFT = -8
 local NAME_X_SHIFT = -2
-local FLASH_X_SHIFT = -1
+
+-- PlayerFrameFlash is not the persistent red combat border. That border is
+-- PlayerStatusTexture (UI-Player-Status), which Blizzard tints red in combat.
+-- Keep the flash at its reference location and align the status texture itself.
+local FLASH_X_SHIFT = 0
+local STATUS_X_SHIFT = 5
 
 local BACKGROUND_LEFT = 106
 local BACKGROUND_TOP = 22
@@ -154,7 +159,7 @@ local function ApplyReferencePlayerFrameLayout()
     if PlayerStatusTexture then
         PlayerStatusTexture:SetWidth(STATUS_WIDTH)
         PlayerStatusTexture:SetHeight(STATUS_HEIGHT)
-        SetFramePoint(PlayerStatusTexture, "TOPLEFT", PlayerFrame, "TOPLEFT", STATUS_LEFT, -STATUS_TOP)
+        SetFramePoint(PlayerStatusTexture, "TOPLEFT", PlayerFrame, "TOPLEFT", STATUS_LEFT + STATUS_X_SHIFT, -STATUS_TOP)
     end
 
     if PlayerName then
