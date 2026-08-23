@@ -67,8 +67,7 @@ class AdventurerResourceHudTests(unittest.TestCase):
     def test_native_player_frame_measurements_match_reference_layout(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
         expected = (
-            'PLAYER_FRAME_X = -25',
-            'PLAYER_FRAME_Y = -4',
+            'RESOURCE_X_SHIFT = -6',
             'PLAYER_FRAME_WIDTH = 232',
             'PLAYER_FRAME_HEIGHT = 100',
             'PORTRAIT_LEFT = 42',
@@ -100,14 +99,29 @@ class AdventurerResourceHudTests(unittest.TestCase):
         for marker in expected:
             self.assertIn(marker, lua)
 
-    def test_root_frame_shift_is_persisted_by_layout_pass(self) -> None:
+    def test_only_resource_stack_is_shifted_six_pixels_left(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
+        self.assertNotIn('SetFramePoint(PlayerFrame, "TOPLEFT", UIParent', lua)
         self.assertIn(
-            'SetFramePoint(PlayerFrame, "TOPLEFT", UIParent, "TOPLEFT", PLAYER_FRAME_X, PLAYER_FRAME_Y)',
+            'SetFramePoint(PlayerFrameBackground, "TOPLEFT", PlayerFrame, "TOPLEFT", BACKGROUND_LEFT + RESOURCE_X_SHIFT, -BACKGROUND_TOP)',
             lua,
         )
-        self.assertIn('self.elapsed < 0.10', lua)
-        self.assertIn('ApplyReferencePlayerFrameLayout()', lua)
+        self.assertIn(
+            'SetFramePoint(PlayerFrameHealthBar, "TOPLEFT", PlayerFrame, "TOPLEFT", HEALTH_LEFT + RESOURCE_X_SHIFT, -HEALTH_TOP)',
+            lua,
+        )
+        self.assertIn(
+            'SetFramePoint(PlayerFrameManaBar, "TOPLEFT", PlayerFrame, "TOPLEFT", MANA_LEFT + RESOURCE_X_SHIFT, -MANA_TOP)',
+            lua,
+        )
+        self.assertIn(
+            'SetFramePoint(PlayerFrameEnergyBar, "TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT + RESOURCE_X_SHIFT, -ENERGY_TOP)',
+            lua,
+        )
+        self.assertIn(
+            'SetFramePoint(PlayerFrameRageBar, "TOPRIGHT", PlayerFrame, "TOPRIGHT", RAGE_RIGHT + RESOURCE_X_SHIFT, -RAGE_TOP)',
+            lua,
+        )
 
     def test_auxiliary_bars_are_frame_xml_children_not_uiparent_statusbars(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
@@ -126,12 +140,12 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('POWER_ENERGY = 3', lua)
         self.assertNotIn('POWER_RUNIC_POWER', lua)
 
-    def test_resource_text_uses_reference_positions_and_hover(self) -> None:
+    def test_resource_text_follows_shifted_bars_and_hover(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
-        self.assertIn('SetFramePoint(PlayerFrameHealthBarText, "CENTER", PlayerFrame, "CENTER", 50, 3)', lua)
-        self.assertIn('SetFramePoint(PlayerFrameManaBarText, "CENTER", PlayerFrame, "CENTER", 50, -8)', lua)
-        self.assertIn('SetFramePoint(PlayerFrameEnergyBarText, "CENTER", PlayerFrame, "CENTER", 50, -22)', lua)
-        self.assertIn('SetFramePoint(PlayerFrameRageBarText, "CENTER", PlayerFrame, "TOPRIGHT", -2, -42)', lua)
+        self.assertIn('SetFramePoint(PlayerFrameHealthBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, 3)', lua)
+        self.assertIn('SetFramePoint(PlayerFrameManaBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, -8)', lua)
+        self.assertIn('SetFramePoint(PlayerFrameEnergyBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, -22)', lua)
+        self.assertIn('SetFramePoint(PlayerFrameRageBarText, "CENTER", PlayerFrame, "TOPRIGHT", -2 + RESOURCE_X_SHIFT, -42)', lua)
         self.assertIn('[POWER_RAGE] = "Ira"', lua)
         self.assertIn('[POWER_ENERGY] = "Energía"', lua)
         self.assertIn('bar:SetScript("OnEnter"', lua)
