@@ -19,25 +19,27 @@ local ADVENTURER_FRAME_HEIGHT = 100
 local ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125
 
 -- The source art is a 256x128 extension of Blizzard's UI-TargetingFrame atlas.
--- PlayerFrame renders that atlas horizontally flipped. Keeping a 1:1 source to
--- screen mapping preserves the stock frame exactly while exposing the new
--- 16-pixel strip on the rendered right side.
-local BAR_LEFT = 105
-local BAR_WIDTH = 121
+-- PlayerFrame renders that atlas horizontally flipped. Keep each bar inside the
+-- exact transparent opening of the atlas so the frame remains visible above it.
+local BAR_LEFT = 112
+local BAR_WIDTH = 113
+local RAGE_LEFT = 100
+local RAGE_WIDTH = 125
 local RAGE_TOP = 15
-local RAGE_HEIGHT = 6
+local RAGE_HEIGHT = 5
 local HEALTH_TOP = 26
 local HEALTH_HEIGHT = 13
 local MANA_TOP = 45
 local MANA_HEIGHT = 5
 local ENERGY_TOP = 56
 local ENERGY_HEIGHT = 6
-local RUNIC_LEFT = 228
+local RUNIC_LEFT = 231
 local RUNIC_TOP = 16
-local RUNIC_WIDTH = 12
-local RUNIC_HEIGHT = 41
-local RUNES_LEFT = 104
-local RUNES_TOP = 76
+local RUNIC_WIDTH = 9
+local RUNIC_HEIGHT = 43
+local RUNES_LEFT = 128
+local RUNES_TOP = 82
+local RUNES_SCALE = 0.90
 
 local function IsAdventurer()
     local className, classToken, classId = UnitClass("player")
@@ -113,7 +115,7 @@ local function UpdateBar(bar)
 
     bar:SetMinMaxValues(0, maximum)
     bar:SetValue(current)
-    bar.valueText:SetText(current .. " / " .. maximum)
+    bar.valueText:SetText(labels[bar.powerId] .. " " .. current .. " / " .. maximum)
 end
 
 local function ApplyAdventurerPlayerFrameArt()
@@ -183,8 +185,8 @@ local function PositionAuxiliaryBars()
 
     rageBar:ClearAllPoints()
     rageBar:SetOrientation("HORIZONTAL")
-    rageBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", BAR_LEFT, -RAGE_TOP)
-    rageBar:SetWidth(BAR_WIDTH)
+    rageBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RAGE_LEFT, -RAGE_TOP)
+    rageBar:SetWidth(RAGE_WIDTH)
     rageBar:SetHeight(RAGE_HEIGHT)
 
     energyBar:ClearAllPoints()
@@ -212,7 +214,7 @@ local function RefreshRunes()
     end
 
     RuneFrame:ClearAllPoints()
-    RuneFrame:SetScale(0.85)
+    RuneFrame:SetScale(RUNES_SCALE)
     RuneFrame:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RUNES_LEFT, -RUNES_TOP)
     RuneFrame:Show()
 
