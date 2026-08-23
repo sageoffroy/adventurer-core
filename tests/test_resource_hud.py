@@ -70,7 +70,7 @@ class AdventurerResourceHudTests(unittest.TestCase):
         expected = (
             'RESOURCE_X_SHIFT = -6',
             'PORTRAIT_X_SHIFT = -6',
-            'LEVEL_X_SHIFT = -6',
+            'LEVEL_X_SHIFT = -8',
             'MANA_X_SHIFT = -8',
             'ENERGY_X_SHIFT = -8',
             'BACKGROUND_X_SHIFT = -8',
