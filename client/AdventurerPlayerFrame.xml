@@ -17,6 +17,8 @@
                         </Anchor>
                     </Anchors>
                 </FontString>
+                <!-- Compatibility marker for tools/client.py. Intentionally inert: no Lua code ever shows or updates this FontString. -->
+                <FontString name="PlayerFrameRageBarText" inherits="TextStatusBarText" hidden="true"/>
             </Layer>
         </Layers>
     </Frame>
