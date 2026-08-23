@@ -17,8 +17,15 @@
                         </Anchor>
                     </Anchors>
                 </FontString>
-                <!-- Compatibility marker for tools/client.py. Intentionally inert: no Lua code ever shows or updates this FontString. -->
-                <FontString name="PlayerFrameRageBarText" inherits="TextStatusBarText" hidden="true"/>
+                <FontString name="PlayerFrameRageBarText" inherits="TextStatusBarText" hidden="true">
+                    <Anchors>
+                        <Anchor point="CENTER" relativeTo="PlayerFrame" relativePoint="TOPRIGHT">
+                            <Offset>
+                                <AbsDimension x="-2" y="-42"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
             </Layer>
         </Layers>
     </Frame>
@@ -49,7 +56,7 @@
         <BarColor r="1" g="1" b="0"/>
     </StatusBar>
 
-    <StatusBar name="PlayerFrameRageBar" parent="PlayerFrame" orientation="VERTICAL" hidden="true">
+    <StatusBar name="PlayerFrameRageBar" parent="PlayerFrame" inherits="TextStatusBar" orientation="VERTICAL" hidden="true">
         <Size>
             <AbsDimension x="12" y="38"/>
         </Size>
@@ -72,6 +79,12 @@
             </Layer>
         </Layers>
         <Scripts>
+            <OnLoad>
+                TextStatusBar_Initialize(self);
+                self.textLockable = 1;
+                self.cvar = "playerStatusText";
+                self.cvarLabel = "STATUS_TEXT_PLAYER";
+            </OnLoad>
             <OnMouseUp>
                 self:GetParent():Click(button);
             </OnMouseUp>
