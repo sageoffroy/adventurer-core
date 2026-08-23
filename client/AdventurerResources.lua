@@ -22,10 +22,10 @@ local ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125
 -- PlayerFrame renders that atlas horizontally flipped. Keeping a 1:1 source to
 -- screen mapping preserves the stock frame exactly while exposing the new
 -- 16-pixel strip on the rendered right side.
-local BAR_LEFT = 106
-local BAR_WIDTH = 119
+local BAR_LEFT = 105
+local BAR_WIDTH = 121
 local RAGE_TOP = 15
-local RAGE_HEIGHT = 5
+local RAGE_HEIGHT = 6
 local HEALTH_TOP = 26
 local HEALTH_HEIGHT = 13
 local MANA_TOP = 45
@@ -33,9 +33,9 @@ local MANA_HEIGHT = 5
 local ENERGY_TOP = 56
 local ENERGY_HEIGHT = 6
 local RUNIC_LEFT = 228
-local RUNIC_TOP = 17
-local RUNIC_WIDTH = 11
-local RUNIC_HEIGHT = 40
+local RUNIC_TOP = 16
+local RUNIC_WIDTH = 12
+local RUNIC_HEIGHT = 41
 local RUNES_LEFT = 104
 local RUNES_TOP = 76
 
