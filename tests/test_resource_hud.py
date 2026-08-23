@@ -19,10 +19,10 @@ from client import (  # noqa: E402
 
 
 class AdventurerResourceHudTests(unittest.TestCase):
-    def test_frame_xml_loads_resource_hud_after_native_runes(self) -> None:
+    def test_frame_xml_loads_resource_hud_after_combo_frame(self) -> None:
         toc = build_frame_xml_toc().decode("utf-8")
         self.assertIn(
-            "RuneFrame.xml\nAdventurerResources.lua\nEasyMenu.lua",
+            "ComboFrame.xml\nAdventurerResources.lua\nTabardFrame.xml",
             toc,
         )
         self.assertEqual(toc.count("AdventurerResources.lua"), 1)
@@ -41,14 +41,6 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('HEALTH_TOP = 26', lua)
         self.assertIn('MANA_TOP = 45', lua)
         self.assertIn('ENERGY_TOP = 56', lua)
-        self.assertIn('RUNIC_LEFT = 225', lua)
-        self.assertIn('RUNIC_TOP = 15', lua)
-        self.assertIn('RUNIC_WIDTH = 16', lua)
-        self.assertIn('RUNIC_HEIGHT = 46', lua)
-        self.assertIn('RUNES_LEFT = 126', lua)
-        self.assertIn('RUNES_TOP = 79', lua)
-        self.assertIn('RUNES_SCALE = 0.90', lua)
-        self.assertIn('runicBar:SetOrientation("VERTICAL")', lua)
         self.assertIn('PlayerFrameHealthBar:SetPoint(', lua)
         self.assertIn('PlayerFrameManaBar:SetPoint(', lua)
         self.assertIn(
@@ -57,15 +49,6 @@ class AdventurerResourceHudTests(unittest.TestCase):
         )
         self.assertIn(
             'energyBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", BAR_LEFT, -ENERGY_TOP)',
-            lua,
-        )
-        self.assertIn(
-            'runicBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RUNIC_LEFT, -RUNIC_TOP)',
-            lua,
-        )
-        self.assertIn('RuneFrame:SetScale(RUNES_SCALE)', lua)
-        self.assertIn(
-            'RuneFrame:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RUNES_LEFT, -RUNES_TOP)',
             lua,
         )
 
@@ -90,13 +73,14 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('PlayerLevelText:Hide()', lua)
         self.assertIn('PlayerLevelText:Show()', lua)
 
-    def test_auxiliary_resources_still_read_native_power_pools(self) -> None:
+    def test_auxiliary_resources_read_only_rage_and_energy_native_pools(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
         self.assertIn('UnitPower("player", bar.powerId)', lua)
         self.assertIn('UnitPowerMax("player", bar.powerId)', lua)
         self.assertIn('AdventurerRageBar', lua)
         self.assertIn('AdventurerEnergyBar', lua)
-        self.assertIn('AdventurerRunicPowerBar', lua)
+        self.assertNotIn('AdventurerRunicPowerBar', lua)
+        self.assertNotIn('POWER_RUNIC_POWER', lua)
 
     def test_resource_text_follows_repositioned_bars_and_custom_bars_show_on_hover(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
@@ -104,10 +88,8 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('PlayerFrameManaBarText:SetPoint("CENTER", PlayerFrameManaBar, "CENTER", 0, 0)', lua)
         self.assertIn('bar:EnableMouse(true)', lua)
         self.assertIn('bar.valueText:SetText(labels[bar.powerId] .. " " .. current .. " / " .. maximum)', lua)
-        self.assertIn('bar.valueText:SetText(current .. " / " .. maximum)', lua)
         self.assertIn('[POWER_RAGE] = "Ira"', lua)
         self.assertIn('[POWER_ENERGY] = "Energía"', lua)
-        self.assertNotIn('[POWER_RUNIC_POWER] = "Poder rúnico"', lua)
         self.assertIn('bar:SetScript("OnEnter"', lua)
         self.assertIn('bar:SetScript("OnLeave"', lua)
         self.assertIn('self.valueText:Show()', lua)
@@ -125,13 +107,17 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertNotIn("SpellDraftCP", lua)
         self.assertNotIn("SpellDraft", lua)
 
-    def test_rune_ready_mask_refreshes_native_action_button_usability(self) -> None:
+    def test_death_knight_client_resources_are_absent(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
-        self.assertIn('RegisterEvent("RUNE_POWER_UPDATE")', lua)
-        self.assertIn('GetRuneCooldown(index)', lua)
-        self.assertIn('RefreshRuneActionUsability()', lua)
-        self.assertIn('ActionButton_UpdateUsable(button)', lua)
-        self.assertIn('lastRuneReadyMask', lua)
+        for token in (
+            'RuneFrame',
+            'RUNE_POWER_UPDATE',
+            'GetRuneCooldown',
+            'RuneButton_Update',
+            'POWER_RUNIC_POWER',
+            'AdventurerRunicPowerBar',
+        ):
+            self.assertNotIn(token, lua)
 
     def test_resource_hud_uses_native_class_id(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
