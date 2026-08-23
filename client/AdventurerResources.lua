@@ -22,15 +22,15 @@ local PORTRAIT_LEFT = 42
 local PORTRAIT_TOP = 12
 local PORTRAIT_SIZE = 64
 
--- Final normal-HUD alignment pass: move the Adventurer BLP and all normal
--- PlayerFrame contents 3px to the right from their previously tuned positions.
--- Combat-only overlays (red status/flash textures and combat icons) stay fixed.
-local FRAME_ART_X_SHIFT = 3
-local RESOURCE_X_SHIFT = -3
+-- Alignment corrections for the supplied Adventurer BLP.
+-- This pass moves only the BLP, resource bars/text, and level another 3px right.
+-- Portrait, name block/text, and combat-only overlays stay exactly where they were.
+local FRAME_ART_X_SHIFT = 6
+local RESOURCE_X_SHIFT = 0
 local PORTRAIT_X_SHIFT = -3
-local LEVEL_X_SHIFT = -5
-local MANA_X_SHIFT = -5
-local ENERGY_X_SHIFT = -5
+local LEVEL_X_SHIFT = -2
+local MANA_X_SHIFT = -2
+local ENERGY_X_SHIFT = -2
 local BACKGROUND_X_SHIFT = -5
 local NAME_X_SHIFT = 1
 
