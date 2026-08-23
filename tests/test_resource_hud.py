@@ -32,10 +32,8 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('ADVENTURER_FRAME_TEXTURE = "Interface\\\\Adventurer\\\\UI-AdventurerFrame"', lua)
         self.assertIn('ADVENTURER_FRAME_WIDTH = 248', lua)
         self.assertIn('ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125', lua)
-        self.assertIn('BAR_LEFT = 112', lua)
-        self.assertIn('BAR_WIDTH = 113', lua)
-        self.assertIn('HEALTH_LEFT = 110', lua)
-        self.assertIn('ENERGY_LEFT = 110', lua)
+        self.assertIn('BAR_LEFT = 110', lua)
+        self.assertIn('BAR_WIDTH = 115', lua)
         self.assertIn('RAGE_LEFT = 90', lua)
         self.assertIn('RAGE_WIDTH = 135', lua)
         self.assertIn('RAGE_TOP = 12', lua)
@@ -58,7 +56,7 @@ class AdventurerResourceHudTests(unittest.TestCase):
             lua,
         )
         self.assertIn(
-            'energyBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT, -ENERGY_TOP)',
+            'energyBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", BAR_LEFT, -ENERGY_TOP)',
             lua,
         )
         self.assertIn(
