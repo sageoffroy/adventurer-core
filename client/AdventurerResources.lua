@@ -32,12 +32,12 @@ local MANA_TOP = 45
 local MANA_HEIGHT = 5
 local ENERGY_TOP = 56
 local ENERGY_HEIGHT = 6
-local RUNIC_LEFT = 229
+local RUNIC_LEFT = 228
 local RUNIC_TOP = 17
-local RUNIC_WIDTH = 9
+local RUNIC_WIDTH = 11
 local RUNIC_HEIGHT = 40
 local RUNES_LEFT = 104
-local RUNES_TOP = 68
+local RUNES_TOP = 76
 
 local function IsAdventurer()
     local className, classToken, classId = UnitClass("player")
@@ -72,6 +72,7 @@ local function CreateResourceBar(name, powerId)
     bar.powerId = powerId
     bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
     bar:SetFrameStrata("LOW")
+    bar:EnableMouse(true)
 
     local r, g, b = GetPowerColor(powerId)
     bar:SetStatusBarColor(r, g, b)
@@ -80,6 +81,19 @@ local function CreateResourceBar(name, powerId)
     background:SetAllPoints(bar)
     background:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
     background:SetVertexColor(0.08, 0.08, 0.08, 0.85)
+
+    local value = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    value:SetPoint("CENTER", bar, "CENTER", 0, 0)
+    value:SetJustifyH("CENTER")
+    value:Hide()
+    bar.valueText = value
+
+    bar:SetScript("OnEnter", function(self)
+        self.valueText:Show()
+    end)
+    bar:SetScript("OnLeave", function(self)
+        self.valueText:Hide()
+    end)
 
     bar:Hide()
     return bar
@@ -99,6 +113,7 @@ local function UpdateBar(bar)
 
     bar:SetMinMaxValues(0, maximum)
     bar:SetValue(current)
+    bar.valueText:SetText(current .. " / " .. maximum)
 end
 
 local function ApplyAdventurerPlayerFrameArt()
@@ -117,6 +132,18 @@ local function ApplyAdventurerPlayerFrameArt()
         0,
         0.78125
     )
+end
+
+local function PositionNativeBarText()
+    if PlayerFrameHealthBarText and PlayerFrameHealthBar then
+        PlayerFrameHealthBarText:ClearAllPoints()
+        PlayerFrameHealthBarText:SetPoint("CENTER", PlayerFrameHealthBar, "CENTER", 0, 0)
+    end
+
+    if PlayerFrameManaBarText and PlayerFrameManaBar then
+        PlayerFrameManaBarText:ClearAllPoints()
+        PlayerFrameManaBarText:SetPoint("CENTER", PlayerFrameManaBar, "CENTER", 0, 0)
+    end
 end
 
 local function PositionNativeBars()
@@ -145,6 +172,8 @@ local function PositionNativeBars()
     )
     PlayerFrameManaBar:SetWidth(BAR_WIDTH)
     PlayerFrameManaBar:SetHeight(MANA_HEIGHT)
+
+    PositionNativeBarText()
 end
 
 local function PositionAuxiliaryBars()
