@@ -18,6 +18,8 @@ ROOT = Path(__file__).resolve().parent.parent
 CHARACTER_CREATE_BASELINE = ROOT / "client" / "baseline" / "CharacterCreate.lua"
 FRAME_XML_BASELINE = ROOT / "client" / "baseline" / "FrameXML.toc"
 ADVENTURER_RESOURCES = ROOT / "client" / "AdventurerResources.lua"
+ADVENTURER_FRAME_ART = ROOT / "client" / "art" / "UI-AdventurerFrame.blp"
+ADVENTURER_FRAME_INTERNAL = "Interface\\Adventurer\\UI-AdventurerFrame.blp"
 DEFAULT_LOCALE = "esMX"
 PROJECT_SUFFIX = "Z"
 OWNER_MANIFEST = ".adventurer-core.json"
@@ -199,6 +201,11 @@ def build_adventurer_resources_lua() -> bytes:
         b"AdventurerRageBar",
         b"AdventurerEnergyBar",
         b"AdventurerRunicPowerBar",
+        b"ADVENTURER_FRAME_TEXTURE",
+        b"PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)",
+        b"PlayerFrameHealthBar:SetPoint",
+        b"PlayerFrameManaBar:SetPoint",
+        b'runicBar:SetOrientation("VERTICAL")',
         b"RuneFrame:SetPoint",
         b'COMBO_PREFIX = "AdventurerCP"',
         b"local nativeGetComboPoints = GetComboPoints",
@@ -231,6 +238,24 @@ def build_adventurer_resources_lua() -> bytes:
     return payload
 
 
+def build_adventurer_frame_art() -> bytes:
+    if not ADVENTURER_FRAME_ART.is_file():
+        raise ClientError(f"Missing Adventurer frame art: {ADVENTURER_FRAME_ART}")
+
+    payload = ADVENTURER_FRAME_ART.read_bytes()
+    if len(payload) < 20 or payload[:4] != b"BLP2":
+        raise ClientError("Adventurer frame art must be a BLP2 texture")
+
+    width = int.from_bytes(payload[12:16], "little")
+    height = int.from_bytes(payload[16:20], "little")
+    if (width, height) != (256, 128):
+        raise ClientError(
+            f"Adventurer frame art must be 256x128, got {width}x{height}"
+        )
+
+    return payload
+
+
 def patch_dbc_copy(source: Path, work: Path) -> dict[str, bool]:
     missing = [name for name in DBC_SOURCE_NAMES if not (source / name).is_file()]
     if missing:
@@ -247,6 +272,7 @@ def build_archive_files(work: Path) -> tuple[dict[str, bytes], dict[str, bytes]]
         "Interface\\GlueXML\\CharacterCreate.lua": build_character_create_lua(),
         "Interface\\FrameXML\\FrameXML.toc": build_frame_xml_toc(),
         "Interface\\FrameXML\\AdventurerResources.lua": build_adventurer_resources_lua(),
+        ADVENTURER_FRAME_INTERNAL: build_adventurer_frame_art(),
         **{
             f"DBFilesClient\\{name}": (work / name).read_bytes()
             for name in ROOT_SHARED_DBCS
@@ -308,6 +334,7 @@ def build_patch(dbc_source: Path, output: Path, locale: str = DEFAULT_LOCALE) ->
         "character_create_sha256": hashlib.sha256(build_character_create_lua()).hexdigest(),
         "frame_xml_toc_sha256": hashlib.sha256(build_frame_xml_toc()).hexdigest(),
         "resource_hud_sha256": hashlib.sha256(build_adventurer_resources_lua()).hexdigest(),
+        "adventurer_frame_sha256": hashlib.sha256(build_adventurer_frame_art()).hexdigest(),
     }
     (output / "manifest.json").write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
