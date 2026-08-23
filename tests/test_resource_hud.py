@@ -38,7 +38,9 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('HEALTH_TOP = 26', lua)
         self.assertIn('MANA_TOP = 45', lua)
         self.assertIn('ENERGY_TOP = 56', lua)
-        self.assertIn('RUNIC_LEFT = 229', lua)
+        self.assertIn('RUNIC_LEFT = 228', lua)
+        self.assertIn('RUNIC_WIDTH = 11', lua)
+        self.assertIn('RUNES_TOP = 76', lua)
         self.assertIn('runicBar:SetOrientation("VERTICAL")', lua)
         self.assertIn('PlayerFrameHealthBar:SetPoint(', lua)
         self.assertIn('PlayerFrameManaBar:SetPoint(', lua)
@@ -66,6 +68,17 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('AdventurerRageBar', lua)
         self.assertIn('AdventurerEnergyBar', lua)
         self.assertIn('AdventurerRunicPowerBar', lua)
+
+    def test_resource_text_follows_repositioned_bars_and_custom_bars_show_on_hover(self) -> None:
+        lua = build_adventurer_resources_lua().decode("utf-8")
+        self.assertIn('PlayerFrameHealthBarText:SetPoint("CENTER", PlayerFrameHealthBar, "CENTER", 0, 0)', lua)
+        self.assertIn('PlayerFrameManaBarText:SetPoint("CENTER", PlayerFrameManaBar, "CENTER", 0, 0)', lua)
+        self.assertIn('bar:EnableMouse(true)', lua)
+        self.assertIn('bar.valueText:SetText(current .. " / " .. maximum)', lua)
+        self.assertIn('bar:SetScript("OnEnter"', lua)
+        self.assertIn('bar:SetScript("OnLeave"', lua)
+        self.assertIn('self.valueText:Show()', lua)
+        self.assertIn('self.valueText:Hide()', lua)
 
     def test_combo_points_feed_blizzards_native_target_frame(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
