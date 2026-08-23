@@ -14,6 +14,7 @@ from client import (  # noqa: E402
     DBC_NAMES,
     build_adventurer_frame_art,
     build_adventurer_player_frame_xml,
+    build_adventurer_resources_lua,
     build_archive_files,
     build_frame_xml_toc,
 )
@@ -74,7 +75,8 @@ class AdventurerResourceHudTests(unittest.TestCase):
             'ENERGY_X_SHIFT = -8',
             'BACKGROUND_X_SHIFT = -8',
             'NAME_X_SHIFT = -2',
-            'FLASH_X_SHIFT = -1',
+            'FLASH_X_SHIFT = 0',
+            'STATUS_X_SHIFT = 5',
             'PLAYER_FRAME_WIDTH = 232',
             'PLAYER_FRAME_HEIGHT = 100',
             'PORTRAIT_LEFT = 42',
@@ -118,6 +120,7 @@ class AdventurerResourceHudTests(unittest.TestCase):
             'SetFramePoint(PlayerFrameRageBar, "TOPRIGHT", PlayerFrame, "TOPRIGHT", RAGE_RIGHT + RESOURCE_X_SHIFT, -RAGE_TOP)',
             'SetFramePoint(PlayerLevelText, "CENTER", PlayerFrame, "CENTER", -63 + LEVEL_X_SHIFT, -16)',
             'SetFramePoint(PlayerFrameFlash, "TOPLEFT", PlayerFrame, "TOPLEFT", FLASH_LEFT + FLASH_X_SHIFT, -FLASH_TOP)',
+            'SetFramePoint(PlayerStatusTexture, "TOPLEFT", PlayerFrame, "TOPLEFT", STATUS_LEFT + STATUS_X_SHIFT, -STATUS_TOP)',
         )
         for marker in expected:
             self.assertIn(marker, lua)
