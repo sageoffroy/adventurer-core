@@ -22,7 +22,9 @@ class CleanInstallContractTests(unittest.TestCase):
 
         source = runtime.read_text(encoding="utf-8")
         self.assertIn("player->ResyncRunes(MAX_RUNES)", source)
-        self.assertNotIn("player->AddRunePower(index)", source)
+        self.assertIn("player->AddRunePower(index)", source)
+        self.assertIn("previousReadyMask & ~readyMask", source)
+        self.assertIn("readyMask & ~previousReadyMask", source)
         self.assertIn(
             "playerClass == CLASS_DEATH_KNIGHT && context == CLASS_CONTEXT_ABILITY",
             source,
