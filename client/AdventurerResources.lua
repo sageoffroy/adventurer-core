@@ -26,7 +26,7 @@ local PORTRAIT_SIZE = 64
 -- The BLP itself is the fixed reference and is never repositioned.
 local RESOURCE_X_SHIFT = -6
 local PORTRAIT_X_SHIFT = -6
-local LEVEL_X_SHIFT = -6
+local LEVEL_X_SHIFT = -8
 local MANA_X_SHIFT = -8
 local ENERGY_X_SHIFT = -8
 local BACKGROUND_X_SHIFT = -8
