@@ -33,28 +33,26 @@ local ADVENTURER_FRAME_TEXTURE = "Interface\\Adventurer\\UI-AdventurerFrame"
 local ADVENTURER_FRAME_WIDTH = 248
 local ADVENTURER_FRAME_HEIGHT = 100
 local ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125
-local ADVENTURER_FRAME_LEVEL_OFFSET = 10
 
 -- The source art is a 256x128 extension of Blizzard's UI-TargetingFrame atlas.
--- Bars are intentionally allowed to extend beneath the painted border. A
--- dedicated copy of the frame art is rendered above every bar so its rounded
--- edges mask the rectangular StatusBars exactly like Blizzard's stock frame.
+-- All resource bars render on lower strata; a dedicated frame-art overlay lives
+-- on HIGH strata so the painted frame always masks the rectangular StatusBars.
 local BAR_LEFT = 112
 local BAR_WIDTH = 113
-local RAGE_LEFT = 100
-local RAGE_WIDTH = 125
+local RAGE_LEFT = 90
+local RAGE_WIDTH = 135
 local RAGE_TOP = 15
-local RAGE_HEIGHT = 7
+local RAGE_HEIGHT = 12
 local HEALTH_TOP = 26
 local HEALTH_HEIGHT = 13
 local MANA_TOP = 45
 local MANA_HEIGHT = 5
 local ENERGY_TOP = 56
 local ENERGY_HEIGHT = 6
-local RUNIC_LEFT = 230
-local RUNIC_TOP = 15
-local RUNIC_WIDTH = 11
-local RUNIC_HEIGHT = 44
+local RUNIC_LEFT = 225
+local RUNIC_TOP = 17
+local RUNIC_WIDTH = 16
+local RUNIC_HEIGHT = 46
 local RUNES_LEFT = 128
 local RUNES_TOP = 82
 local RUNES_SCALE = 0.90
@@ -65,8 +63,6 @@ local function IsAdventurer()
         return true
     end
 
-    -- The numeric class id is authoritative on normal 3.3.5a clients. Keep a
-    -- localized-name fallback for clients whose UnitClass binding omits it.
     return className == "Adventurer"
         or className == "Aventurero"
         or className == "Aventurera"
@@ -91,7 +87,8 @@ local function CreateResourceBar(name, powerId)
     local bar = CreateFrame("StatusBar", name, UIParent)
     bar.powerId = powerId
     bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    bar:SetFrameStrata("LOW")
+    bar:SetFrameStrata("BACKGROUND")
+    bar:SetFrameLevel(1)
     bar:EnableMouse(true)
 
     local r, g, b = GetPowerColor(powerId)
@@ -123,13 +120,11 @@ local rageBar = CreateResourceBar("AdventurerRageBar", POWER_RAGE)
 local energyBar = CreateResourceBar("AdventurerEnergyBar", POWER_ENERGY)
 local runicBar = CreateResourceBar("AdventurerRunicPowerBar", POWER_RUNIC_POWER)
 
--- PlayerFrameTexture itself belongs to PlayerFrame, whose child status bars can
--- render after parent texture regions. Use a separate, mouse-transparent frame
--- above the bars as the final painted shell; this guarantees every resource is
--- visually clipped by the custom border without changing the actual bar values.
 local frameArtOverlay = CreateFrame("Frame", "AdventurerPlayerFrameArtOverlay", UIParent)
 frameArtOverlay:SetWidth(ADVENTURER_FRAME_WIDTH)
 frameArtOverlay:SetHeight(ADVENTURER_FRAME_HEIGHT)
+frameArtOverlay:SetFrameStrata("HIGH")
+frameArtOverlay:SetFrameLevel(1)
 frameArtOverlay:EnableMouse(false)
 frameArtOverlay:Hide()
 
@@ -161,18 +156,14 @@ local function ApplyAdventurerPlayerFrameArt()
         return
     end
 
-    -- Hide Blizzard's original parent texture and replace it with an equivalent
-    -- Adventurer overlay at a higher frame level. The overlay is transparent in
-    -- every resource opening, so names/text remain visible while its border
-    -- cleanly masks square StatusBar corners.
     PlayerFrameTexture:SetAlpha(0)
 
     frameArtOverlay:ClearAllPoints()
     frameArtOverlay:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", 0, 0)
     frameArtOverlay:SetWidth(ADVENTURER_FRAME_WIDTH)
     frameArtOverlay:SetHeight(ADVENTURER_FRAME_HEIGHT)
-    frameArtOverlay:SetFrameStrata(PlayerFrame:GetFrameStrata())
-    frameArtOverlay:SetFrameLevel(PlayerFrame:GetFrameLevel() + ADVENTURER_FRAME_LEVEL_OFFSET)
+    frameArtOverlay:SetFrameStrata("HIGH")
+    frameArtOverlay:SetFrameLevel(1)
     frameArtOverlay:Show()
 end
 
@@ -290,11 +281,6 @@ end
 -- ---------------------------------------------------------------------------
 -- Combo points
 -- ---------------------------------------------------------------------------
--- The 3.3.5a client deliberately returns zero from GetComboPoints for classes
--- other than Rogue/Druid. AzerothCore still tracks combo points for Adventurer,
--- so the server mirrors the visible count through AdventurerCP. We only replace
--- the player->target query used by Blizzard's own ComboFrame; every other call
--- continues to use the original API.
 local nativeGetComboPoints = GetComboPoints
 local adventurerComboPoints = 0
 
@@ -321,11 +307,6 @@ end
 -- ---------------------------------------------------------------------------
 -- Rune usability
 -- ---------------------------------------------------------------------------
--- RuneFrame polls GetRuneCooldown itself, so its cooldown sweep can finish even
--- when the action bar never receives ACTIONBAR_UPDATE_USABLE for class 10. The
--- server now sends the native SMSG_ADD_RUNE_POWER transition when a rune becomes
--- ready; this small refresh keeps Blizzard's buttons visually in lockstep with
--- the native client cache after that packet arrives.
 local lastRuneReadyMask = -1
 
 local function GetRuneReadyMask()
@@ -426,8 +407,6 @@ AdventurerResourceFrame:SetScript("OnEvent", function(self, event, ...)
         SetVisibleComboPoints(0)
         lastRuneReadyMask = -1
     elseif event == "PLAYER_TARGET_CHANGED" then
-        -- Hide stale points immediately; the server sends the correct count for
-        -- the new selected target on its next 100 ms sync tick.
         SetVisibleComboPoints(0)
     elseif event == "RUNE_POWER_UPDATE" then
         RefreshRuneActionUsability()
@@ -461,9 +440,6 @@ AdventurerResourceFrame:SetScript("OnUpdate", function(self, elapsed)
     UpdateBar(energyBar)
     UpdateBar(runicBar)
 
-    -- Blizzard may reassert PlayerFrame dimensions or anchors after state
-    -- changes. Reapply the bars first and the painted shell last so the shell
-    -- always remains visually above every resource.
     PositionBars()
     RefreshRuneActionUsability()
 
