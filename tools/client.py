@@ -17,8 +17,10 @@ from talents import patch_talent_directory
 ROOT = Path(__file__).resolve().parent.parent
 CHARACTER_CREATE_BASELINE = ROOT / "client" / "baseline" / "CharacterCreate.lua"
 FRAME_XML_BASELINE = ROOT / "client" / "baseline" / "FrameXML.toc"
+ADVENTURER_PLAYER_FRAME = ROOT / "client" / "AdventurerPlayerFrame.xml"
 ADVENTURER_RESOURCES = ROOT / "client" / "AdventurerResources.lua"
 ADVENTURER_FRAME_ART = ROOT / "client" / "art" / "UI-AdventurerFrame.blp"
+ADVENTURER_PLAYER_FRAME_INTERNAL = "Interface\\FrameXML\\AdventurerPlayerFrame.xml"
 ADVENTURER_FRAME_INTERNAL = "Interface\\Adventurer\\UI-AdventurerFrame.blp"
 DEFAULT_LOCALE = "esMX"
 PROJECT_SUFFIX = "Z"
@@ -176,18 +178,59 @@ def build_frame_xml_toc() -> bytes:
         raise ClientError(f"Missing bundled FrameXML baseline: {FRAME_XML_BASELINE}")
 
     text = FRAME_XML_BASELINE.read_text(encoding="utf-8")
-    marker = "ComboFrame.xml\nTabardFrame.xml"
-    replacement = "ComboFrame.xml\nAdventurerResources.lua\nTabardFrame.xml"
+    marker = "PlayerFrame.xml\nPartyFrame.xml"
+    replacement = "PlayerFrame.xml\nAdventurerPlayerFrame.xml\nAdventurerResources.lua\nPartyFrame.xml"
 
     if replacement in text:
         raise ClientError("FrameXML baseline must remain pristine")
     if text.count(marker) != 1:
         raise ClientError(
             "FrameXML baseline is not the expected 3.3.5a revision: "
-            f"ComboFrame/TabardFrame anchor count={text.count(marker)}"
+            f"PlayerFrame/PartyFrame anchor count={text.count(marker)}"
         )
 
     return text.replace(marker, replacement, 1).encode("utf-8")
+
+
+def build_adventurer_player_frame_xml() -> bytes:
+    if not ADVENTURER_PLAYER_FRAME.is_file():
+        raise ClientError(f"Missing Adventurer PlayerFrame XML: {ADVENTURER_PLAYER_FRAME}")
+
+    payload = ADVENTURER_PLAYER_FRAME.read_bytes()
+    required = (
+        b'name="PlayerFrameEnergyBar"',
+        b'name="PlayerFrameRageBar"',
+        b'name="PlayerFrameEnergyBarText"',
+        b'name="PlayerFrameRageBarText"',
+        b'<AbsDimension x="92" y="11"/>',
+        b'<AbsDimension x="117" y="-65"/>',
+        b'<AbsDimension x="12" y="38"/>',
+        b'<AbsDimension x="3" y="-24"/>',
+        b'orientation="VERTICAL"',
+        b'Interface\\TargetingFrame\\UI-StatusBar',
+    )
+    missing = [token.decode("ascii") for token in required if token not in payload]
+    if missing:
+        raise ClientError(
+            "Adventurer PlayerFrame XML is missing reference-layout markers: "
+            + ", ".join(missing)
+        )
+
+    # Do not copy Ascension-client-only widgets into a stock 3.3.5a FrameXML.
+    forbidden = (
+        b"TotalAbsorbBarTemplate",
+        b"HealAbsorbBarTemplate",
+        b"SetAtlas",
+        b"PlayerPrimaryStat",
+    )
+    present = [token.decode("ascii") for token in forbidden if token in payload]
+    if present:
+        raise ClientError(
+            "Adventurer PlayerFrame XML contains non-stock client widgets: "
+            + ", ".join(present)
+        )
+
+    return payload
 
 
 def build_adventurer_resources_lua() -> bytes:
@@ -198,16 +241,15 @@ def build_adventurer_resources_lua() -> bytes:
     required = (
         b"ADVENTURER_CLASS_ID = 10",
         b"AdventurerResourceFrame",
-        b"AdventurerRageBar",
-        b"AdventurerEnergyBar",
+        b"PlayerFrameRageBar",
+        b"PlayerFrameEnergyBar",
         b"ADVENTURER_FRAME_TEXTURE",
-        b"AdventurerPlayerFrameArtOverlay",
-        b"frameArtTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)",
-        b"PlayerFrameTexture:SetAlpha(0)",
-        b"frameArtOverlay:SetFrameLevel",
-        b"PlayerFrameTexture:SetAlpha(1)",
-        b"PlayerFrameHealthBar:SetPoint",
-        b"PlayerFrameManaBar:SetPoint",
+        b"ADVENTURER_FRAME_TEX_RIGHT = 0.07421875",
+        b"ApplyReferencePlayerFrameLayout",
+        b"PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)",
+        b"PlayerFrameHealthBar:SetWidth(HEALTH_WIDTH)",
+        b"PlayerFrameManaBar:SetWidth(MANA_WIDTH)",
+        b"hooksecurefunc(\"PlayerFrame_ToPlayerArt\"",
         b'COMBO_PREFIX = \"AdventurerCP\"',
         b"local nativeGetComboPoints = GetComboPoints",
         b"GetComboPoints = function(unit, target)",
@@ -223,7 +265,9 @@ def build_adventurer_resources_lua() -> bytes:
             + ", ".join(missing)
         )
 
-    # The Adventurer no longer inherits Death Knight resources or client state.
+    # The Adventurer no longer inherits Death Knight resources or client state,
+    # and its auxiliary bars must come from FrameXML rather than ad-hoc UIParent
+    # StatusBars.
     forbidden = (
         b"POWER_RUNIC_POWER",
         b"AdventurerRunicPowerBar",
@@ -231,11 +275,16 @@ def build_adventurer_resources_lua() -> bytes:
         b"RUNE_POWER_UPDATE",
         b"GetRuneCooldown",
         b"RuneButton_Update",
+        b"AdventurerPlayerFrameArtOverlay",
+        b"CreateResourceBar",
+        b'CreateFrame(\"StatusBar\"',
+        b"AdventurerRageBar",
+        b"AdventurerEnergyBar",
     )
     present = [token.decode("ascii") for token in forbidden if token in payload]
     if present:
         raise ClientError(
-            "Adventurer resource HUD contains removed Death Knight resource state: "
+            "Adventurer resource HUD contains removed resource/layout state: "
             + ", ".join(present)
         )
 
@@ -285,6 +334,7 @@ def build_archive_files(work: Path) -> tuple[dict[str, bytes], dict[str, bytes]]
     root_files = {
         "Interface\\GlueXML\\CharacterCreate.lua": build_character_create_lua(),
         "Interface\\FrameXML\\FrameXML.toc": build_frame_xml_toc(),
+        ADVENTURER_PLAYER_FRAME_INTERNAL: build_adventurer_player_frame_xml(),
         "Interface\\FrameXML\\AdventurerResources.lua": build_adventurer_resources_lua(),
         ADVENTURER_FRAME_INTERNAL: build_adventurer_frame_art(),
         **{
@@ -347,6 +397,7 @@ def build_patch(dbc_source: Path, output: Path, locale: str = DEFAULT_LOCALE) ->
         "locale_sha256": sha256(locale_patch),
         "character_create_sha256": hashlib.sha256(build_character_create_lua()).hexdigest(),
         "frame_xml_toc_sha256": hashlib.sha256(build_frame_xml_toc()).hexdigest(),
+        "player_frame_xml_sha256": hashlib.sha256(build_adventurer_player_frame_xml()).hexdigest(),
         "resource_hud_sha256": hashlib.sha256(build_adventurer_resources_lua()).hexdigest(),
         "adventurer_frame_sha256": hashlib.sha256(build_adventurer_frame_art()).hexdigest(),
     }
