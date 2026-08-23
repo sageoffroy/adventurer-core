@@ -34,7 +34,7 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125', lua)
         self.assertIn('BAR_LEFT = 110', lua)
         self.assertIn('BAR_WIDTH = 115', lua)
-        self.assertIn('RAGE_LEFT = 90', lua)
+        self.assertIn('RAGE_LEFT = 91', lua)
         self.assertIn('RAGE_WIDTH = 135', lua)
         self.assertIn('RAGE_TOP = 12', lua)
         self.assertIn('RAGE_HEIGHT = 10', lua)
@@ -45,8 +45,8 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('RUNIC_TOP = 15', lua)
         self.assertIn('RUNIC_WIDTH = 16', lua)
         self.assertIn('RUNIC_HEIGHT = 46', lua)
-        self.assertIn('RUNES_LEFT = 128', lua)
-        self.assertIn('RUNES_TOP = 82', lua)
+        self.assertIn('RUNES_LEFT = 126', lua)
+        self.assertIn('RUNES_TOP = 79', lua)
         self.assertIn('RUNES_SCALE = 0.90', lua)
         self.assertIn('runicBar:SetOrientation("VERTICAL")', lua)
         self.assertIn('PlayerFrameHealthBar:SetPoint(', lua)
@@ -80,6 +80,15 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('frameArtOverlay:Show()', lua)
         self.assertIn('frameArtOverlay:Hide()', lua)
         self.assertIn('PlayerFrameTexture:SetAlpha(1)', lua)
+
+    def test_player_level_is_mirrored_above_frame_art(self) -> None:
+        lua = build_adventurer_resources_lua().decode("utf-8")
+        self.assertIn('AdventurerPlayerLevelText', lua)
+        self.assertIn('frameArtOverlay:CreateFontString(', lua)
+        self.assertIn('adventurerLevelText:SetPoint("CENTER", PlayerFrame, "CENTER", -63, -16)', lua)
+        self.assertIn('adventurerLevelText:SetText(UnitLevel("player") or "")', lua)
+        self.assertIn('PlayerLevelText:Hide()', lua)
+        self.assertIn('PlayerLevelText:Show()', lua)
 
     def test_auxiliary_resources_still_read_native_power_pools(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
