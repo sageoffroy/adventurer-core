@@ -1,0 +1,60 @@
+name: Materialize Adventurer frame
+
+on:
+  push:
+    branches:
+      - agent/bootstrap-v1
+    paths:
+      - client/art/UI-AdventurerFrame.blp.zlib.b64
+      - .github/workflows/materialize-adventurer-frame.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/bootstrap-v1
+
+      - name: Decode validated BLP2 payload
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64
+          import struct
+          import zlib
+          from pathlib import Path
+
+          source = Path('client/art/UI-AdventurerFrame.blp.zlib.b64')
+          target = Path('client/art/UI-AdventurerFrame.blp')
+          payload = zlib.decompress(base64.b64decode(source.read_text(encoding='ascii').strip()))
+
+          if payload[:4] != b'BLP2':
+              raise SystemExit('decoded frame is not BLP2')
+          width = struct.unpack_from('<I', payload, 12)[0]
+          height = struct.unpack_from('<I', payload, 16)[0]
+          if (width, height) != (256, 128):
+              raise SystemExit(f'unexpected frame dimensions: {width}x{height}')
+          if len(payload) != 33940:
+              raise SystemExit(f'unexpected BLP size: {len(payload)}')
+
+          target.write_bytes(payload)
+          source.unlink()
+          print(f'wrote {target} ({len(payload)} bytes, {width}x{height})')
+          PY
+
+      - name: Commit materialized binary
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/art/UI-AdventurerFrame.blp client/art/UI-AdventurerFrame.blp.zlib.b64
+          if git diff --cached --quiet; then
+            echo "BLP already materialized"
+            exit 0
+          fi
+          git commit -m "feat(client): install custom Adventurer frame art"
+          git push origin HEAD:agent/bootstrap-v1
