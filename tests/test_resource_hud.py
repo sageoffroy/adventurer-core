@@ -9,7 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from client import (  # noqa: E402
+    ADVENTURER_FRAME_INTERNAL,
     DBC_NAMES,
+    build_adventurer_frame_art,
     build_adventurer_resources_lua,
     build_archive_files,
     build_frame_xml_toc,
@@ -25,27 +27,45 @@ class AdventurerResourceHudTests(unittest.TestCase):
         )
         self.assertEqual(toc.count("AdventurerResources.lua"), 1)
 
-    def test_resource_hud_stacks_all_auxiliary_bars_under_native_mana(self) -> None:
+    def test_resource_hud_uses_custom_adventurer_player_frame_layout(self) -> None:
+        lua = build_adventurer_resources_lua().decode("utf-8")
+        self.assertIn('ADVENTURER_FRAME_TEXTURE = "Interface\\\\Adventurer\\\\UI-AdventurerFrame"', lua)
+        self.assertIn('PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)', lua)
+        self.assertIn('ADVENTURER_FRAME_WIDTH = 248', lua)
+        self.assertIn('ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125', lua)
+        self.assertIn('BAR_LEFT = 106', lua)
+        self.assertIn('RAGE_TOP = 15', lua)
+        self.assertIn('HEALTH_TOP = 26', lua)
+        self.assertIn('MANA_TOP = 45', lua)
+        self.assertIn('ENERGY_TOP = 56', lua)
+        self.assertIn('RUNIC_LEFT = 229', lua)
+        self.assertIn('runicBar:SetOrientation("VERTICAL")', lua)
+        self.assertIn('PlayerFrameHealthBar:SetPoint(', lua)
+        self.assertIn('PlayerFrameManaBar:SetPoint(', lua)
+        self.assertIn(
+            'rageBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", BAR_LEFT, -RAGE_TOP)',
+            lua,
+        )
+        self.assertIn(
+            'energyBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", BAR_LEFT, -ENERGY_TOP)',
+            lua,
+        )
+        self.assertIn(
+            'runicBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RUNIC_LEFT, -RUNIC_TOP)',
+            lua,
+        )
+        self.assertIn(
+            'RuneFrame:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RUNES_LEFT, -RUNES_TOP)',
+            lua,
+        )
+
+    def test_auxiliary_resources_still_read_native_power_pools(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
         self.assertIn('UnitPower("player", bar.powerId)', lua)
         self.assertIn('UnitPowerMax("player", bar.powerId)', lua)
-        self.assertIn('bar:SetHeight(11)', lua)
-        self.assertIn(
-            'rageBar:SetPoint("TOPLEFT", PlayerFrameManaBar, "BOTTOMLEFT", 0, -2)',
-            lua,
-        )
-        self.assertIn(
-            'energyBar:SetPoint("TOPLEFT", rageBar, "BOTTOMLEFT", 0, -2)',
-            lua,
-        )
-        self.assertIn(
-            'runicBar:SetPoint("TOPLEFT", energyBar, "BOTTOMLEFT", 0, -2)',
-            lua,
-        )
-        self.assertIn(
-            'RuneFrame:SetPoint("TOPLEFT", runicBar, "BOTTOMLEFT", 2, -6)',
-            lua,
-        )
+        self.assertIn('AdventurerRageBar', lua)
+        self.assertIn('AdventurerEnergyBar', lua)
+        self.assertIn('AdventurerRunicPowerBar', lua)
 
     def test_combo_points_feed_blizzards_native_target_frame(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
@@ -73,15 +93,24 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('classId == ADVENTURER_CLASS_ID', lua)
         self.assertIn('classToken == "ADVENTURER"', lua)
 
-    def test_root_mpq_contains_frame_xml_resource_payload(self) -> None:
+    def test_adventurer_frame_art_is_valid_bundled_blp2(self) -> None:
+        art = build_adventurer_frame_art()
+        self.assertTrue(art.startswith(b"BLP2"))
+        self.assertEqual(int.from_bytes(art[12:16], "little"), 256)
+        self.assertEqual(int.from_bytes(art[16:20], "little"), 128)
+
+    def test_root_mpq_contains_frame_xml_hud_and_frame_art(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             work = Path(tmp_name)
             for index, name in enumerate(DBC_NAMES):
                 (work / name).write_bytes(f"dbc-{index}-{name}".encode("utf-8"))
 
-            root_files, _ = build_archive_files(work)
+            root_files, locale_files = build_archive_files(work)
             self.assertIn("Interface\\FrameXML\\FrameXML.toc", root_files)
             self.assertIn("Interface\\FrameXML\\AdventurerResources.lua", root_files)
+            self.assertIn(ADVENTURER_FRAME_INTERNAL, root_files)
+            self.assertEqual(root_files[ADVENTURER_FRAME_INTERNAL], build_adventurer_frame_art())
+            self.assertNotIn(ADVENTURER_FRAME_INTERNAL, locale_files)
 
 
 if __name__ == "__main__":
