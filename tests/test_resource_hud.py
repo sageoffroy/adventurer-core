@@ -40,7 +40,11 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('<AbsDimension x="12" y="38"/>', xml)
         self.assertIn('<AbsDimension x="3" y="-24"/>', xml)
         self.assertIn('name="PlayerFrameEnergyBarText"', xml)
-        self.assertIn('name="PlayerFrameRageBarText"', xml)
+        self.assertNotIn('name="PlayerFrameRageBarText"', xml)
+        self.assertIn(
+            '<StatusBar name="PlayerFrameRageBar" parent="PlayerFrame" orientation="VERTICAL" hidden="true">',
+            xml,
+        )
         self.assertIn('Interface\\TargetingFrame\\UI-StatusBar', xml)
 
     def test_xml_remains_stock_wotlk_compatible(self) -> None:
@@ -149,14 +153,16 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('POWER_ENERGY = 3', lua)
         self.assertNotIn('POWER_RUNIC_POWER', lua)
 
-    def test_resource_text_follows_shifted_bars_and_hover(self) -> None:
+    def test_energy_keeps_hover_text_but_rage_has_no_text(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
         self.assertIn('SetFramePoint(PlayerFrameHealthBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, 3)', lua)
         self.assertIn('SetFramePoint(PlayerFrameManaBarText, "CENTER", PlayerFrame, "CENTER", 50 + MANA_X_SHIFT, -8)', lua)
         self.assertIn('SetFramePoint(PlayerFrameEnergyBarText, "CENTER", PlayerFrame, "CENTER", 50 + ENERGY_X_SHIFT, -22)', lua)
-        self.assertIn('SetFramePoint(PlayerFrameRageBarText, "CENTER", PlayerFrame, "TOPRIGHT", -2 + RESOURCE_X_SHIFT, -42)', lua)
-        self.assertIn('[POWER_RAGE] = "Ira"', lua)
         self.assertIn('[POWER_ENERGY] = "Energía"', lua)
+        self.assertIn('ConfigureAuxiliaryMouse(PlayerFrameEnergyBar, PlayerFrameEnergyBarText)', lua)
+        self.assertIn('UpdateAuxiliaryBar(PlayerFrameRageBar, POWER_RAGE, nil)', lua)
+        self.assertNotIn('PlayerFrameRageBarText', lua)
+        self.assertNotIn('[POWER_RAGE] = "Ira"', lua)
         self.assertIn('bar:SetScript("OnEnter"', lua)
         self.assertIn('bar:SetScript("OnLeave"', lua)
 
