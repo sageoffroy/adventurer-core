@@ -61,6 +61,7 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)', lua)
         self.assertIn('ApplyReferencePlayerFrameLayout()', lua)
         self.assertIn('hooksecurefunc("PlayerFrame_ToPlayerArt"', lua)
+        self.assertNotIn('SetFramePoint(PlayerFrame, "TOPLEFT", UIParent', lua)
         self.assertNotIn('AdventurerPlayerFrameArtOverlay', lua)
         self.assertNotIn('frameArtOverlay', lua)
 
@@ -68,6 +69,11 @@ class AdventurerResourceHudTests(unittest.TestCase):
         lua = build_adventurer_resources_lua().decode("utf-8")
         expected = (
             'RESOURCE_X_SHIFT = -6',
+            'PORTRAIT_X_SHIFT = -6',
+            'LEVEL_X_SHIFT = -6',
+            'MANA_X_SHIFT = -8',
+            'ENERGY_X_SHIFT = -8',
+            'FLASH_X_SHIFT = -6',
             'PLAYER_FRAME_WIDTH = 232',
             'PLAYER_FRAME_HEIGHT = 100',
             'PORTRAIT_LEFT = 42',
@@ -99,29 +105,20 @@ class AdventurerResourceHudTests(unittest.TestCase):
         for marker in expected:
             self.assertIn(marker, lua)
 
-    def test_only_resource_stack_is_shifted_six_pixels_left(self) -> None:
+    def test_frame_elements_follow_custom_blp_alignment(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
-        self.assertNotIn('SetFramePoint(PlayerFrame, "TOPLEFT", UIParent', lua)
-        self.assertIn(
+        expected = (
+            'SetFramePoint(PlayerPortrait, "TOPLEFT", PlayerFrame, "TOPLEFT", PORTRAIT_LEFT + PORTRAIT_X_SHIFT, -PORTRAIT_TOP)',
             'SetFramePoint(PlayerFrameBackground, "TOPLEFT", PlayerFrame, "TOPLEFT", BACKGROUND_LEFT + RESOURCE_X_SHIFT, -BACKGROUND_TOP)',
-            lua,
-        )
-        self.assertIn(
             'SetFramePoint(PlayerFrameHealthBar, "TOPLEFT", PlayerFrame, "TOPLEFT", HEALTH_LEFT + RESOURCE_X_SHIFT, -HEALTH_TOP)',
-            lua,
-        )
-        self.assertIn(
-            'SetFramePoint(PlayerFrameManaBar, "TOPLEFT", PlayerFrame, "TOPLEFT", MANA_LEFT + RESOURCE_X_SHIFT, -MANA_TOP)',
-            lua,
-        )
-        self.assertIn(
-            'SetFramePoint(PlayerFrameEnergyBar, "TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT + RESOURCE_X_SHIFT, -ENERGY_TOP)',
-            lua,
-        )
-        self.assertIn(
+            'SetFramePoint(PlayerFrameManaBar, "TOPLEFT", PlayerFrame, "TOPLEFT", MANA_LEFT + MANA_X_SHIFT, -MANA_TOP)',
+            'SetFramePoint(PlayerFrameEnergyBar, "TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT + ENERGY_X_SHIFT, -ENERGY_TOP)',
             'SetFramePoint(PlayerFrameRageBar, "TOPRIGHT", PlayerFrame, "TOPRIGHT", RAGE_RIGHT + RESOURCE_X_SHIFT, -RAGE_TOP)',
-            lua,
+            'SetFramePoint(PlayerLevelText, "CENTER", PlayerFrame, "CENTER", -63 + LEVEL_X_SHIFT, -16)',
+            'SetFramePoint(PlayerFrameFlash, "TOPLEFT", PlayerFrame, "TOPLEFT", FLASH_LEFT + FLASH_X_SHIFT, -FLASH_TOP)',
         )
+        for marker in expected:
+            self.assertIn(marker, lua)
 
     def test_auxiliary_bars_are_frame_xml_children_not_uiparent_statusbars(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
@@ -143,8 +140,8 @@ class AdventurerResourceHudTests(unittest.TestCase):
     def test_resource_text_follows_shifted_bars_and_hover(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
         self.assertIn('SetFramePoint(PlayerFrameHealthBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, 3)', lua)
-        self.assertIn('SetFramePoint(PlayerFrameManaBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, -8)', lua)
-        self.assertIn('SetFramePoint(PlayerFrameEnergyBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, -22)', lua)
+        self.assertIn('SetFramePoint(PlayerFrameManaBarText, "CENTER", PlayerFrame, "CENTER", 50 + MANA_X_SHIFT, -8)', lua)
+        self.assertIn('SetFramePoint(PlayerFrameEnergyBarText, "CENTER", PlayerFrame, "CENTER", 50 + ENERGY_X_SHIFT, -22)', lua)
         self.assertIn('SetFramePoint(PlayerFrameRageBarText, "CENTER", PlayerFrame, "TOPRIGHT", -2 + RESOURCE_X_SHIFT, -42)', lua)
         self.assertIn('[POWER_RAGE] = "Ira"', lua)
         self.assertIn('[POWER_ENERGY] = "Energía"', lua)
