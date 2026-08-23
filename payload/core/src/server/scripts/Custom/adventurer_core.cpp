@@ -156,17 +156,32 @@ void UpdateRuneClientSync(Player* player)
         return;
     }
 
-    uint8 newlyReady = uint8(readyMask & ~state.readyMask);
+    uint8 previousReadyMask = state.readyMask;
+    uint8 newlySpent = uint8(previousReadyMask & ~readyMask);
+    uint8 newlyReady = uint8(readyMask & ~previousReadyMask);
     state.readyMask = readyMask;
 
-    // A native DK advances rune cooldowns locally in the 3.3.5a client, but
-    // class 10 does not run that hidden DK-only usability transition. The
-    // decisive clue is that relogging fixes the stale action immediately:
-    // SMSG_RESYNC_RUNES replaces the client's complete rune state (type plus
-    // remaining cooldown). Re-send that authoritative snapshot only when at
-    // least one server rune actually crosses cooldown -> ready.
+    if (newlySpent == 0 && newlyReady == 0)
+        return;
+
+    // A native DK advances rune state locally from SPELL_GO and its own class
+    // runtime. Class 10 reaches the same AzerothCore rune backend, but the 3.3.5a
+    // client does not reliably apply those hidden DK-only transitions. Keep the
+    // client's six-rune snapshot authoritative on both edges: the moment a rune
+    // is consumed and the moment it becomes ready again.
+    player->ResyncRunes(MAX_RUNES);
+
+    // SMSG_RESYNC_RUNES fixes the complete type/cooldown snapshot. A native DK
+    // also performs a local "rune became available" transition when cooldown
+    // completes; Adventurer does not. Follow the resync with the stock
+    // SMSG_ADD_RUNE_POWER notification only for the exact runes that crossed
+    // cooldown -> ready so action-button usability is invalidated immediately.
     if (newlyReady != 0)
-        player->ResyncRunes(MAX_RUNES);
+    {
+        for (uint8 index = 0; index < MAX_RUNES; ++index)
+            if (newlyReady & uint8(1u << index))
+                player->AddRunePower(index);
+    }
 }
 
 void LearnMissingSpells(Player* player, uint32 const* spells, uint32 count)
