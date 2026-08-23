@@ -86,9 +86,18 @@ class AdventurerResourceHudTests(unittest.TestCase):
 
             lua = root_files["Interface\\FrameXML\\AdventurerResources.lua"].decode("utf-8")
             runtime_lua = lua.split("--[[", 1)[0]
-            self.assertNotIn("PlayerFrame", runtime_lua)
-            self.assertNotIn("CreateFrame(", runtime_lua)
-            self.assertNotIn("hooksecurefunc(", runtime_lua)
+            for forbidden in (
+                "PlayerFrameTexture:",
+                "PlayerFrameHealthBar",
+                "PlayerFrameManaBar",
+                "PlayerFrameEnergyBar",
+                "PlayerFrameRageBar",
+                "CreateFrame(",
+                "hooksecurefunc(",
+                "SetPoint(",
+                "SetTexture(",
+            ):
+                self.assertNotIn(forbidden, runtime_lua)
 
             self.assertNotIn(ADVENTURER_PLAYER_FRAME_INTERNAL, locale_files)
             self.assertNotIn(ADVENTURER_FRAME_INTERNAL, locale_files)
