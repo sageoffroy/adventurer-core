@@ -40,7 +40,7 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('<AbsDimension x="12" y="38"/>', xml)
         self.assertIn('<AbsDimension x="3" y="-24"/>', xml)
         self.assertIn('name="PlayerFrameEnergyBarText"', xml)
-        self.assertNotIn('name="PlayerFrameRageBarText"', xml)
+        self.assertIn('name="PlayerFrameRageBarText"', xml)
         self.assertIn(
             '<StatusBar name="PlayerFrameRageBar" parent="PlayerFrame" orientation="VERTICAL" hidden="true">',
             xml,
