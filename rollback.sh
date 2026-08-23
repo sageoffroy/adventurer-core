@@ -26,7 +26,9 @@ fi
 # databases changed, recoverable class-10 characters still exist, or an owned
 # file was edited outside Adventurer Core.
 python3 "$ROOT/tools/database.py" can-rollback "$@"
-python3 "$ROOT/tools/adventurer.py" verify "$@"
+# adventurer.py verify owns only package/source state and accepts --core-dir.
+# Do not forward runtime/client/locale arguments intended for the DB wrapper.
+python3 "$ROOT/tools/adventurer.py" verify --core-dir "$core_dir"
 
 # Restore class-10 world rows first while the original snapshot is still
 # attached to .adventurer-core.
