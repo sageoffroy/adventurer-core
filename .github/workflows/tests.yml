@@ -47,7 +47,19 @@ jobs:
           assert runtime.original is None
           assert runtime.patched == (payload / runtime_rel).read_bytes()
           text = runtime.patched.decode("utf-8")
-          assert "player->ResyncRunes(MAX_RUNES)" in text
-          assert "player->AddRunePower(index)" not in text
-          print("Supported clean-core source patch smoke test OK")
+          assert "ADVENTURER_MAX_RAGE = 1000" in text
+          assert "ADVENTURER_MAX_ENERGY = 100" in text
+          assert 'ADVENTURER_COMBO_PREFIX[] = "AdventurerCP"' in text
+          for token in (
+              "CLASS_DEATH_KNIGHT",
+              "POWER_RUNIC_POWER",
+              "POWER_RUNE",
+              "MAX_RUNES",
+              "GetRuneCooldown",
+              "ResyncRunes",
+              "AddRunePower",
+              "PLAYERHOOK_ON_PLAYER_IS_CLASS",
+          ):
+              assert token not in text, token
+          print("Supported clean-core no-DK source patch smoke test OK")
           PY
