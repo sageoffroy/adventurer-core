@@ -1,9 +1,10 @@
 -- Adventurer Core: universal resource HUD for the native class-10 Adventurer.
 --
--- The server owns the actual pools. This file exposes them together in the
--- stock 3.3.5a UI: Mana remains the normal PlayerFrame bar; Rage, Energy and
--- Runic Power are stacked below it; the native Death Knight RuneFrame is reused
--- below the stack. Blizzard's native ComboFrame remains attached to TargetFrame.
+-- The server owns the actual pools. This file arranges Blizzard's native
+-- PlayerFrame around the Adventurer frame art: Rage above Health, Mana below
+-- Health, Energy below Mana, Runic Power vertically at the right, and native
+-- Death Knight runes below the frame. Blizzard's native ComboFrame remains
+-- attached to TargetFrame.
 
 local ADVENTURER_CLASS_ID = 10
 local POWER_RAGE = 1
@@ -12,21 +13,31 @@ local POWER_RUNIC_POWER = 6
 local COMBO_PREFIX = "AdventurerCP"
 local MAX_RUNES = 6
 
-local locale = GetLocale()
-local labels
-if locale == "esES" or locale == "esMX" then
-    labels = {
-        [POWER_RAGE] = "Ira",
-        [POWER_ENERGY] = "Energía",
-        [POWER_RUNIC_POWER] = "Poder rúnico",
-    }
-else
-    labels = {
-        [POWER_RAGE] = "Rage",
-        [POWER_ENERGY] = "Energy",
-        [POWER_RUNIC_POWER] = "Runic Power",
-    }
-end
+local ADVENTURER_FRAME_TEXTURE = "Interface\\Adventurer\\UI-AdventurerFrame"
+local ADVENTURER_FRAME_WIDTH = 248
+local ADVENTURER_FRAME_HEIGHT = 100
+local ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125
+
+-- The source art is a 256x128 extension of Blizzard's UI-TargetingFrame atlas.
+-- PlayerFrame renders that atlas horizontally flipped. Keeping a 1:1 source to
+-- screen mapping preserves the stock frame exactly while exposing the new
+-- 16-pixel strip on the rendered right side.
+local BAR_LEFT = 106
+local BAR_WIDTH = 119
+local RAGE_TOP = 15
+local RAGE_HEIGHT = 5
+local HEALTH_TOP = 26
+local HEALTH_HEIGHT = 13
+local MANA_TOP = 45
+local MANA_HEIGHT = 5
+local ENERGY_TOP = 56
+local ENERGY_HEIGHT = 6
+local RUNIC_LEFT = 229
+local RUNIC_TOP = 17
+local RUNIC_WIDTH = 9
+local RUNIC_HEIGHT = 40
+local RUNES_LEFT = 104
+local RUNES_TOP = 68
 
 local function IsAdventurer()
     local className, classToken, classId = UnitClass("player")
@@ -61,8 +72,6 @@ local function CreateResourceBar(name, powerId)
     bar.powerId = powerId
     bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
     bar:SetFrameStrata("LOW")
-    bar:SetHeight(11)
-    bar:SetWidth(119)
 
     local r, g, b = GetPowerColor(powerId)
     bar:SetStatusBarColor(r, g, b)
@@ -71,17 +80,6 @@ local function CreateResourceBar(name, powerId)
     background:SetAllPoints(bar)
     background:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
     background:SetVertexColor(0.08, 0.08, 0.08, 0.85)
-
-    local label = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    label:SetPoint("LEFT", bar, "LEFT", 3, 0)
-    label:SetJustifyH("LEFT")
-    label:SetText(labels[powerId])
-    bar.label = label
-
-    local value = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    value:SetPoint("RIGHT", bar, "RIGHT", -3, 0)
-    value:SetJustifyH("RIGHT")
-    bar.valueText = value
 
     bar:Hide()
     return bar
@@ -101,39 +99,92 @@ local function UpdateBar(bar)
 
     bar:SetMinMaxValues(0, maximum)
     bar:SetValue(current)
-    bar.valueText:SetText(current .. " / " .. maximum)
 end
 
-local function PositionBars()
-    if not PlayerFrameManaBar then
+local function ApplyAdventurerPlayerFrameArt()
+    if not PlayerFrame or not PlayerFrameTexture then
         return
     end
 
-    local width = PlayerFrameManaBar:GetWidth()
-    if width and width > 0 then
-        rageBar:SetWidth(width)
-        energyBar:SetWidth(width)
-        runicBar:SetWidth(width)
+    PlayerFrameTexture:ClearAllPoints()
+    PlayerFrameTexture:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", 0, 0)
+    PlayerFrameTexture:SetWidth(ADVENTURER_FRAME_WIDTH)
+    PlayerFrameTexture:SetHeight(ADVENTURER_FRAME_HEIGHT)
+    PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)
+    PlayerFrameTexture:SetTexCoord(
+        1.0,
+        ADVENTURER_FRAME_RIGHT_TEXCOORD,
+        0,
+        0.78125
+    )
+end
+
+local function PositionNativeBars()
+    if not PlayerFrame or not PlayerFrameHealthBar or not PlayerFrameManaBar then
+        return
+    end
+
+    PlayerFrameHealthBar:ClearAllPoints()
+    PlayerFrameHealthBar:SetPoint(
+        "TOPLEFT",
+        PlayerFrame,
+        "TOPLEFT",
+        BAR_LEFT,
+        -HEALTH_TOP
+    )
+    PlayerFrameHealthBar:SetWidth(BAR_WIDTH)
+    PlayerFrameHealthBar:SetHeight(HEALTH_HEIGHT)
+
+    PlayerFrameManaBar:ClearAllPoints()
+    PlayerFrameManaBar:SetPoint(
+        "TOPLEFT",
+        PlayerFrame,
+        "TOPLEFT",
+        BAR_LEFT,
+        -MANA_TOP
+    )
+    PlayerFrameManaBar:SetWidth(BAR_WIDTH)
+    PlayerFrameManaBar:SetHeight(MANA_HEIGHT)
+end
+
+local function PositionAuxiliaryBars()
+    if not PlayerFrame then
+        return
     end
 
     rageBar:ClearAllPoints()
-    rageBar:SetPoint("TOPLEFT", PlayerFrameManaBar, "BOTTOMLEFT", 0, -2)
+    rageBar:SetOrientation("HORIZONTAL")
+    rageBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", BAR_LEFT, -RAGE_TOP)
+    rageBar:SetWidth(BAR_WIDTH)
+    rageBar:SetHeight(RAGE_HEIGHT)
 
     energyBar:ClearAllPoints()
-    energyBar:SetPoint("TOPLEFT", rageBar, "BOTTOMLEFT", 0, -2)
+    energyBar:SetOrientation("HORIZONTAL")
+    energyBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", BAR_LEFT, -ENERGY_TOP)
+    energyBar:SetWidth(BAR_WIDTH)
+    energyBar:SetHeight(ENERGY_HEIGHT)
 
     runicBar:ClearAllPoints()
-    runicBar:SetPoint("TOPLEFT", energyBar, "BOTTOMLEFT", 0, -2)
+    runicBar:SetOrientation("VERTICAL")
+    runicBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RUNIC_LEFT, -RUNIC_TOP)
+    runicBar:SetWidth(RUNIC_WIDTH)
+    runicBar:SetHeight(RUNIC_HEIGHT)
+end
+
+local function PositionBars()
+    ApplyAdventurerPlayerFrameArt()
+    PositionNativeBars()
+    PositionAuxiliaryBars()
 end
 
 local function RefreshRunes()
-    if not RuneFrame then
+    if not RuneFrame or not PlayerFrame then
         return
     end
 
     RuneFrame:ClearAllPoints()
     RuneFrame:SetScale(0.85)
-    RuneFrame:SetPoint("TOPLEFT", runicBar, "BOTTOMLEFT", 2, -6)
+    RuneFrame:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RUNES_LEFT, -RUNES_TOP)
     RuneFrame:Show()
 
     if RuneButton_Update then
@@ -334,8 +385,8 @@ AdventurerResourceFrame:SetScript("OnUpdate", function(self, elapsed)
     UpdateBar(energyBar)
     UpdateBar(runicBar)
 
-    -- PlayerFrame can change width/anchors when vehicle or other Blizzard art
-    -- changes. Reassert the stack without replacing any stock texture.
+    -- Blizzard may reassert PlayerFrame dimensions or anchors after state
+    -- changes. Reapply only the Adventurer player's local layout every tick.
     PositionBars()
     RefreshRuneActionUsability()
 
