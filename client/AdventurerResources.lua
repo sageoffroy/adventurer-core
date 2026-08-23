@@ -29,7 +29,9 @@ local PORTRAIT_X_SHIFT = -6
 local LEVEL_X_SHIFT = -6
 local MANA_X_SHIFT = -8
 local ENERGY_X_SHIFT = -8
-local FLASH_X_SHIFT = -6
+local BACKGROUND_X_SHIFT = -8
+local NAME_X_SHIFT = -2
+local FLASH_X_SHIFT = -1
 
 local BACKGROUND_LEFT = 106
 local BACKGROUND_TOP = 22
@@ -129,7 +131,7 @@ local function ApplyReferencePlayerFrameLayout()
     if PlayerFrameBackground then
         PlayerFrameBackground:SetWidth(BACKGROUND_WIDTH)
         PlayerFrameBackground:SetHeight(BACKGROUND_HEIGHT)
-        SetFramePoint(PlayerFrameBackground, "TOPLEFT", PlayerFrame, "TOPLEFT", BACKGROUND_LEFT + RESOURCE_X_SHIFT, -BACKGROUND_TOP)
+        SetFramePoint(PlayerFrameBackground, "TOPLEFT", PlayerFrame, "TOPLEFT", BACKGROUND_LEFT + BACKGROUND_X_SHIFT, -BACKGROUND_TOP)
     end
 
     if PlayerFrameTexture then
@@ -156,7 +158,7 @@ local function ApplyReferencePlayerFrameLayout()
     end
 
     if PlayerName then
-        SetFramePoint(PlayerName, "CENTER", PlayerFrame, "CENTER", 50, 19)
+        SetFramePoint(PlayerName, "CENTER", PlayerFrame, "CENTER", 50 + NAME_X_SHIFT, 19)
     end
     if PlayerLevelText then
         SetFramePoint(PlayerLevelText, "CENTER", PlayerFrame, "CENTER", -63 + LEVEL_X_SHIFT, -16)
