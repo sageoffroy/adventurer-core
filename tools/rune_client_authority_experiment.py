@@ -5,10 +5,10 @@ WotLK 3.3.5a keeps part of Death Knight rune usability state in the client.
 For native class ID 10 that cache can remain stale after the last rune of a
 family is spent, even though AzerothCore has already regenerated the rune.
 
-This experiment keeps the server Spell.dbc completely native and creates a
-client-only Spell.dbc variant for three known test spells. The client variant
-removes local power/rune-cost validation; AzerothCore remains authoritative for
-checking, spending and regenerating the actual runes.
+This experiment leaves the installed server Spell.dbc byte-for-byte untouched
+and creates a client-only Spell.dbc variant for three known test spells. The
+client variant removes local power/rune-cost validation; AzerothCore remains
+authoritative for checking, spending and regenerating the actual runes.
 
 Nothing here changes the spell ID sent to the server. Icy Touch is still 45477,
 Plague Strike is still 45462 and Blood Strike is still 45902.
@@ -17,7 +17,6 @@ Plague Strike is still 45462 and Blood Strike is still 45902.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import shutil
 import tempfile
@@ -41,7 +40,6 @@ from client import (
     build_character_create_lua,
     build_frame_xml_toc,
     install_patch,
-    install_server_dbcs,
     patch_dbc_copy,
     sha256,
 )
@@ -124,8 +122,9 @@ def build_experimental_bundle(dbc_source: Path, output: Path, locale: str) -> di
         server_work.mkdir()
         changed = patch_dbc_copy(dbc_source, server_work)
 
-        # Freeze the server spell bytes first. Only the separate client copy is
-        # modified below.
+        # This working copy represents exactly what the normal Adventurer client
+        # builder would package. We never install it into the server during this
+        # experiment; it is only the source for the client-side split.
         server_spell = server_work / "Spell.dbc"
         server_signatures = {
             spell_id: rune_signature(server_spell, spell_id)
@@ -141,22 +140,23 @@ def build_experimental_bundle(dbc_source: Path, output: Path, locale: str) -> di
             for spell_id in EXPERIMENT_SPELL_IDS
         }
 
-        # Guard the experiment itself: server rows must remain rune-powered and
-        # client rows must be cost-neutral. If either invariant is false, refuse
-        # to install anything.
+        # Guard the experiment itself: source/server-side rows must remain
+        # rune-powered and client rows must be cost-neutral. If either invariant
+        # is false, refuse to install anything.
         for spell_id in EXPERIMENT_SPELL_IDS:
-            server_power, server_rune_cost, _, _ = server_signatures[spell_id]
+            _, server_rune_cost, _, _ = server_signatures[spell_id]
             client_power, client_rune_cost, client_mana, client_mana_pct = client_signatures[spell_id]
             if server_rune_cost == 0:
                 raise RuneClientExperimentError(
-                    f"Server spell {spell_id} unexpectedly has RuneCostID=0"
+                    f"Server/source spell {spell_id} unexpectedly has RuneCostID=0"
                 )
             if client_power != POWER_MANA or client_rune_cost != 0 or client_mana != 0 or client_mana_pct != 0:
                 raise RuneClientExperimentError(
                     f"Client spell {spell_id} was not neutralized correctly: {client_signatures[spell_id]}"
                 )
-            if server_spell.read_bytes() == client_spell.read_bytes():
-                raise RuneClientExperimentError("Client/server Spell.dbc split did not change any bytes")
+
+        if server_spell.read_bytes() == client_spell.read_bytes():
+            raise RuneClientExperimentError("Client/server Spell.dbc split did not change any bytes")
 
         root_files = {
             "Interface\\GlueXML\\CharacterCreate.lua": build_character_create_lua(),
@@ -174,7 +174,8 @@ def build_experimental_bundle(dbc_source: Path, output: Path, locale: str) -> di
         }
 
         # Root and locale client archives must still agree with each other. The
-        # only intentional divergence is client Spell.dbc vs server Spell.dbc.
+        # only intentional divergence is client Spell.dbc vs the installed
+        # server Spell.dbc.
         for name in ROOT_SHARED_DBCS:
             internal = f"DBFilesClient\\{name}"
             if root_files[internal] != locale_files[internal]:
@@ -186,11 +187,6 @@ def build_experimental_bundle(dbc_source: Path, output: Path, locale: str) -> di
         locale_patch = output / "Data" / locale / f"patch-{locale}-{PROJECT_SUFFIX.lower()}.mpq"
         write_mpq(root_patch, root_files)
         write_mpq(locale_patch, locale_files)
-
-        server_dbc_dir = output / "server-dbc"
-        server_dbc_dir.mkdir(parents=True, exist_ok=True)
-        for name in DBC_NAMES:
-            shutil.copy2(server_work / name, server_dbc_dir / name)
 
     manifest = {
         "schema": 1,
@@ -219,22 +215,30 @@ def apply_experiment(args) -> None:
     server_dbc, dbc_source, client_dir = validate_runtime_inputs(
         core, args, build_smoke_test=False
     )
+    installed_server_spell = server_dbc / "Spell.dbc"
+    if not installed_server_spell.is_file():
+        raise RuneClientExperimentError(
+            f"Installed server Spell.dbc not found: {installed_server_spell}"
+        )
 
+    # The experiment must be client-only. Hash the installed server spell file
+    # before and after installing the patch and abort if anything touched it.
+    server_spell_hash_before = sha256(installed_server_spell)
     state = load_state(core)
 
     with tempfile.TemporaryDirectory(prefix="adventurer-rune-install-") as tmp_name:
         staged = Path(tmp_name) / "build"
         manifest = build_experimental_bundle(dbc_source, staged, args.locale)
-
-        dbc_hashes = install_server_dbcs(staged, server_dbc)
         installed_client = install_patch(client_dir, staged, args.locale)
 
-        # Keep Adventurer's ownership state truthful so a later normal
-        # update/verify knows exactly which generated artifacts are installed.
-        state["dbc"] = {
-            "directory": str(server_dbc),
-            "files": dbc_hashes,
-        }
+        server_spell_hash_after = sha256(installed_server_spell)
+        if server_spell_hash_after != server_spell_hash_before:
+            raise RuneClientExperimentError(
+                "Experiment modified the installed server Spell.dbc; refusing to continue"
+            )
+
+        # Only client ownership changes. The existing server DBC ownership state
+        # is intentionally preserved unchanged.
         state["client"] = {
             "directory": str(client_dir),
             "installed": installed_client,
@@ -249,12 +253,13 @@ def apply_experiment(args) -> None:
 
     print("Rune client-authority experiment installed.")
     print(f"  core:          {core}")
-    print(f"  server DBC:    {server_dbc}")
+    print(f"  server DBC:    {server_dbc} (UNCHANGED)")
     print(f"  client:        {client_dir}")
     print(f"  spell IDs:     {', '.join(str(x) for x in EXPERIMENT_SPELL_IDS)}")
+    print(f"  server hash:   {server_spell_hash_after}")
     for spell_id in EXPERIMENT_SPELL_IDS:
         print(
-            f"  {spell_id}: server(power,rune,mana,mana%)={manifest['server_signatures'][str(spell_id)]} "
+            f"  {spell_id}: source(power,rune,mana,mana%)={manifest['server_signatures'][str(spell_id)]} "
             f"client={manifest['client_signatures'][str(spell_id)]}"
         )
     print("  NEXT: fully close WoW, reopen it, then reproduce the two-rune regression.")
@@ -271,11 +276,12 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    args = parser().parse_args()
+    arg_parser = parser()
+    args = arg_parser.parse_args()
     try:
         apply_experiment(args)
     except (InstallError, RuneClientExperimentError, DBCError, OSError) as exc:
-        parser().error(str(exc))
+        arg_parser.error(str(exc))
     return 0
 
 
