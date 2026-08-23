@@ -36,51 +36,38 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertNotIn("<StatusBar ", runtime_xml)
         self.assertNotIn("<FontString ", runtime_xml)
 
-    def test_lua_runtime_only_applies_custom_frame_art(self) -> None:
+    def test_lua_executes_no_player_frame_code(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
-        self.assertIn("Adventurer Core diagnostic PlayerFrame mode", lua)
+        self.assertIn("NO PlayerFrame runtime code", lua)
         runtime = lua.split("--[[", 1)[0]
 
-        self.assertIn("ADVENTURER_CLASS_ID = 10", runtime)
-        self.assertIn('ADVENTURER_FRAME_TEXTURE = "Interface\\\\Adventurer\\\\UI-AdventurerFrame"', runtime)
-        self.assertIn("FRAME_ART_X_SHIFT = 8", runtime)
-        self.assertIn("ApplyAdventurerFrameArt", runtime)
-        self.assertIn("PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)", runtime)
-        self.assertIn('hooksecurefunc("PlayerFrame_ToPlayerArt"', runtime)
-
         for forbidden in (
+            "PlayerFrameTexture:",
             "PlayerFrameHealthBar",
             "PlayerFrameManaBar",
             "PlayerFrameEnergyBar",
             "PlayerFrameRageBar",
             "GetComboPoints =",
             "UnitPower(",
-            "SetMinMaxValues",
-            "SetValue(",
-            "ConfigureAuxiliaryMouse",
-            "ApplyReferencePlayerFrameLayout",
+            "CreateFrame(",
+            "hooksecurefunc(",
+            "SetPoint(",
+            "SetTexture(",
         ):
             self.assertNotIn(forbidden, runtime)
 
-    def test_custom_art_keeps_latest_eight_pixel_offset(self) -> None:
-        lua = build_adventurer_resources_lua().decode("utf-8")
-        runtime = lua.split("--[[", 1)[0]
-        self.assertIn(
-            'PlayerFrameTexture:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", FRAME_ART_X_SHIFT, 0)',
-            runtime,
-        )
-        self.assertIn(
-            'PlayerFrameTexture:SetPoint("BOTTOMRIGHT", PlayerFrame, "BOTTOMRIGHT", FRAME_ART_X_SHIFT, 0)',
-            runtime,
-        )
-
-    def test_adventurer_frame_art_is_valid_bundled_blp2(self) -> None:
+    def test_custom_art_is_bundled_but_unused_in_runtime(self) -> None:
         art = build_adventurer_frame_art()
         self.assertTrue(art.startswith(b"BLP2"))
         self.assertEqual(int.from_bytes(art[12:16], "little"), 256)
         self.assertEqual(int.from_bytes(art[16:20], "little"), 128)
 
-    def test_root_mpq_keeps_only_inert_hud_files_plus_frame_art(self) -> None:
+        lua = build_adventurer_resources_lua().decode("utf-8")
+        runtime = lua.split("--[[", 1)[0]
+        self.assertNotIn("UI-AdventurerFrame", runtime)
+        self.assertNotIn("PlayerFrameTexture:SetTexture", runtime)
+
+    def test_root_mpq_contains_only_inert_player_frame_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             work = Path(tmp_name)
             for index, name in enumerate(DBC_NAMES):
@@ -95,12 +82,13 @@ class AdventurerResourceHudTests(unittest.TestCase):
             xml = root_files[ADVENTURER_PLAYER_FRAME_INTERNAL].decode("utf-8")
             runtime_xml = xml.split("<!--", 1)[0] + xml.rsplit("-->", 1)[-1]
             self.assertNotIn("<StatusBar ", runtime_xml)
+            self.assertNotIn("<Frame ", runtime_xml)
 
             lua = root_files["Interface\\FrameXML\\AdventurerResources.lua"].decode("utf-8")
             runtime_lua = lua.split("--[[", 1)[0]
-            self.assertNotIn("PlayerFrameManaBar", runtime_lua)
-            self.assertNotIn("PlayerFrameRageBar", runtime_lua)
-            self.assertNotIn("PlayerFrameEnergyBar", runtime_lua)
+            self.assertNotIn("PlayerFrame", runtime_lua)
+            self.assertNotIn("CreateFrame(", runtime_lua)
+            self.assertNotIn("hooksecurefunc(", runtime_lua)
 
             self.assertNotIn(ADVENTURER_PLAYER_FRAME_INTERNAL, locale_files)
             self.assertNotIn(ADVENTURER_FRAME_INTERNAL, locale_files)
