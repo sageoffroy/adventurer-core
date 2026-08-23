@@ -1,19 +1,28 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
-    <!-- Adventurer-only auxiliary resource controls. -->
+    <!--
+        Adventurer-only auxiliary resource controls.
+        Measurements mirror the reference PlayerFrame layout supplied from the
+        classless client, but only use widgets available in stock WotLK 3.3.5a.
+        Native PlayerFrame health/mana/art are repositioned by AdventurerResources.lua.
+    -->
     <Frame name="AdventurerPlayerFrameElements" parent="PlayerFrame" setAllPoints="true">
         <Layers>
             <Layer level="BACKGROUND">
                 <FontString name="PlayerFrameEnergyBarText" inherits="TextStatusBarText" hidden="true">
                     <Anchors>
                         <Anchor point="CENTER" relativeTo="PlayerFrame" relativePoint="CENTER">
-                            <Offset><AbsDimension x="50" y="-22"/></Offset>
+                            <Offset>
+                                <AbsDimension x="50" y="-22"/>
+                            </Offset>
                         </Anchor>
                     </Anchors>
                 </FontString>
                 <FontString name="PlayerFrameRageBarText" inherits="TextStatusBarText" hidden="true">
                     <Anchors>
                         <Anchor point="CENTER" relativeTo="PlayerFrame" relativePoint="TOPRIGHT">
-                            <Offset><AbsDimension x="-2" y="-42"/></Offset>
+                            <Offset>
+                                <AbsDimension x="-2" y="-42"/>
+                            </Offset>
                         </Anchor>
                     </Anchors>
                 </FontString>
@@ -22,10 +31,14 @@
     </Frame>
 
     <StatusBar name="PlayerFrameEnergyBar" parent="PlayerFrame" inherits="TextStatusBar" hidden="true">
-        <Size><AbsDimension x="92" y="11"/></Size>
+        <Size>
+            <AbsDimension x="92" y="11"/>
+        </Size>
         <Anchors>
             <Anchor point="TOPLEFT" relativeTo="PlayerFrame" relativePoint="TOPLEFT">
-                <Offset><AbsDimension x="117" y="-65"/></Offset>
+                <Offset>
+                    <AbsDimension x="117" y="-65"/>
+                </Offset>
             </Anchor>
         </Anchors>
         <Scripts>
@@ -35,17 +48,23 @@
                 self.cvar = "playerStatusText";
                 self.cvarLabel = "STATUS_TEXT_PLAYER";
             </OnLoad>
-            <OnMouseUp>self:GetParent():Click(button);</OnMouseUp>
+            <OnMouseUp>
+                self:GetParent():Click(button);
+            </OnMouseUp>
         </Scripts>
         <BarTexture file="Interface\TargetingFrame\UI-StatusBar"/>
         <BarColor r="1" g="1" b="0"/>
     </StatusBar>
 
     <StatusBar name="PlayerFrameRageBar" parent="PlayerFrame" inherits="TextStatusBar" orientation="VERTICAL" hidden="true">
-        <Size><AbsDimension x="12" y="38"/></Size>
+        <Size>
+            <AbsDimension x="12" y="38"/>
+        </Size>
         <Anchors>
             <Anchor point="TOPRIGHT" relativeTo="PlayerFrame" relativePoint="TOPRIGHT">
-                <Offset><AbsDimension x="3" y="-24"/></Offset>
+                <Offset>
+                    <AbsDimension x="3" y="-24"/>
+                </Offset>
             </Anchor>
         </Anchors>
         <Layers>
@@ -66,7 +85,9 @@
                 self.cvar = "playerStatusText";
                 self.cvarLabel = "STATUS_TEXT_PLAYER";
             </OnLoad>
-            <OnMouseUp>self:GetParent():Click(button);</OnMouseUp>
+            <OnMouseUp>
+                self:GetParent():Click(button);
+            </OnMouseUp>
         </Scripts>
         <BarTexture file="Interface\TargetingFrame\UI-StatusBar"/>
         <BarColor r="1" g="0" b="0"/>

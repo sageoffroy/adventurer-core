@@ -15,12 +15,15 @@ local ADVENTURER_FRAME_TEX_RIGHT = 0.07421875
 local ADVENTURER_FRAME_TEX_TOP = 0
 local ADVENTURER_FRAME_TEX_BOTTOM = 0.78125
 
+-- Internal PlayerFrame measurements copied from the reference PlayerFrame.xml.
 local PLAYER_FRAME_WIDTH = 232
 local PLAYER_FRAME_HEIGHT = 100
 local PORTRAIT_LEFT = 42
 local PORTRAIT_TOP = 12
 local PORTRAIT_SIZE = 64
 
+-- Final horizontal alignment: only the custom Adventurer BLP is offset.
+-- Every native PlayerFrame child stays at its reference coordinate.
 local FRAME_ART_X_SHIFT = 8
 local RESOURCE_X_SHIFT = 0
 local PORTRAIT_X_SHIFT = 0
@@ -244,6 +247,9 @@ local function HideAdventurerResources()
     end
 end
 
+-- ---------------------------------------------------------------------------
+-- Combo points
+-- ---------------------------------------------------------------------------
 local nativeGetComboPoints = GetComboPoints
 local adventurerComboPoints = 0
 
@@ -298,6 +304,10 @@ local function RefreshAdventurerResources()
     end
 end
 
+-- Blizzard's PlayerFrame_ToPlayerArt reapplies the stock 119px bar widths after
+-- vehicle transitions and PLAYER_ENTERING_WORLD. Reapply the Adventurer layout
+-- immediately after the native function instead of fighting it with a separate
+-- art overlay.
 if hooksecurefunc and PlayerFrame_ToPlayerArt then
     hooksecurefunc("PlayerFrame_ToPlayerArt", function()
         if IsAdventurer() and not PlayerIsUsingVehicleUI() then
@@ -360,6 +370,8 @@ AdventurerResourceFrame:SetScript("OnUpdate", function(self, elapsed)
 
     UpdateAuxiliaryBar(PlayerFrameEnergyBar, POWER_ENERGY, PlayerFrameEnergyBarText)
     UpdateAuxiliaryBar(PlayerFrameRageBar, POWER_RAGE, PlayerFrameRageBarText)
+
+    -- Keep exact geometry stable if another stock PlayerFrame transition ran.
     ApplyReferencePlayerFrameLayout()
 
     if PlayerFrameEnergyBar and not PlayerFrameEnergyBar:IsShown() then
