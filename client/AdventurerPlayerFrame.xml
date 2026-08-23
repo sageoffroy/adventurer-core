@@ -5,18 +5,6 @@
         classless client, but only use widgets available in stock WotLK 3.3.5a.
         Native PlayerFrame health/mana/art are repositioned by AdventurerResources.lua.
     -->
-    <Frame name="AdventurerPlayerFrameRootOffset" parent="UIParent">
-        <Scripts>
-            <OnLoad>
-                local className, classToken, classId = UnitClass("player");
-                if classId == 10 or classToken == "ADVENTURER" or className == "Adventurer" or className == "Aventurero" or className == "Aventurera" then
-                    PlayerFrame:ClearAllPoints();
-                    PlayerFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", -25, -4);
-                end
-            </OnLoad>
-        </Scripts>
-    </Frame>
-
     <Frame name="AdventurerPlayerFrameElements" parent="PlayerFrame" setAllPoints="true">
         <Layers>
             <Layer level="BACKGROUND">
