@@ -19,13 +19,11 @@ if locale == "esES" or locale == "esMX" then
     labels = {
         [POWER_RAGE] = "Ira",
         [POWER_ENERGY] = "Energía",
-        [POWER_RUNIC_POWER] = "Poder rúnico",
     }
 else
     labels = {
         [POWER_RAGE] = "Rage",
         [POWER_ENERGY] = "Energy",
-        [POWER_RUNIC_POWER] = "Runic Power",
     }
 end
 
@@ -39,10 +37,12 @@ local ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125
 -- on HIGH strata so the painted frame always masks the rectangular StatusBars.
 local BAR_LEFT = 112
 local BAR_WIDTH = 113
+local HEALTH_LEFT = 110
+local ENERGY_LEFT = 110
 local RAGE_LEFT = 90
 local RAGE_WIDTH = 135
-local RAGE_TOP = 15
-local RAGE_HEIGHT = 12
+local RAGE_TOP = 12
+local RAGE_HEIGHT = 10
 local HEALTH_TOP = 26
 local HEALTH_HEIGHT = 13
 local MANA_TOP = 45
@@ -50,7 +50,7 @@ local MANA_HEIGHT = 5
 local ENERGY_TOP = 56
 local ENERGY_HEIGHT = 6
 local RUNIC_LEFT = 225
-local RUNIC_TOP = 17
+local RUNIC_TOP = 15
 local RUNIC_WIDTH = 16
 local RUNIC_HEIGHT = 46
 local RUNES_LEFT = 128
@@ -148,7 +148,12 @@ local function UpdateBar(bar)
 
     bar:SetMinMaxValues(0, maximum)
     bar:SetValue(current)
-    bar.valueText:SetText(labels[bar.powerId] .. " " .. current .. " / " .. maximum)
+
+    if bar.powerId == POWER_RUNIC_POWER then
+        bar.valueText:SetText(current .. " / " .. maximum)
+    else
+        bar.valueText:SetText(labels[bar.powerId] .. " " .. current .. " / " .. maximum)
+    end
 end
 
 local function ApplyAdventurerPlayerFrameArt()
@@ -189,7 +194,7 @@ local function PositionNativeBars()
         "TOPLEFT",
         PlayerFrame,
         "TOPLEFT",
-        BAR_LEFT,
+        HEALTH_LEFT,
         -HEALTH_TOP
     )
     PlayerFrameHealthBar:SetWidth(BAR_WIDTH)
@@ -222,7 +227,7 @@ local function PositionAuxiliaryBars()
 
     energyBar:ClearAllPoints()
     energyBar:SetOrientation("HORIZONTAL")
-    energyBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", BAR_LEFT, -ENERGY_TOP)
+    energyBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT, -ENERGY_TOP)
     energyBar:SetWidth(BAR_WIDTH)
     energyBar:SetHeight(ENERGY_HEIGHT)
 
