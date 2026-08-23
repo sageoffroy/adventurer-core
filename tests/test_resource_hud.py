@@ -68,13 +68,14 @@ class AdventurerResourceHudTests(unittest.TestCase):
     def test_native_player_frame_measurements_match_reference_layout(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
         expected = (
-            'RESOURCE_X_SHIFT = -6',
-            'PORTRAIT_X_SHIFT = -6',
-            'LEVEL_X_SHIFT = -8',
-            'MANA_X_SHIFT = -8',
-            'ENERGY_X_SHIFT = -8',
-            'BACKGROUND_X_SHIFT = -8',
-            'NAME_X_SHIFT = -2',
+            'FRAME_ART_X_SHIFT = 3',
+            'RESOURCE_X_SHIFT = -3',
+            'PORTRAIT_X_SHIFT = -3',
+            'LEVEL_X_SHIFT = -5',
+            'MANA_X_SHIFT = -5',
+            'ENERGY_X_SHIFT = -5',
+            'BACKGROUND_X_SHIFT = -5',
+            'NAME_X_SHIFT = 1',
             'FLASH_X_SHIFT = 0',
             'STATUS_X_SHIFT = 5',
             'PLAYER_FRAME_WIDTH = 232',
@@ -108,9 +109,11 @@ class AdventurerResourceHudTests(unittest.TestCase):
         for marker in expected:
             self.assertIn(marker, lua)
 
-    def test_frame_elements_follow_custom_blp_alignment(self) -> None:
+    def test_normal_hud_group_moves_three_pixels_right(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
         expected = (
+            'PlayerFrameTexture:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", FRAME_ART_X_SHIFT, 0)',
+            'PlayerFrameTexture:SetPoint("BOTTOMRIGHT", PlayerFrame, "BOTTOMRIGHT", FRAME_ART_X_SHIFT, 0)',
             'SetFramePoint(PlayerPortrait, "TOPLEFT", PlayerFrame, "TOPLEFT", PORTRAIT_LEFT + PORTRAIT_X_SHIFT, -PORTRAIT_TOP)',
             'SetFramePoint(PlayerFrameBackground, "TOPLEFT", PlayerFrame, "TOPLEFT", BACKGROUND_LEFT + BACKGROUND_X_SHIFT, -BACKGROUND_TOP)',
             'SetFramePoint(PlayerName, "CENTER", PlayerFrame, "CENTER", 50 + NAME_X_SHIFT, 19)',
@@ -119,11 +122,24 @@ class AdventurerResourceHudTests(unittest.TestCase):
             'SetFramePoint(PlayerFrameEnergyBar, "TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT + ENERGY_X_SHIFT, -ENERGY_TOP)',
             'SetFramePoint(PlayerFrameRageBar, "TOPRIGHT", PlayerFrame, "TOPRIGHT", RAGE_RIGHT + RESOURCE_X_SHIFT, -RAGE_TOP)',
             'SetFramePoint(PlayerLevelText, "CENTER", PlayerFrame, "CENTER", -63 + LEVEL_X_SHIFT, -16)',
-            'SetFramePoint(PlayerFrameFlash, "TOPLEFT", PlayerFrame, "TOPLEFT", FLASH_LEFT + FLASH_X_SHIFT, -FLASH_TOP)',
-            'SetFramePoint(PlayerStatusTexture, "TOPLEFT", PlayerFrame, "TOPLEFT", STATUS_LEFT + STATUS_X_SHIFT, -STATUS_TOP)',
         )
         for marker in expected:
             self.assertIn(marker, lua)
+
+    def test_combat_overlays_remain_untouched_by_group_shift(self) -> None:
+        lua = build_adventurer_resources_lua().decode("utf-8")
+        self.assertIn('FLASH_X_SHIFT = 0', lua)
+        self.assertIn('STATUS_X_SHIFT = 5', lua)
+        self.assertIn(
+            'SetFramePoint(PlayerFrameFlash, "TOPLEFT", PlayerFrame, "TOPLEFT", FLASH_LEFT + FLASH_X_SHIFT, -FLASH_TOP)',
+            lua,
+        )
+        self.assertIn(
+            'SetFramePoint(PlayerStatusTexture, "TOPLEFT", PlayerFrame, "TOPLEFT", STATUS_LEFT + STATUS_X_SHIFT, -STATUS_TOP)',
+            lua,
+        )
+        self.assertNotIn('PlayerAttackIcon', lua)
+        self.assertNotIn('PlayerAttackBackground', lua)
 
     def test_auxiliary_bars_are_frame_xml_children_not_uiparent_statusbars(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
