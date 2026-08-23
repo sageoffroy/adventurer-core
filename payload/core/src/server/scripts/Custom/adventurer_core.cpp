@@ -17,10 +17,9 @@ constexpr uint32 SPELL_BROWN_HORSE = 458;
 constexpr uint32 SPELL_DUAL_WIELD = 674;
 constexpr uint32 APPRENTICE_RIDING_VALUE = 75;
 
-// Rage is stored at ten times the value shown by the 3.3.5a client. Energy is
-// stored 1:1. Mana remains the Adventurer's native primary pool.
-constexpr uint32 ADVENTURER_MAX_RAGE = 1000;
-constexpr uint32 ADVENTURER_MAX_ENERGY = 100;
+// Diagnostic baseline: Mana is the Adventurer's only active power pool.
+// Rage and Energy are deliberately disabled here so the stock 3.3.5a
+// PlayerFrame can be observed without auxiliary-power state from the server.
 
 // The 3.3.5a client refuses to expose combo points through GetComboPoints for a
 // non-Rogue/non-Druid class even though AzerothCore's Unit combo-point backend
@@ -193,25 +192,6 @@ void SetRacialLanguages(Player* player)
     }
 }
 
-void ApplyUniversalResources(Player* player, bool initializeCurrent = false)
-{
-    if (!IsAdventurer(player))
-        return;
-
-    // Mana remains native. Rage and Energy are the only auxiliary resource
-    // pools owned by Adventurer Core.
-    if (player->GetMaxPower(POWER_RAGE) < ADVENTURER_MAX_RAGE)
-        player->SetMaxPower(POWER_RAGE, ADVENTURER_MAX_RAGE);
-    if (player->GetMaxPower(POWER_ENERGY) < ADVENTURER_MAX_ENERGY)
-        player->SetMaxPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY);
-
-    if (initializeCurrent)
-    {
-        player->SetPower(POWER_RAGE, 0);
-        player->SetPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY);
-    }
-}
-
 void ApplyRuntimeCapabilities(Player* player)
 {
     uint32 allWeapons = (1u << MAX_ITEM_SUBCLASS_WEAPON) - 1u;
@@ -222,7 +202,6 @@ void ApplyRuntimeCapabilities(Player* player)
     player->SetCanParry(true);
     player->SetCanBlock(true);
     player->UpdateDefenseBonusesMod();
-    ApplyUniversalResources(player);
 }
 
 void FinalizeNewAdventurer(Player* player)
@@ -239,7 +218,6 @@ void FinalizeNewAdventurer(Player* player)
     LearnRacialBaseline(player);
     SetRacialLanguages(player);
     ApplyRuntimeCapabilities(player);
-    ApplyUniversalResources(player, true);
 
     // PLAYERHOOK_ON_CREATE runs after AzerothCore's original creation
     // transaction. Persist the completed class baseline before the temporary
@@ -257,9 +235,7 @@ public:
         PLAYERHOOK_ON_LOGIN,
         PLAYERHOOK_ON_LOGOUT,
         PLAYERHOOK_ON_LEVEL_CHANGED,
-        PLAYERHOOK_ON_UPDATE,
-        PLAYERHOOK_ON_AFTER_UPDATE_MAX_POWER,
-        PLAYERHOOK_ON_PLAYER_HAS_ACTIVE_POWER_TYPE
+        PLAYERHOOK_ON_UPDATE
     }) { }
 
     void OnPlayerCreate(Player* player) override
@@ -290,43 +266,6 @@ public:
     {
         if (IsAdventurer(player))
             ApplyRuntimeCapabilities(player);
-    }
-
-    void OnPlayerAfterUpdateMaxPower(Player* player, Powers& power, float& value) override
-    {
-        if (!IsAdventurer(player))
-            return;
-
-        // Preserve native-sized floors for the two auxiliary pools while still
-        // allowing talents/auras to increase them above the baseline.
-        switch (power)
-        {
-            case POWER_RAGE:
-                value = std::max(value, static_cast<float>(ADVENTURER_MAX_RAGE));
-                break;
-            case POWER_ENERGY:
-                value = std::max(value, static_cast<float>(ADVENTURER_MAX_ENERGY));
-                break;
-            default:
-                break;
-        }
-    }
-
-    bool OnPlayerHasActivePowerType(Player const* player, Powers power) override
-    {
-        if (!IsAdventurer(player))
-            return false;
-        if (player->getPowerType() == power)
-            return false; // Native Mana continues through AzerothCore's stock path.
-
-        switch (power)
-        {
-            case POWER_RAGE:
-            case POWER_ENERGY:
-                return player->GetMaxPower(power) > 0;
-            default:
-                return false;
-        }
     }
 };
 
