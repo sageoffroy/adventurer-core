@@ -16,6 +16,10 @@ local ADVENTURER_FRAME_TEX_TOP = 0
 local ADVENTURER_FRAME_TEX_BOTTOM = 0.78125
 
 -- Internal PlayerFrame measurements copied from the reference PlayerFrame.xml.
+-- Stock WotLK anchors PlayerFrame at x=-19. Shift the whole Adventurer frame
+-- left by half the 12px Rage bar width: -19 - 6 = -25.
+local PLAYER_FRAME_X = -25
+local PLAYER_FRAME_Y = -4
 local PLAYER_FRAME_WIDTH = 232
 local PLAYER_FRAME_HEIGHT = 100
 local PORTRAIT_LEFT = 42
@@ -107,6 +111,10 @@ local function ApplyReferencePlayerFrameLayout()
         return
     end
 
+    -- Keep the root frame itself at the Adventurer offset. Blizzard can restore
+    -- the stock PlayerFrame anchor after login/vehicle transitions, so this must
+    -- live in the stable layout pass rather than a one-shot XML OnLoad.
+    SetFramePoint(PlayerFrame, "TOPLEFT", UIParent, "TOPLEFT", PLAYER_FRAME_X, PLAYER_FRAME_Y)
     PlayerFrame:SetWidth(PLAYER_FRAME_WIDTH)
     PlayerFrame:SetHeight(PLAYER_FRAME_HEIGHT)
 
