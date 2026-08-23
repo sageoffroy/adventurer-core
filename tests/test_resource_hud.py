@@ -14,7 +14,6 @@ from client import (  # noqa: E402
     DBC_NAMES,
     build_adventurer_frame_art,
     build_adventurer_player_frame_xml,
-    build_adventurer_resources_lua,
     build_archive_files,
     build_frame_xml_toc,
 )
@@ -73,7 +72,9 @@ class AdventurerResourceHudTests(unittest.TestCase):
             'LEVEL_X_SHIFT = -6',
             'MANA_X_SHIFT = -8',
             'ENERGY_X_SHIFT = -8',
-            'FLASH_X_SHIFT = -6',
+            'BACKGROUND_X_SHIFT = -8',
+            'NAME_X_SHIFT = -2',
+            'FLASH_X_SHIFT = -1',
             'PLAYER_FRAME_WIDTH = 232',
             'PLAYER_FRAME_HEIGHT = 100',
             'PORTRAIT_LEFT = 42',
@@ -109,7 +110,8 @@ class AdventurerResourceHudTests(unittest.TestCase):
         lua = build_adventurer_resources_lua().decode("utf-8")
         expected = (
             'SetFramePoint(PlayerPortrait, "TOPLEFT", PlayerFrame, "TOPLEFT", PORTRAIT_LEFT + PORTRAIT_X_SHIFT, -PORTRAIT_TOP)',
-            'SetFramePoint(PlayerFrameBackground, "TOPLEFT", PlayerFrame, "TOPLEFT", BACKGROUND_LEFT + RESOURCE_X_SHIFT, -BACKGROUND_TOP)',
+            'SetFramePoint(PlayerFrameBackground, "TOPLEFT", PlayerFrame, "TOPLEFT", BACKGROUND_LEFT + BACKGROUND_X_SHIFT, -BACKGROUND_TOP)',
+            'SetFramePoint(PlayerName, "CENTER", PlayerFrame, "CENTER", 50 + NAME_X_SHIFT, 19)',
             'SetFramePoint(PlayerFrameHealthBar, "TOPLEFT", PlayerFrame, "TOPLEFT", HEALTH_LEFT + RESOURCE_X_SHIFT, -HEALTH_TOP)',
             'SetFramePoint(PlayerFrameManaBar, "TOPLEFT", PlayerFrame, "TOPLEFT", MANA_LEFT + MANA_X_SHIFT, -MANA_TOP)',
             'SetFramePoint(PlayerFrameEnergyBar, "TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT + ENERGY_X_SHIFT, -ENERGY_TOP)',
