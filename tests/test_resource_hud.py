@@ -33,23 +33,27 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)', lua)
         self.assertIn('ADVENTURER_FRAME_WIDTH = 248', lua)
         self.assertIn('ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125', lua)
-        self.assertIn('BAR_LEFT = 105', lua)
-        self.assertIn('BAR_WIDTH = 121', lua)
+        self.assertIn('BAR_LEFT = 112', lua)
+        self.assertIn('BAR_WIDTH = 113', lua)
+        self.assertIn('RAGE_LEFT = 100', lua)
+        self.assertIn('RAGE_WIDTH = 125', lua)
         self.assertIn('RAGE_TOP = 15', lua)
-        self.assertIn('RAGE_HEIGHT = 6', lua)
+        self.assertIn('RAGE_HEIGHT = 5', lua)
         self.assertIn('HEALTH_TOP = 26', lua)
         self.assertIn('MANA_TOP = 45', lua)
         self.assertIn('ENERGY_TOP = 56', lua)
-        self.assertIn('RUNIC_LEFT = 228', lua)
+        self.assertIn('RUNIC_LEFT = 231', lua)
         self.assertIn('RUNIC_TOP = 16', lua)
-        self.assertIn('RUNIC_WIDTH = 12', lua)
-        self.assertIn('RUNIC_HEIGHT = 41', lua)
-        self.assertIn('RUNES_TOP = 76', lua)
+        self.assertIn('RUNIC_WIDTH = 9', lua)
+        self.assertIn('RUNIC_HEIGHT = 43', lua)
+        self.assertIn('RUNES_LEFT = 128', lua)
+        self.assertIn('RUNES_TOP = 82', lua)
+        self.assertIn('RUNES_SCALE = 0.90', lua)
         self.assertIn('runicBar:SetOrientation("VERTICAL")', lua)
         self.assertIn('PlayerFrameHealthBar:SetPoint(', lua)
         self.assertIn('PlayerFrameManaBar:SetPoint(', lua)
         self.assertIn(
-            'rageBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", BAR_LEFT, -RAGE_TOP)',
+            'rageBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RAGE_LEFT, -RAGE_TOP)',
             lua,
         )
         self.assertIn(
@@ -60,6 +64,7 @@ class AdventurerResourceHudTests(unittest.TestCase):
             'runicBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RUNIC_LEFT, -RUNIC_TOP)',
             lua,
         )
+        self.assertIn('RuneFrame:SetScale(RUNES_SCALE)', lua)
         self.assertIn(
             'RuneFrame:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RUNES_LEFT, -RUNES_TOP)',
             lua,
@@ -78,7 +83,10 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertIn('PlayerFrameHealthBarText:SetPoint("CENTER", PlayerFrameHealthBar, "CENTER", 0, 0)', lua)
         self.assertIn('PlayerFrameManaBarText:SetPoint("CENTER", PlayerFrameManaBar, "CENTER", 0, 0)', lua)
         self.assertIn('bar:EnableMouse(true)', lua)
-        self.assertIn('bar.valueText:SetText(current .. " / " .. maximum)', lua)
+        self.assertIn('bar.valueText:SetText(labels[bar.powerId] .. " " .. current .. " / " .. maximum)', lua)
+        self.assertIn('[POWER_RAGE] = "Ira"', lua)
+        self.assertIn('[POWER_ENERGY] = "Energía"', lua)
+        self.assertIn('[POWER_RUNIC_POWER] = "Poder rúnico"', lua)
         self.assertIn('bar:SetScript("OnEnter"', lua)
         self.assertIn('bar:SetScript("OnLeave"', lua)
         self.assertIn('self.valueText:Show()', lua)
