@@ -23,13 +23,13 @@ local PORTRAIT_TOP = 12
 local PORTRAIT_SIZE = 64
 
 -- Alignment corrections for the supplied Adventurer BLP.
--- Health/background/rage are 6px left of the classless reference coordinates.
--- Mana and Energy need 2px more, while portrait and level follow the 6px shift.
+-- The BLP itself is the fixed reference and is never repositioned.
 local RESOURCE_X_SHIFT = -6
 local PORTRAIT_X_SHIFT = -6
 local LEVEL_X_SHIFT = -6
 local MANA_X_SHIFT = -8
 local ENERGY_X_SHIFT = -8
+local FLASH_X_SHIFT = -6
 
 local BACKGROUND_LEFT = 106
 local BACKGROUND_TOP = 22
@@ -146,7 +146,7 @@ local function ApplyReferencePlayerFrameLayout()
     if PlayerFrameFlash then
         PlayerFrameFlash:SetWidth(FLASH_WIDTH)
         PlayerFrameFlash:SetHeight(FLASH_HEIGHT)
-        SetFramePoint(PlayerFrameFlash, "TOPLEFT", PlayerFrame, "TOPLEFT", FLASH_LEFT, -FLASH_TOP)
+        SetFramePoint(PlayerFrameFlash, "TOPLEFT", PlayerFrame, "TOPLEFT", FLASH_LEFT + FLASH_X_SHIFT, -FLASH_TOP)
     end
 
     if PlayerStatusTexture then
