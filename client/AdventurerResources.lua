@@ -1,14 +1,54 @@
--- Adventurer Core: universal resource HUD for the native class-10 Adventurer.
+-- Adventurer Core: native PlayerFrame resource layout for class 10.
 --
--- The server owns the actual pools. This file arranges Blizzard's native
--- PlayerFrame around the Adventurer frame art: Rage above Health, Mana below
--- Health, and Energy below Mana. Blizzard's native ComboFrame remains attached
--- to TargetFrame.
+-- The frame art, Health and Mana stay on Blizzard's real PlayerFrame. Rage and
+-- Energy are TextStatusBar children declared in AdventurerPlayerFrame.xml using
+-- the same dimensions/anchors as the supplied classless reference layout.
 
 local ADVENTURER_CLASS_ID = 10
 local POWER_RAGE = 1
 local POWER_ENERGY = 3
 local COMBO_PREFIX = "AdventurerCP"
+
+local ADVENTURER_FRAME_TEXTURE = "Interface\\Adventurer\\UI-AdventurerFrame"
+local ADVENTURER_FRAME_TEX_LEFT = 1.0
+local ADVENTURER_FRAME_TEX_RIGHT = 0.07421875
+local ADVENTURER_FRAME_TEX_TOP = 0
+local ADVENTURER_FRAME_TEX_BOTTOM = 0.78125
+
+-- Internal PlayerFrame measurements copied from the reference PlayerFrame.xml.
+local PLAYER_FRAME_WIDTH = 232
+local PLAYER_FRAME_HEIGHT = 100
+local PORTRAIT_LEFT = 42
+local PORTRAIT_TOP = 12
+local PORTRAIT_SIZE = 64
+local BACKGROUND_LEFT = 106
+local BACKGROUND_TOP = 22
+local BACKGROUND_WIDTH = 116
+local BACKGROUND_HEIGHT = 41
+local HEALTH_LEFT = 106
+local HEALTH_TOP = 41
+local HEALTH_WIDTH = 116
+local HEALTH_HEIGHT = 12
+local MANA_LEFT = 106
+local MANA_TOP = 52
+local MANA_WIDTH = 116
+local MANA_HEIGHT = 12
+local ENERGY_LEFT = 117
+local ENERGY_TOP = 65
+local ENERGY_WIDTH = 92
+local ENERGY_HEIGHT = 11
+local RAGE_RIGHT = 3
+local RAGE_TOP = 24
+local RAGE_WIDTH = 12
+local RAGE_HEIGHT = 38
+local FLASH_LEFT = 13
+local FLASH_TOP = 0
+local FLASH_WIDTH = 238
+local FLASH_HEIGHT = 93
+local STATUS_LEFT = 35
+local STATUS_TOP = 8
+local STATUS_WIDTH = 187
+local STATUS_HEIGHT = 66
 
 local locale = GetLocale()
 local labels
@@ -24,26 +64,6 @@ else
     }
 end
 
-local ADVENTURER_FRAME_TEXTURE = "Interface\\Adventurer\\UI-AdventurerFrame"
-local ADVENTURER_FRAME_WIDTH = 248
-local ADVENTURER_FRAME_HEIGHT = 100
-local ADVENTURER_FRAME_RIGHT_TEXCOORD = 0.03125
-
--- All resource bars stay behind the painted shell. Blizzard's level text lives
--- on PlayerFrame, so we mirror it on the HIGH-strata overlay to keep it visible.
-local BAR_LEFT = 110
-local BAR_WIDTH = 115
-local RAGE_LEFT = 91
-local RAGE_WIDTH = 135
-local RAGE_TOP = 12
-local RAGE_HEIGHT = 10
-local HEALTH_TOP = 26
-local HEALTH_HEIGHT = 13
-local MANA_TOP = 45
-local MANA_HEIGHT = 5
-local ENERGY_TOP = 56
-local ENERGY_HEIGHT = 6
-
 local function IsAdventurer()
     local className, classToken, classId = UnitClass("player")
     if classId == ADVENTURER_CLASS_ID or classToken == "ADVENTURER" then
@@ -55,200 +75,159 @@ local function IsAdventurer()
         or className == "Aventurera"
 end
 
-local function GetPowerColor(powerId)
-    if PowerBarColor and PowerBarColor[powerId] then
-        local color = PowerBarColor[powerId]
-        return color.r, color.g, color.b
-    end
-
-    if powerId == POWER_RAGE then
-        return 1.0, 0.0, 0.0
-    elseif powerId == POWER_ENERGY then
-        return 1.0, 1.0, 0.0
-    end
-
-    return 0.0, 0.82, 1.0
+local function PlayerIsUsingVehicleUI()
+    return UnitHasVehicleUI and UnitHasVehicleUI("player")
 end
 
-local function CreateResourceBar(name, powerId)
-    local bar = CreateFrame("StatusBar", name, UIParent)
-    bar.powerId = powerId
-    bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    bar:SetFrameStrata("BACKGROUND")
-    bar:SetFrameLevel(1)
-    bar:EnableMouse(true)
-
-    local r, g, b = GetPowerColor(powerId)
-    bar:SetStatusBarColor(r, g, b)
-
-    local background = bar:CreateTexture(nil, "BACKGROUND")
-    background:SetAllPoints(bar)
-    background:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    background:SetVertexColor(0.08, 0.08, 0.08, 0.85)
-
-    local value = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    value:SetPoint("CENTER", bar, "CENTER", 0, 0)
-    value:SetJustifyH("CENTER")
-    value:Hide()
-    bar.valueText = value
-
-    bar:SetScript("OnEnter", function(self)
-        self.valueText:Show()
-    end)
-    bar:SetScript("OnLeave", function(self)
-        self.valueText:Hide()
-    end)
-
-    bar:Hide()
-    return bar
+local function SetFramePoint(frame, point, relativeTo, relativePoint, x, y)
+    if not frame then
+        return
+    end
+    frame:ClearAllPoints()
+    frame:SetPoint(point, relativeTo, relativePoint, x, y)
 end
 
-local rageBar = CreateResourceBar("AdventurerRageBar", POWER_RAGE)
-local energyBar = CreateResourceBar("AdventurerEnergyBar", POWER_ENERGY)
+local function PositionNativeText()
+    if PlayerFrameHealthBarText then
+        SetFramePoint(PlayerFrameHealthBarText, "CENTER", PlayerFrame, "CENTER", 50, 3)
+    end
+    if PlayerFrameManaBarText then
+        SetFramePoint(PlayerFrameManaBarText, "CENTER", PlayerFrame, "CENTER", 50, -8)
+    end
+    if PlayerFrameEnergyBarText then
+        SetFramePoint(PlayerFrameEnergyBarText, "CENTER", PlayerFrame, "CENTER", 50, -22)
+    end
+    if PlayerFrameRageBarText then
+        SetFramePoint(PlayerFrameRageBarText, "CENTER", PlayerFrame, "TOPRIGHT", -2, -42)
+    end
+end
 
-local frameArtOverlay = CreateFrame("Frame", "AdventurerPlayerFrameArtOverlay", UIParent)
-frameArtOverlay:SetWidth(ADVENTURER_FRAME_WIDTH)
-frameArtOverlay:SetHeight(ADVENTURER_FRAME_HEIGHT)
-frameArtOverlay:SetFrameStrata("HIGH")
-frameArtOverlay:SetFrameLevel(1)
-frameArtOverlay:EnableMouse(false)
-frameArtOverlay:Hide()
+local function ApplyReferencePlayerFrameLayout()
+    if not PlayerFrame or not PlayerFrameHealthBar or not PlayerFrameManaBar then
+        return
+    end
 
-local frameArtTexture = frameArtOverlay:CreateTexture(nil, "ARTWORK")
-frameArtTexture:SetAllPoints(frameArtOverlay)
-frameArtTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)
-frameArtTexture:SetTexCoord(
-    1.0,
-    ADVENTURER_FRAME_RIGHT_TEXCOORD,
-    0,
-    0.78125
-)
+    PlayerFrame:SetWidth(PLAYER_FRAME_WIDTH)
+    PlayerFrame:SetHeight(PLAYER_FRAME_HEIGHT)
 
-local adventurerLevelText = frameArtOverlay:CreateFontString(
-    "AdventurerPlayerLevelText",
-    "OVERLAY",
-    "GameFontNormalSmall"
-)
-adventurerLevelText:SetPoint("CENTER", PlayerFrame, "CENTER", -63, -16)
-adventurerLevelText:Hide()
+    if PlayerPortrait then
+        PlayerPortrait:SetWidth(PORTRAIT_SIZE)
+        PlayerPortrait:SetHeight(PORTRAIT_SIZE)
+        SetFramePoint(PlayerPortrait, "TOPLEFT", PlayerFrame, "TOPLEFT", PORTRAIT_LEFT, -PORTRAIT_TOP)
+    end
 
-local function UpdateBar(bar)
-    local current = UnitPower("player", bar.powerId) or 0
-    local maximum = UnitPowerMax("player", bar.powerId) or 0
+    if PlayerFrameBackground then
+        PlayerFrameBackground:SetWidth(BACKGROUND_WIDTH)
+        PlayerFrameBackground:SetHeight(BACKGROUND_HEIGHT)
+        SetFramePoint(PlayerFrameBackground, "TOPLEFT", PlayerFrame, "TOPLEFT", BACKGROUND_LEFT, -BACKGROUND_TOP)
+    end
 
+    if PlayerFrameTexture then
+        PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)
+        PlayerFrameTexture:SetTexCoord(
+            ADVENTURER_FRAME_TEX_LEFT,
+            ADVENTURER_FRAME_TEX_RIGHT,
+            ADVENTURER_FRAME_TEX_TOP,
+            ADVENTURER_FRAME_TEX_BOTTOM
+        )
+        PlayerFrameTexture:Show()
+    end
+
+    if PlayerFrameFlash then
+        PlayerFrameFlash:SetWidth(FLASH_WIDTH)
+        PlayerFrameFlash:SetHeight(FLASH_HEIGHT)
+        SetFramePoint(PlayerFrameFlash, "TOPLEFT", PlayerFrame, "TOPLEFT", FLASH_LEFT, -FLASH_TOP)
+    end
+
+    if PlayerStatusTexture then
+        PlayerStatusTexture:SetWidth(STATUS_WIDTH)
+        PlayerStatusTexture:SetHeight(STATUS_HEIGHT)
+        SetFramePoint(PlayerStatusTexture, "TOPLEFT", PlayerFrame, "TOPLEFT", STATUS_LEFT, -STATUS_TOP)
+    end
+
+    if PlayerName then
+        SetFramePoint(PlayerName, "CENTER", PlayerFrame, "CENTER", 50, 19)
+    end
+    if PlayerLevelText then
+        SetFramePoint(PlayerLevelText, "CENTER", PlayerFrame, "CENTER", -63, -16)
+        PlayerLevelText:Show()
+    end
+
+    PlayerFrameHealthBar:SetWidth(HEALTH_WIDTH)
+    PlayerFrameHealthBar:SetHeight(HEALTH_HEIGHT)
+    SetFramePoint(PlayerFrameHealthBar, "TOPLEFT", PlayerFrame, "TOPLEFT", HEALTH_LEFT, -HEALTH_TOP)
+
+    PlayerFrameManaBar:SetWidth(MANA_WIDTH)
+    PlayerFrameManaBar:SetHeight(MANA_HEIGHT)
+    SetFramePoint(PlayerFrameManaBar, "TOPLEFT", PlayerFrame, "TOPLEFT", MANA_LEFT, -MANA_TOP)
+
+    if PlayerFrameEnergyBar then
+        PlayerFrameEnergyBar:SetWidth(ENERGY_WIDTH)
+        PlayerFrameEnergyBar:SetHeight(ENERGY_HEIGHT)
+        SetFramePoint(PlayerFrameEnergyBar, "TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT, -ENERGY_TOP)
+    end
+
+    if PlayerFrameRageBar then
+        PlayerFrameRageBar:SetOrientation("VERTICAL")
+        PlayerFrameRageBar:SetWidth(RAGE_WIDTH)
+        PlayerFrameRageBar:SetHeight(RAGE_HEIGHT)
+        SetFramePoint(PlayerFrameRageBar, "TOPRIGHT", PlayerFrame, "TOPRIGHT", RAGE_RIGHT, -RAGE_TOP)
+    end
+
+    PositionNativeText()
+end
+
+local function UpdateAuxiliaryBar(bar, powerId, valueText)
+    if not bar then
+        return
+    end
+
+    local current = UnitPower("player", powerId) or 0
+    local maximum = UnitPowerMax("player", powerId) or 0
     if maximum <= 0 then
         maximum = 1
     end
 
     bar:SetMinMaxValues(0, maximum)
     bar:SetValue(current)
-    bar.valueText:SetText(labels[bar.powerId] .. " " .. current .. " / " .. maximum)
+
+    if valueText then
+        valueText:SetText(labels[powerId] .. " " .. current .. " / " .. maximum)
+    end
 end
 
-local function ApplyAdventurerPlayerFrameArt()
-    if not PlayerFrame or not PlayerFrameTexture then
+local function ConfigureAuxiliaryMouse(bar, valueText)
+    if not bar or bar.adventurerMouseConfigured then
         return
     end
 
-    PlayerFrameTexture:SetAlpha(0)
-    if PlayerLevelText then
-        PlayerLevelText:Hide()
-    end
-
-    frameArtOverlay:ClearAllPoints()
-    frameArtOverlay:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", 0, 0)
-    frameArtOverlay:SetWidth(ADVENTURER_FRAME_WIDTH)
-    frameArtOverlay:SetHeight(ADVENTURER_FRAME_HEIGHT)
-    frameArtOverlay:SetFrameStrata("HIGH")
-    frameArtOverlay:SetFrameLevel(1)
-
-    adventurerLevelText:SetText(UnitLevel("player") or "")
-    adventurerLevelText:Show()
-    frameArtOverlay:Show()
-end
-
-local function PositionNativeBarText()
-    if PlayerFrameHealthBarText and PlayerFrameHealthBar then
-        PlayerFrameHealthBarText:ClearAllPoints()
-        PlayerFrameHealthBarText:SetPoint("CENTER", PlayerFrameHealthBar, "CENTER", 0, 0)
-    end
-
-    if PlayerFrameManaBarText and PlayerFrameManaBar then
-        PlayerFrameManaBarText:ClearAllPoints()
-        PlayerFrameManaBarText:SetPoint("CENTER", PlayerFrameManaBar, "CENTER", 0, 0)
-    end
-end
-
-local function PositionNativeBars()
-    if not PlayerFrame or not PlayerFrameHealthBar or not PlayerFrameManaBar then
-        return
-    end
-
-    PlayerFrameHealthBar:ClearAllPoints()
-    PlayerFrameHealthBar:SetPoint(
-        "TOPLEFT",
-        PlayerFrame,
-        "TOPLEFT",
-        BAR_LEFT,
-        -HEALTH_TOP
-    )
-    PlayerFrameHealthBar:SetWidth(BAR_WIDTH)
-    PlayerFrameHealthBar:SetHeight(HEALTH_HEIGHT)
-
-    PlayerFrameManaBar:ClearAllPoints()
-    PlayerFrameManaBar:SetPoint(
-        "TOPLEFT",
-        PlayerFrame,
-        "TOPLEFT",
-        BAR_LEFT,
-        -MANA_TOP
-    )
-    PlayerFrameManaBar:SetWidth(BAR_WIDTH)
-    PlayerFrameManaBar:SetHeight(MANA_HEIGHT)
-
-    PositionNativeBarText()
-end
-
-local function PositionAuxiliaryBars()
-    if not PlayerFrame then
-        return
-    end
-
-    rageBar:ClearAllPoints()
-    rageBar:SetOrientation("HORIZONTAL")
-    rageBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", RAGE_LEFT, -RAGE_TOP)
-    rageBar:SetWidth(RAGE_WIDTH)
-    rageBar:SetHeight(RAGE_HEIGHT)
-
-    energyBar:ClearAllPoints()
-    energyBar:SetOrientation("HORIZONTAL")
-    energyBar:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", BAR_LEFT, -ENERGY_TOP)
-    energyBar:SetWidth(BAR_WIDTH)
-    energyBar:SetHeight(ENERGY_HEIGHT)
-end
-
-local function PositionBars()
-    PositionNativeBars()
-    PositionAuxiliaryBars()
-    ApplyAdventurerPlayerFrameArt()
+    bar.adventurerMouseConfigured = true
+    bar:EnableMouse(true)
+    bar:SetScript("OnEnter", function()
+        if valueText then
+            valueText:Show()
+        end
+    end)
+    bar:SetScript("OnLeave", function()
+        if valueText then
+            valueText:Hide()
+        end
+    end)
 end
 
 local function HideAdventurerResources()
-    rageBar:Hide()
-    energyBar:Hide()
-    adventurerLevelText:Hide()
-    frameArtOverlay:Hide()
-
-    if PlayerFrameTexture then
-        PlayerFrameTexture:SetAlpha(1)
+    if PlayerFrameEnergyBar then
+        PlayerFrameEnergyBar:Hide()
     end
-    if PlayerLevelText then
-        PlayerLevelText:Show()
+    if PlayerFrameRageBar then
+        PlayerFrameRageBar:Hide()
     end
-end
-
-local function PlayerIsUsingVehicleUI()
-    return UnitHasVehicleUI and UnitHasVehicleUI("player")
+    if PlayerFrameEnergyBarText then
+        PlayerFrameEnergyBarText:Hide()
+    end
+    if PlayerFrameRageBarText then
+        PlayerFrameRageBarText:Hide()
+    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -279,6 +258,7 @@ end
 
 local function RefreshAdventurerResources()
     if not IsAdventurer() then
+        HideAdventurerResources()
         return
     end
 
@@ -287,16 +267,36 @@ local function RefreshAdventurerResources()
         return
     end
 
-    PositionBars()
-    UpdateBar(rageBar)
-    UpdateBar(energyBar)
+    ApplyReferencePlayerFrameLayout()
 
-    rageBar:Show()
-    energyBar:Show()
+    ConfigureAuxiliaryMouse(PlayerFrameEnergyBar, PlayerFrameEnergyBarText)
+    ConfigureAuxiliaryMouse(PlayerFrameRageBar, PlayerFrameRageBarText)
+
+    UpdateAuxiliaryBar(PlayerFrameEnergyBar, POWER_ENERGY, PlayerFrameEnergyBarText)
+    UpdateAuxiliaryBar(PlayerFrameRageBar, POWER_RAGE, PlayerFrameRageBarText)
+
+    if PlayerFrameEnergyBar then
+        PlayerFrameEnergyBar:Show()
+    end
+    if PlayerFrameRageBar then
+        PlayerFrameRageBar:Show()
+    end
 
     if ComboFrame_Update then
         ComboFrame_Update()
     end
+end
+
+-- Blizzard's PlayerFrame_ToPlayerArt reapplies the stock 119px bar widths after
+-- vehicle transitions and PLAYER_ENTERING_WORLD. Reapply the Adventurer layout
+-- immediately after the native function instead of fighting it with a separate
+-- art overlay.
+if hooksecurefunc and PlayerFrame_ToPlayerArt then
+    hooksecurefunc("PlayerFrame_ToPlayerArt", function()
+        if IsAdventurer() and not PlayerIsUsingVehicleUI() then
+            ApplyReferencePlayerFrameLayout()
+        end
+    end)
 end
 
 local AdventurerResourceFrame = CreateFrame("Frame", "AdventurerResourceFrame", UIParent)
@@ -351,12 +351,16 @@ AdventurerResourceFrame:SetScript("OnUpdate", function(self, elapsed)
         return
     end
 
-    UpdateBar(rageBar)
-    UpdateBar(energyBar)
-    PositionBars()
+    UpdateAuxiliaryBar(PlayerFrameEnergyBar, POWER_ENERGY, PlayerFrameEnergyBarText)
+    UpdateAuxiliaryBar(PlayerFrameRageBar, POWER_RAGE, PlayerFrameRageBarText)
 
-    if not rageBar:IsShown() then
-        rageBar:Show()
-        energyBar:Show()
+    -- Keep exact geometry stable if another stock PlayerFrame transition ran.
+    ApplyReferencePlayerFrameLayout()
+
+    if PlayerFrameEnergyBar and not PlayerFrameEnergyBar:IsShown() then
+        PlayerFrameEnergyBar:Show()
+    end
+    if PlayerFrameRageBar and not PlayerFrameRageBar:IsShown() then
+        PlayerFrameRageBar:Show()
     end
 end)
