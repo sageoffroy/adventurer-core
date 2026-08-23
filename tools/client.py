@@ -176,15 +176,15 @@ def build_frame_xml_toc() -> bytes:
         raise ClientError(f"Missing bundled FrameXML baseline: {FRAME_XML_BASELINE}")
 
     text = FRAME_XML_BASELINE.read_text(encoding="utf-8")
-    marker = "RuneFrame.xml\nEasyMenu.lua"
-    replacement = "RuneFrame.xml\nAdventurerResources.lua\nEasyMenu.lua"
+    marker = "ComboFrame.xml\nTabardFrame.xml"
+    replacement = "ComboFrame.xml\nAdventurerResources.lua\nTabardFrame.xml"
 
     if replacement in text:
         raise ClientError("FrameXML baseline must remain pristine")
     if text.count(marker) != 1:
         raise ClientError(
             "FrameXML baseline is not the expected 3.3.5a revision: "
-            f"RuneFrame/EasyMenu anchor count={text.count(marker)}"
+            f"ComboFrame/TabardFrame anchor count={text.count(marker)}"
         )
 
     return text.replace(marker, replacement, 1).encode("utf-8")
@@ -200,7 +200,6 @@ def build_adventurer_resources_lua() -> bytes:
         b"AdventurerResourceFrame",
         b"AdventurerRageBar",
         b"AdventurerEnergyBar",
-        b"AdventurerRunicPowerBar",
         b"ADVENTURER_FRAME_TEXTURE",
         b"AdventurerPlayerFrameArtOverlay",
         b"frameArtTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)",
@@ -209,8 +208,6 @@ def build_adventurer_resources_lua() -> bytes:
         b"PlayerFrameTexture:SetAlpha(1)",
         b"PlayerFrameHealthBar:SetPoint",
         b"PlayerFrameManaBar:SetPoint",
-        b'runicBar:SetOrientation(\"VERTICAL\")',
-        b"RuneFrame:SetPoint",
         b'COMBO_PREFIX = \"AdventurerCP\"',
         b"local nativeGetComboPoints = GetComboPoints",
         b"GetComboPoints = function(unit, target)",
@@ -218,15 +215,28 @@ def build_adventurer_resources_lua() -> bytes:
         b"return nativeGetComboPoints(unit, target)",
         b'RegisterEvent(\"CHAT_MSG_ADDON\")',
         b"RegisterAddonMessagePrefix(COMBO_PREFIX)",
-        b'RegisterEvent(\"RUNE_POWER_UPDATE\")',
-        b"GetRuneCooldown(index)",
-        b"ActionButton_UpdateUsable(button)",
     )
     missing = [token.decode("ascii") for token in required if token not in payload]
     if missing:
         raise ClientError(
             "Adventurer resource HUD is missing required contract markers: "
             + ", ".join(missing)
+        )
+
+    # The Adventurer no longer inherits Death Knight resources or client state.
+    forbidden = (
+        b"POWER_RUNIC_POWER",
+        b"AdventurerRunicPowerBar",
+        b"RuneFrame",
+        b"RUNE_POWER_UPDATE",
+        b"GetRuneCooldown",
+        b"RuneButton_Update",
+    )
+    present = [token.decode("ascii") for token in forbidden if token in payload]
+    if present:
+        raise ClientError(
+            "Adventurer resource HUD contains removed Death Knight resource state: "
+            + ", ".join(present)
         )
 
     # 3.3.5a suppresses the client-side combo-point query for class 10. Keep
