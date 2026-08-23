@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import unittest
 from pathlib import Path
 
@@ -13,39 +12,25 @@ class AdventurerResourceTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.source = RUNTIME.read_text(encoding="utf-8")
 
-    def test_auxiliary_power_pool_sizes_match_wotlk_storage_scale(self) -> None:
-        self.assertIn("ADVENTURER_MAX_RAGE = 1000", self.source)
-        self.assertIn("ADVENTURER_MAX_ENERGY = 100", self.source)
-        self.assertIn("SetMaxPower(POWER_RAGE, ADVENTURER_MAX_RAGE)", self.source)
-        self.assertIn("SetMaxPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY)", self.source)
-        self.assertNotIn("ADVENTURER_MAX_RUNIC_POWER", self.source)
-        self.assertNotIn("SetMaxPower(POWER_RUNIC_POWER", self.source)
-
-    def test_adventurer_keeps_mana_native_and_activates_only_rage_and_energy(self) -> None:
-        self.assertIn("PLAYERHOOK_ON_PLAYER_HAS_ACTIVE_POWER_TYPE", self.source)
-        self.assertIn("OnPlayerHasActivePowerType", self.source)
-        self.assertRegex(
-            self.source,
-            re.compile(
-                r"case POWER_RAGE:\s*case POWER_ENERGY:\s*"
-                r"return player->GetMaxPower\(power\) > 0;",
-                re.MULTILINE,
-            ),
-        )
-        self.assertNotIn("case POWER_RUNIC_POWER:", self.source)
-        # Mana is deliberately not given a fake fixed pool: class-10 DBC/stat
-        # scaling remains authoritative for the primary resource.
-        self.assertNotIn("ADVENTURER_MAX_MANA", self.source)
-
-    def test_stat_recalculation_cannot_erase_auxiliary_power_pools(self) -> None:
-        self.assertIn("PLAYERHOOK_ON_AFTER_UPDATE_MAX_POWER", self.source)
-        self.assertIn("OnPlayerAfterUpdateMaxPower", self.source)
+    def test_diagnostic_baseline_exposes_only_native_mana(self) -> None:
         for token in (
             "ADVENTURER_MAX_RAGE",
             "ADVENTURER_MAX_ENERGY",
+            "SetMaxPower(POWER_RAGE",
+            "SetMaxPower(POWER_ENERGY",
+            "SetPower(POWER_RAGE",
+            "SetPower(POWER_ENERGY",
+            "PLAYERHOOK_ON_PLAYER_HAS_ACTIVE_POWER_TYPE",
+            "OnPlayerHasActivePowerType",
+            "PLAYERHOOK_ON_AFTER_UPDATE_MAX_POWER",
+            "OnPlayerAfterUpdateMaxPower",
         ):
-            self.assertIn(f"std::max(value, static_cast<float>({token}))", self.source)
-        self.assertNotIn("ADVENTURER_MAX_RUNIC_POWER", self.source)
+            self.assertNotIn(token, self.source)
+
+        # Mana remains native to the class-10 DBC/stat path; the runtime does
+        # not create a fake fixed mana pool either.
+        self.assertNotIn("ADVENTURER_MAX_MANA", self.source)
+        self.assertIn("Mana is the Adventurer's only active power pool", self.source)
 
     def test_death_knight_runtime_is_not_attached_to_adventurer(self) -> None:
         forbidden = (
@@ -64,12 +49,7 @@ class AdventurerResourceTests(unittest.TestCase):
         for token in forbidden:
             self.assertNotIn(token, self.source)
 
-    def test_new_adventurer_starts_energy_full_and_rage_empty(self) -> None:
-        self.assertIn("SetPower(POWER_RAGE, 0)", self.source)
-        self.assertIn("SetPower(POWER_ENERGY, ADVENTURER_MAX_ENERGY)", self.source)
-        self.assertNotIn("SetPower(POWER_RUNIC_POWER", self.source)
-
-    def test_combo_points_are_mirrored_to_frame_xml_without_reimplementing_backend(self) -> None:
+    def test_combo_points_backend_bridge_remains_server_side(self) -> None:
         self.assertIn("PLAYERHOOK_ON_UPDATE", self.source)
         self.assertIn("OnPlayerUpdate(Player* player, uint32 diff)", self.source)
         self.assertIn("ADVENTURER_COMBO_SYNC_INTERVAL_MS = 100", self.source)
