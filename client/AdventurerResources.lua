@@ -22,10 +22,14 @@ local PORTRAIT_LEFT = 42
 local PORTRAIT_TOP = 12
 local PORTRAIT_SIZE = 64
 
--- The supplied Adventurer BLP places the resource wells 6px left of the
--- classless reference coordinates. Keep the art/portrait fixed and shift only
--- the resource stack so the bars line up with the wells in the texture.
+-- Alignment corrections for the supplied Adventurer BLP.
+-- Health/background/rage are 6px left of the classless reference coordinates.
+-- Mana and Energy need 2px more, while portrait and level follow the 6px shift.
 local RESOURCE_X_SHIFT = -6
+local PORTRAIT_X_SHIFT = -6
+local LEVEL_X_SHIFT = -6
+local MANA_X_SHIFT = -8
+local ENERGY_X_SHIFT = -8
 
 local BACKGROUND_LEFT = 106
 local BACKGROUND_TOP = 22
@@ -98,10 +102,10 @@ local function PositionNativeText()
         SetFramePoint(PlayerFrameHealthBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, 3)
     end
     if PlayerFrameManaBarText then
-        SetFramePoint(PlayerFrameManaBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, -8)
+        SetFramePoint(PlayerFrameManaBarText, "CENTER", PlayerFrame, "CENTER", 50 + MANA_X_SHIFT, -8)
     end
     if PlayerFrameEnergyBarText then
-        SetFramePoint(PlayerFrameEnergyBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, -22)
+        SetFramePoint(PlayerFrameEnergyBarText, "CENTER", PlayerFrame, "CENTER", 50 + ENERGY_X_SHIFT, -22)
     end
     if PlayerFrameRageBarText then
         SetFramePoint(PlayerFrameRageBarText, "CENTER", PlayerFrame, "TOPRIGHT", -2 + RESOURCE_X_SHIFT, -42)
@@ -119,7 +123,7 @@ local function ApplyReferencePlayerFrameLayout()
     if PlayerPortrait then
         PlayerPortrait:SetWidth(PORTRAIT_SIZE)
         PlayerPortrait:SetHeight(PORTRAIT_SIZE)
-        SetFramePoint(PlayerPortrait, "TOPLEFT", PlayerFrame, "TOPLEFT", PORTRAIT_LEFT, -PORTRAIT_TOP)
+        SetFramePoint(PlayerPortrait, "TOPLEFT", PlayerFrame, "TOPLEFT", PORTRAIT_LEFT + PORTRAIT_X_SHIFT, -PORTRAIT_TOP)
     end
 
     if PlayerFrameBackground then
@@ -155,7 +159,7 @@ local function ApplyReferencePlayerFrameLayout()
         SetFramePoint(PlayerName, "CENTER", PlayerFrame, "CENTER", 50, 19)
     end
     if PlayerLevelText then
-        SetFramePoint(PlayerLevelText, "CENTER", PlayerFrame, "CENTER", -63, -16)
+        SetFramePoint(PlayerLevelText, "CENTER", PlayerFrame, "CENTER", -63 + LEVEL_X_SHIFT, -16)
         PlayerLevelText:Show()
     end
 
@@ -165,12 +169,12 @@ local function ApplyReferencePlayerFrameLayout()
 
     PlayerFrameManaBar:SetWidth(MANA_WIDTH)
     PlayerFrameManaBar:SetHeight(MANA_HEIGHT)
-    SetFramePoint(PlayerFrameManaBar, "TOPLEFT", PlayerFrame, "TOPLEFT", MANA_LEFT + RESOURCE_X_SHIFT, -MANA_TOP)
+    SetFramePoint(PlayerFrameManaBar, "TOPLEFT", PlayerFrame, "TOPLEFT", MANA_LEFT + MANA_X_SHIFT, -MANA_TOP)
 
     if PlayerFrameEnergyBar then
         PlayerFrameEnergyBar:SetWidth(ENERGY_WIDTH)
         PlayerFrameEnergyBar:SetHeight(ENERGY_HEIGHT)
-        SetFramePoint(PlayerFrameEnergyBar, "TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT + RESOURCE_X_SHIFT, -ENERGY_TOP)
+        SetFramePoint(PlayerFrameEnergyBar, "TOPLEFT", PlayerFrame, "TOPLEFT", ENERGY_LEFT + ENERGY_X_SHIFT, -ENERGY_TOP)
     end
 
     if PlayerFrameRageBar then
