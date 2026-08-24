@@ -15,6 +15,7 @@
       "col": 1,
       "enUS": "Vitality",
       "esMX": "Vitalidad",
+      "icon": "spell_nature_abolishmagic",
       "spell_source_ids": [19584, 19584, 19584, 19584, 19584],
       "effect_values": {"1": [2, 4, 6, 8, 10]},
       "disable_effects": [0],
@@ -27,7 +28,7 @@
       "col": 3,
       "enUS": "Overwhelming Strength",
       "esMX": "Fuerza descomunal",
-      "icon": "ability_warrior_secondwind",
+      "icon": "inv_gauntlets_19",
       "spell_source_ids": [20266, 20266, 20266, 20266, 20266],
       "effect_values": {"0": [3, 6, 9, 12, 15]},
       "description_enUS": "Increases your total Strength by $s1%.",
@@ -39,7 +40,7 @@
       "col": 1,
       "enUS": "Cicatrization",
       "esMX": "Cicatrización",
-      "icon": "Spell_deathknight_bloodboil",
+      "icon": "spell_shadow_lifedrain",
       "spell_source_ids": [63650, 63650],
       "effect_values": {"1": [3, 6]},
       "disable_effects": [0],
@@ -183,6 +184,7 @@
       "col": 1,
       "enUS": "Survivor",
       "esMX": "Superviviente",
+      "icon": "spell_misc_emotionangry",
       "spell_source_ids": [31850, 31851, 31852]
     },
     {
