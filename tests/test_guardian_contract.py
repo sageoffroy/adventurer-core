@@ -63,7 +63,6 @@ class GuardianContractTests(unittest.TestCase):
     def test_native_proc_sensitive_talents_keep_native_rank_spells(self) -> None:
         expected = {
             "shield_specialization": [12298, 12724, 12725, 12726, 12727],
-            "survivor": [31850, 31851, 31852],
             "unfair_advantage": [51672, 51674],
             "acclimation": [49200, 50151, 50152],
             "bulwark": [20127, 20130, 20135],
@@ -75,6 +74,18 @@ class GuardianContractTests(unittest.TestCase):
             definition = self.definitions[key]
             self.assertTrue(definition["reuse_native_spells"], key)
             self.assertEqual(definition["spell_source_ids"], spell_ids, key)
+
+    def test_survivor_is_renamed_without_touching_paladin_spell_rows(self) -> None:
+        definition = self.definitions["survivor"]
+        self.assertEqual(definition["spell_source_ids"], [31850, 31851, 31852])
+        self.assertFalse(definition.get("reuse_native_spells", False))
+        self.assertEqual(definition["esMX"], "Superviviente")
+        index = next(i for i, item in enumerate(self.spec["talents"]) if item["key"] == "survivor")
+        self.assertEqual(index, 15)
+        self.assertEqual(
+            [custom_spell_id(self.spec, index, rank) for rank in range(3)],
+            [290150, 290151, 290152],
+        )
 
     def test_customized_native_talents_remove_class_specific_baggage(self) -> None:
         critical = self.definitions["critical_block"]
