@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "guardian_points": 71,
+  "guardian_points": 80,
   "tabs": [
     {"id": 5000, "key": "guardian", "source_tab_id": 383, "order": 0, "enUS": "Guardian", "esMX": "Guardián"},
     {"id": 5001, "key": "champion", "source_tab_id": 161, "order": 1, "enUS": "Champion", "esMX": "Campeón"},
@@ -16,15 +16,15 @@
       "enUS": "Tenacity",
       "esMX": "Tenacidad",
       "icon": "ability_warrior_intensifyrage",
-      "spell_source_ids": [63650, 63650, 63650, 63650, 63650],
-      "effect_values": {"0": [1, 2, 3, 4, 5], "1": [1, 2, 3, 4, 5]},
+      "spell_source_ids": [63650, 63650, 63650],
+      "effect_values": {"0": [2, 4, 6], "1": [2, 4, 6]},
       "description_enUS": "Increases all healing done by you and all healing effects on you by $s1%.",
       "description_esMX": "Aumenta las sanaciones que realices y los efectos de sanación que recibas un $s1%."
     },
     {
       "key": "steady_hand",
-      "row": 0,
-      "col": 2,
+      "row": 2,
+      "col": 3,
       "enUS": "Steady Hand",
       "esMX": "Mano firme",
       "icon": "ability_warrior_secondwind",
@@ -40,18 +40,18 @@
       "enUS": "Cicatrization",
       "esMX": "Cicatrización",
       "icon": "Spell_deathknight_bloodboil",
-      "spell_source_ids": [20555, 20555, 20555],
-      "effect_values": {"0": [5, 10, 15], "1": [5, 10, 15]},
+      "spell_source_ids": [20555, 20555],
+      "effect_values": {"0": [5, 10], "1": [5, 10]},
       "description_enUS": "Increases health regeneration by $s1%. $s2% of your total health regeneration may continue during combat.",
       "description_esMX": "Aumenta la velocidad de regeneración de salud un $s1%. Durante el combate puede continuar un $s2% de la regeneración de salud total.",
       "requires": "tenacity"
     },
     {
       "key": "threatening_presence",
-      "row": 1,
-      "col": 1,
+      "row": 2,
+      "col": 0,
       "enUS": "Threatening Presence",
-      "esMX": "Prescencia amenazante",
+      "esMX": "Presencia amenazante",
       "spell_source_ids": [21156, 21156, 21156],
       "effect_values": {"0": [5, 10, 15]},
       "effect_misc_values": {"0": 1},
@@ -63,17 +63,16 @@
       "row": 1,
       "col": 2,
       "enUS": "Deflection",
-      "esMX": "Desvio",
+      "esMX": "Desvío",
       "spell_source_ids": [20060, 20060, 20060],
       "effect_values": {"0": [2, 4, 6]},
       "description_enUS": "Increases your chance to parry by $s1%.",
       "description_esMX": "Aumenta tu probabilidad de parar un $s1%."
     },
-
     {
       "key": "nerves_of_steel",
-      "row": 2,
-      "col": 0,
+      "row": 3,
+      "col": 1,
       "enUS": "Nerves of Steel",
       "esMX": "Nervios de acero",
       "spell_source_ids": [31130, 31131],
@@ -81,7 +80,7 @@
     },
     {
       "key": "consistency",
-      "row": 2,
+      "row": 4,
       "col": 1,
       "enUS": "Consistency",
       "esMX": "Consistencia",
@@ -104,8 +103,8 @@
     },
     {
       "key": "shield_specialization",
-      "row": 2,
-      "col": 3,
+      "row": 0,
+      "col": 1,
       "enUS": "Shield Specialization",
       "esMX": "Especialización con escudo",
       "spell_source_ids": [12298, 12724, 12725, 12726, 12727],
@@ -114,10 +113,9 @@
       "description_enUS": "Increases your chance to block attacks with a shield by $s1%.",
       "description_esMX": "Aumenta la probabilidad de bloquear ataques con un escudo un $s1%."
     },
-
     {
       "key": "last_stand",
-      "row": 3,
+      "row": 4,
       "col": 0,
       "enUS": "Last Stand",
       "esMX": "Última Carga",
@@ -128,59 +126,42 @@
     },
     {
       "key": "one_handed_weapon_specialization",
-      "row": 3,
+      "row": 4,
       "col": 2,
       "enUS": "One-Handed Weapon Specialization",
       "esMX": "Especialización en armas de una mano",
-      "spell_source_ids": [20198, 20198, 20198],
-      "effect_values": {"0": [5, 10, 15]},
+      "spell_source_ids": [20198, 20198, 20198, 20198, 20198],
+      "effect_values": {"0": [2, 4, 6, 8, 10]},
       "description_enUS": "Increases all damage you deal by $s1% while a one-handed melee weapon is equipped.",
       "description_esMX": "Aumenta un $s1% todo daño infligido al equipar un arma cuerpo a cuerpo de una mano."
     },
-
     {
       "key": "steady_footing",
-      "row": 4,
-      "col": 1,
+      "row": 0,
+      "col": 2,
       "enUS": "Steady Footing",
       "esMX": "Paso firme",
       "icon": "ability_warstomp",
       "spell_source_ids": [17002, 17002],
       "effect_values": {"0": [15, 30], "1": [2, 4], "2": [2, 4]},
-      "spell_u32_values": {
-        "12": 0,
-        "13": 0,
-        "14": 0,
-        "15": 0,
-        "71": 6,
-        "72": 6,
-        "73": 6,
-        "89": 1,
-        "90": 1,
-        "91": 1,
-        "95": 33,
-        "96": 51,
-        "97": 47
-      },
+      "spell_u32_values": {"12": 0, "13": 0, "14": 0, "15": 0, "71": 6, "72": 6, "73": 6, "89": 1, "90": 1, "91": 1, "95": 33, "96": 51, "97": 47},
       "description_enUS": "Reduces your movement speed by $s1%, but increases your chance to block and parry by $s2%.",
       "description_esMX": "Reduce tu velocidad de movimiento un $s1%, pero aumenta tu probabilidad de bloquear y parar un $s2%."
     },
     {
-      "key": "critical_block",
-      "row": 4,
-      "col": 3,
-      "enUS": "Critical Block",
-      "esMX": "Bloqueo crítico",
-      "spell_source_ids": [47294, 47295, 47296],
-      "disable_effects": [1],
-      "description_enUS": "Your successful blocks have a $s1% chance to block double the normal amount.",
-      "description_esMX": "Tus bloqueos realizados tienen un $s1% de probabilidad de bloquear el doble de daño de la cantidad normal.",
-      "requires": "shield_specialization"
+      "key": "iron_will",
+      "row": 1,
+      "col": 1,
+      "enUS": "Iron Will",
+      "esMX": "Voluntad de Hierro",
+      "spell_source_ids": [12300, 12300, 12300],
+      "effect_values": {"0": [-7, -14, -20], "1": [-7, -14, -20]},
+      "description_enUS": "Reduces the duration of all Stun and Charm effects used against you by $s1%.",
+      "description_esMX": "Reduce la duración de todos los efectos de Aturdir y Embelesamiento que se usen contra ti un $s1%."
     },
-
     {
       "key": "bulwark",
-      "row": 5,
+      "row": 7,
       "col": 1,
       "enUS": "Redoubt",
       "esMX": "Baluarte",
@@ -197,11 +178,10 @@
       "reuse_native_spells": true,
       "requires": "one_handed_weapon_specialization"
     },
-
     {
       "key": "ardent_defender",
-      "row": 6,
-      "col": 0,
+      "row": 3,
+      "col": 2,
       "enUS": "Ardent Defender",
       "esMX": "Defensor candente",
       "spell_source_ids": [31850, 31851, 31852],
@@ -209,18 +189,17 @@
     },
     {
       "key": "shield_mastery",
-      "row": 6,
-      "col": 3,
+      "row": 5,
+      "col": 1,
       "enUS": "Shield Mastery",
       "esMX": "Maestría con escudo",
       "spell_source_ids": [29598, 29599],
       "reuse_native_spells": true
     },
-
     {
       "key": "unbreakable_will",
-      "row": 7,
-      "col": 0,
+      "row": 4,
+      "col": 3,
       "enUS": "Unbreakable Will",
       "esMX": "Voluntad inquebrantable",
       "spell_source_ids": [14522, 14788, 14789, 14790, 14791],
@@ -228,8 +207,8 @@
     },
     {
       "key": "sweeping_strikes",
-      "row": 7,
-      "col": 2,
+      "row": 6,
+      "col": 3,
       "enUS": "Sweeping Strikes",
       "esMX": "Golpes de barrido",
       "spell_source_ids": [12328],
@@ -238,11 +217,10 @@
       "description_enUS": "Your next 5 melee attacks strike an additional nearby opponent.",
       "description_esMX": "Tus próximos 5 ataques cuerpo a cuerpo golpean a un oponente cercano adicional."
     },
-
     {
       "key": "vitality",
-      "row": 8,
-      "col": 0,
+      "row": 5,
+      "col": 3,
       "enUS": "Vitality",
       "esMX": "Vitalidad",
       "spell_source_ids": [29140, 29143, 29144],
@@ -251,26 +229,26 @@
     {
       "key": "improved_mortal_strike",
       "row": 8,
-      "col": 1,
+      "col": 2,
       "enUS": "Improved Mortal Strike",
       "esMX": "Golpe mortal mejorado",
       "spell_source_ids": [35446, 35448, 35449],
-      "reuse_native_spells": true
+      "reuse_native_spells": true,
+      "requires": "mortal_strike"
     },
     {
       "key": "damage_shield",
       "row": 8,
-      "col": 3,
+      "col": 1,
       "enUS": "Damage Shield",
       "esMX": "Escudo de daño",
       "spell_source_ids": [58872, 58874],
       "reuse_native_spells": true
     },
-
     {
       "key": "acclimation",
-      "row": 9,
-      "col": 1,
+      "row": 6,
+      "col": 2,
       "enUS": "Acclimation",
       "esMX": "Aclimatación",
       "spell_source_ids": [49200, 50151, 50152],
@@ -278,8 +256,8 @@
     },
     {
       "key": "mortal_strike",
-      "row": 9,
-      "col": 2,
+      "row": 8,
+      "col": 3,
       "enUS": "Mortal Strike",
       "esMX": "Golpe mortal",
       "spell_source_ids": [12294],
@@ -287,11 +265,10 @@
       "add_to_spellbook": true,
       "requires": "sweeping_strikes"
     },
-
     {
       "key": "throw_shield",
       "row": 10,
-      "col": 3,
+      "col": 1,
       "enUS": "Throw Shield",
       "esMX": "Arrojar escudo",
       "spell_source_ids": [31935],
@@ -302,7 +279,40 @@
       "spell_u32_values": {"208": 0, "209": 0, "210": 0, "211": 0, "225": 1},
       "description_enUS": "Hurls your shield at the enemy, dealing (0.24 * Attack power) Physical damage and dazing them, then jumping to nearby enemies. Affects 3 total targets. Lasts 10 sec.",
       "description_esMX": "Lanza tu escudo al enemigo, inflige (0.24 * Attack power) p. de daño Físico y dejándolo atontado. A continuación salta a los enemigos cercanos. Afecta a 3 objetivos en total. Dura 10 sec.",
-      "requires": "damage_shield"
+      "requires": "demolition_machine"
+    },
+    {
+      "key": "focused_rage",
+      "row": 6,
+      "col": 0,
+      "enUS": "Focused Rage",
+      "esMX": "Ira enfocada",
+      "spell_source_ids": [29787, 29790, 29792],
+      "reuse_native_spells": true
+    },
+    {
+      "key": "prayer",
+      "row": 6,
+      "col": 1,
+      "enUS": "Prayer",
+      "esMX": "Oración",
+      "spell_source_ids": [20101, 20101],
+      "effect_values": {"0": [-5, -10]},
+      "spell_u32_values": {"208": 0, "209": 0, "210": 0, "211": 0},
+      "description_enUS": "Reduces the mana cost of all your instant cast spells by $s1%.",
+      "description_esMX": "Reduce el coste de maná de todos tus hechizos instantáneos un $s1%."
+    },
+    {
+      "key": "demolition_machine",
+      "row": 9,
+      "col": 1,
+      "enUS": "Demolition Machine",
+      "esMX": "Máquina de demolición",
+      "spell_source_ids": [29593, 29593, 29593, 29593, 29593],
+      "disable_effects": [0],
+      "spell_u32_values": {"12": 0, "13": 0, "14": 0, "15": 0, "35": [15, 30, 45, 60, 75]},
+      "description_enUS": "When you block, parry or dodge an attack you have a $h% chance to become Enraged, increasing Physical damage caused by 5% for 12 sec.",
+      "description_esMX": "Cuando bloqueas, paras o esquivas un ataque tienes un $h% de probabilidad de enfurecerte, lo que aumenta el daño físico infligido un 5% durante 12 sec."
     }
   ]
 }
