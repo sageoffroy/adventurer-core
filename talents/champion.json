@@ -190,6 +190,7 @@
       "enUS": "Blood Vengeance",
       "esMX": "Venganza sangrienta",
       "spell_source_ids": [20049, 20049, 20049],
+      "effect_values": {"0": [1, 2, 3]},
       "trigger_spell_slot": 0,
       "trigger_spell_source_ids": [20050, 20050, 20050],
       "trigger_effect_values": {"0": [1, 2, 3]},
@@ -227,7 +228,8 @@
       "enUS": "Overflowing Energy",
       "esMX": "Energía desbordante",
       "spell_source_ids": [31122, 31123, 61329],
-      "reuse_native_spells": true
+      "description_enUS": "Increases your Energy regeneration rate by $s1%.",
+      "description_esMX": "Aumenta tu índice de regeneración de energía un $s1%."
     },
     {
       "key": "cheat_death",
