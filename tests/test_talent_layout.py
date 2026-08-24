@@ -11,39 +11,37 @@ from talents import load_spec, talent_source_spell_ids  # noqa: E402
 
 
 class TalentLayoutTests(unittest.TestCase):
-    def test_guardian_layout_matches_drive(self) -> None:
+    def test_guardian_layout_matches_approved_builder_shape(self) -> None:
         spec = load_spec()
         definitions = {definition["key"]: definition for definition in spec["talents"]}
 
         expected = {
-            "tenacity": (0, 0),
-            "shield_specialization": (0, 1),
-            "steady_footing": (0, 2),
-            "cicatrization": (1, 0),
-            "iron_will": (1, 1),
+            "vitality": (0, 1),
+            "consistency": (0, 2),
+            "overwhelming_strength": (0, 3),
+            "shield_specialization": (1, 0),
+            "cicatrization": (1, 1),
             "deflection": (1, 2),
-            "threatening_presence": (2, 0),
+            "painful_impacts": (2, 1),
             "riposte": (2, 2),
-            "steady_hand": (2, 3),
-            "nerves_of_steel": (3, 1),
-            "ardent_defender": (3, 2),
-            "last_stand": (4, 0),
-            "consistency": (4, 1),
-            "one_handed_weapon_specialization": (4, 2),
-            "unbreakable_will": (4, 3),
-            "shield_mastery": (5, 1),
-            "spell_deflection": (5, 2),
-            "vitality": (5, 3),
-            "focused_rage": (6, 0),
+            "impassibility": (2, 3),
+            "critical_block": (3, 0),
+            "last_stand": (3, 1),
+            "spell_deflection": (3, 2),
+            "one_handed_weapon_specialization": (3, 3),
+            "steady_footing": (4, 0),
+            "survivor": (4, 1),
+            "unfair_advantage": (4, 2),
+            "indomitable": (5, 0),
+            "acclimation": (5, 1),
+            "sweeping_strikes": (5, 3),
+            "nerves_of_steel": (6, 0),
             "prayer": (6, 1),
-            "acclimation": (6, 2),
-            "sweeping_strikes": (6, 3),
-            "bulwark": (7, 1),
-            "damage_shield": (8, 1),
-            "improved_mortal_strike": (8, 2),
-            "mortal_strike": (8, 3),
-            "demolition_machine": (9, 1),
-            "throw_shield": (10, 1),
+            "focused_rage": (6, 3),
+            "bulwark": (7, 0),
+            "damage_shield": (8, 0),
+            "demolition_machine": (9, 2),
+            "throw_shield": (10, 0),
         }
 
         self.assertEqual(set(definitions), set(expected))
@@ -51,38 +49,68 @@ class TalentLayoutTests(unittest.TestCase):
             definition = definitions[key]
             self.assertEqual((int(definition["row"]), int(definition["col"])), position, key)
 
-    def test_guardian_is_exactly_28_talents_and_80_points(self) -> None:
+    def test_guardian_is_26_talents_73_available_ranks_and_eleven_rows(self) -> None:
         spec = load_spec()
         definitions = spec["talents"]
-        self.assertEqual(len(definitions), 28)
+        self.assertEqual(len(definitions), 26)
         self.assertEqual(
             sum(len(talent_source_spell_ids(definition)) for definition in definitions),
-            80,
+            73,
         )
-        self.assertEqual(int(spec["guardian_points"]), 80)
+        self.assertEqual(int(spec["point_total"]), 73)
 
         positions = [(int(d["row"]), int(d["col"])) for d in definitions]
         self.assertEqual(len(positions), len(set(positions)))
         self.assertEqual(min(row for row, _col in positions), 0)
         self.assertEqual(max(row for row, _col in positions), 10)
 
+    def test_first_six_rows_hold_the_build_complete_core(self) -> None:
+        definitions = {definition["key"]: definition for definition in load_spec()["talents"]}
+        first_six = {key for key, definition in definitions.items() if int(definition["row"]) <= 5}
+        self.assertEqual(
+            first_six,
+            {
+                "vitality",
+                "consistency",
+                "overwhelming_strength",
+                "shield_specialization",
+                "cicatrization",
+                "deflection",
+                "painful_impacts",
+                "riposte",
+                "impassibility",
+                "critical_block",
+                "last_stand",
+                "spell_deflection",
+                "one_handed_weapon_specialization",
+                "steady_footing",
+                "survivor",
+                "unfair_advantage",
+                "indomitable",
+                "acclimation",
+                "sweeping_strikes",
+            },
+        )
+        self.assertEqual(
+            sum(len(talent_source_spell_ids(definitions[key])) for key in first_six),
+            57,
+        )
+
     def test_paso_firme_uses_stock_spell_icon(self) -> None:
         definitions = {definition["key"]: definition for definition in load_spec()["talents"]}
-        self.assertIn("steady_footing", definitions)
         self.assertEqual(definitions["steady_footing"]["esMX"], "Paso firme")
         self.assertEqual(definitions["steady_footing"]["icon"], "ability_warstomp")
         self.assertEqual(len(talent_source_spell_ids(definitions["steady_footing"])), 2)
         self.assertFalse(any(definition.get("provisional_drive_blank") for definition in definitions.values()))
 
-    def test_guardian_prerequisites_match_reference_arrows(self) -> None:
+    def test_guardian_prerequisites_match_approved_arrows(self) -> None:
         definitions = {definition["key"]: definition for definition in load_spec()["talents"]}
         expected = {
-            "cicatrization": "tenacity",
             "riposte": "deflection",
-            "spell_deflection": "one_handed_weapon_specialization",
-            "improved_mortal_strike": "mortal_strike",
-            "mortal_strike": "sweeping_strikes",
-            "throw_shield": "demolition_machine",
+            "critical_block": "shield_specialization",
+            "sweeping_strikes": "one_handed_weapon_specialization",
+            "damage_shield": "bulwark",
+            "throw_shield": "damage_shield",
         }
         actual = {
             key: definition.get("requires")
