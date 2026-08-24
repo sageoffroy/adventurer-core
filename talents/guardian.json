@@ -183,8 +183,7 @@
       "col": 1,
       "enUS": "Survivor",
       "esMX": "Superviviente",
-      "spell_source_ids": [31850, 31851, 31852],
-      "reuse_native_spells": true
+      "spell_source_ids": [31850, 31851, 31852]
     },
     {
       "key": "critical_block",
