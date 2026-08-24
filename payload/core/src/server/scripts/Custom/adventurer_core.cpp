@@ -1,3 +1,5 @@
+#include "DBCStores.h"
+#include "Item.h"
 #include "Language.h"
 #include "Opcodes.h"
 #include "Player.h"
@@ -6,6 +8,7 @@
 #include "WorldPacket.h"
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <unordered_map>
 
@@ -22,6 +25,12 @@ constexpr uint32 APPRENTICE_RIDING_VALUE = 75;
 constexpr uint32 ADVENTURER_MAX_RAGE = 1000;
 constexpr uint32 ADVENTURER_MAX_ENERGY = 100;
 
+// Guardian Consistency owns these stable custom rank spell IDs. The talent is
+// intentionally kept at Guardian definition index 6 so this range never moves.
+constexpr uint32 CONSISTENCY_RANK_1 = 290060;
+constexpr uint8 CONSISTENCY_RANKS = 5;
+constexpr uint32 CONSISTENCY_ARMOR_SYNC_INTERVAL_MS = 500;
+
 // The 3.3.5a client refuses to expose combo points through GetComboPoints for a
 // non-Rogue/non-Druid class even though AzerothCore's Unit combo-point backend
 // is class agnostic. Keep Blizzard's target ComboFrame, but mirror the visible
@@ -37,7 +46,14 @@ struct ComboSyncState
     uint8 points = 0xFF; // impossible sentinel: force the first sync
 };
 
+struct ConsistencyArmorState
+{
+    uint32 elapsed = 0;
+    float appliedBonus = 0.0f;
+};
+
 std::unordered_map<uint64, ComboSyncState> comboSyncStates;
+std::unordered_map<uint64, ConsistencyArmorState> consistencyArmorStates;
 
 constexpr uint32 UNIVERSAL_SKILLS[] =
 {
@@ -78,6 +94,115 @@ constexpr uint32 DRAENEI_SPELLS[] = { 59547, 28878, 28875 };
 bool IsAdventurer(Player const* player)
 {
     return player && player->getClass() == CLASS_ADVENTURER;
+}
+
+uint8 GetConsistencyRank(Player const* player)
+{
+    if (!IsAdventurer(player))
+        return 0;
+
+    for (uint8 rank = CONSISTENCY_RANKS; rank > 0; --rank)
+        if (player->HasAura(CONSISTENCY_RANK_1 + rank - 1))
+            return rank;
+
+    return 0;
+}
+
+uint32 GetEffectiveItemArmor(Player* player, ItemTemplate const* proto)
+{
+    if (!player || !proto)
+        return 0;
+
+    uint32 level = player->GetLevel();
+    ScalingStatDistributionEntry const* distribution = proto->ScalingStatDistribution
+        ? sScalingStatDistributionStore.LookupEntry(proto->ScalingStatDistribution)
+        : nullptr;
+
+    if (distribution && level > distribution->MaxLevel)
+        level = distribution->MaxLevel;
+
+    ScalingStatValuesEntry const* scaling = proto->ScalingStatValue
+        ? sScalingStatValuesStore.LookupEntry(level)
+        : nullptr;
+
+    uint32 armor = proto->Armor;
+    if (scaling)
+    {
+        if (uint32 scaledArmor = scaling->getArmorMod(proto->ScalingStatValue))
+            if (proto->ScalingStatValue > 0 || scaledArmor < proto->Armor)
+                armor = scaledArmor;
+    }
+    else if (armor && proto->ArmorDamageModifier)
+        armor -= uint32(proto->ArmorDamageModifier);
+
+    return armor;
+}
+
+float CalculateConsistencyArmorBonus(Player* player)
+{
+    uint8 rank = GetConsistencyRank(player);
+    if (!rank)
+        return 0.0f;
+
+    float bonus = 0.0f;
+    for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+    {
+        Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+        if (!item || item->IsBroken())
+            continue;
+
+        ItemTemplate const* proto = item->GetTemplate();
+        if (!proto || proto->Class != ITEM_CLASS_ARMOR)
+            continue;
+
+        uint32 percentPerRank = 0;
+        switch (proto->SubClass)
+        {
+            case ITEM_SUBCLASS_ARMOR_CLOTH:
+            case ITEM_SUBCLASS_ARMOR_LEATHER:
+                percentPerRank = 4;
+                break;
+            case ITEM_SUBCLASS_ARMOR_MAIL:
+                percentPerRank = 3;
+                break;
+            case ITEM_SUBCLASS_ARMOR_PLATE:
+                percentPerRank = 2;
+                break;
+            default:
+                // Shields and miscellaneous/relic subclasses deliberately do
+                // not benefit. Shield progression has its own Guardian tools.
+                continue;
+        }
+
+        uint32 armor = GetEffectiveItemArmor(player, proto);
+        bonus += float(armor) * float(percentPerRank * rank) / 100.0f;
+    }
+
+    return bonus;
+}
+
+void RefreshConsistencyArmor(Player* player, uint32 diff = 0, bool force = false)
+{
+    if (!IsAdventurer(player) || !player->IsInWorld())
+        return;
+
+    uint64 key = player->GetGUID().GetRawValue();
+    ConsistencyArmorState& state = consistencyArmorStates[key];
+    state.elapsed += diff;
+    if (!force && state.elapsed < CONSISTENCY_ARMOR_SYNC_INTERVAL_MS)
+        return;
+    state.elapsed = 0;
+
+    float desiredBonus = CalculateConsistencyArmorBonus(player);
+    if (std::fabs(desiredBonus - state.appliedBonus) < 0.01f)
+        return;
+
+    if (state.appliedBonus > 0.0f)
+        player->HandleStatFlatModifier(UNIT_MOD_ARMOR, BASE_VALUE, state.appliedBonus, false);
+    if (desiredBonus > 0.0f)
+        player->HandleStatFlatModifier(UNIT_MOD_ARMOR, BASE_VALUE, desiredBonus, true);
+
+    state.appliedBonus = desiredBonus;
 }
 
 void SendVisibleComboPoints(Player* player, uint8 points)
@@ -273,23 +398,30 @@ public:
         {
             ApplyRuntimeCapabilities(player);
             comboSyncStates.erase(player->GetGUID().GetRawValue());
+            consistencyArmorStates.erase(player->GetGUID().GetRawValue());
+            RefreshConsistencyArmor(player, 0, true);
         }
     }
 
     void OnPlayerLogout(Player* player) override
     {
         comboSyncStates.erase(player->GetGUID().GetRawValue());
+        consistencyArmorStates.erase(player->GetGUID().GetRawValue());
     }
 
     void OnPlayerUpdate(Player* player, uint32 diff) override
     {
         UpdateComboPointSync(player, diff);
+        RefreshConsistencyArmor(player, diff);
     }
 
     void OnPlayerLevelChanged(Player* player, uint8 /*oldLevel*/) override
     {
         if (IsAdventurer(player))
+        {
             ApplyRuntimeCapabilities(player);
+            RefreshConsistencyArmor(player, 0, true);
+        }
     }
 
     void OnPlayerAfterUpdateMaxPower(Player* player, Powers& power, float& value) override
