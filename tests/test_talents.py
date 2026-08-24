@@ -89,20 +89,34 @@ class TalentGeneratorTests(unittest.TestCase):
                 set_u32(spell, 96, 42)
                 set_u32(spell, 116, 0)
                 set_u32(spell, 117, 99999)
-            if spell_id in {47294, 47295, 47296}:
+            if spell_id == 12300:  # Iron Will has two mechanic-duration effects.
                 set_u32(spell, 71, 6)
                 set_u32(spell, 72, 6)
-                set_u32(spell, 95, 158)
-                set_u32(spell, 96, 7)
+                set_u32(spell, 95, 232)
+                set_u32(spell, 96, 232)
             if spell_id == 12764:
                 set_u32(spell, 71, 6)
                 set_u32(spell, 72, 6)
                 set_i32(spell, 80, 9)
                 set_i32(spell, 81, -31)
+            if spell_id == 20101:  # Benediction source is family-restricted in stock DBC.
+                set_u32(spell, 208, 10)
+                set_u32(spell, 209, 0x1234)
+                set_u32(spell, 210, 0x5678)
+                set_u32(spell, 211, 0x9ABC)
             if spell_id == 12328:
                 # Native Sweeping Strikes is restricted to Warrior stances.
                 set_u32(spell, 12, 0x1)
                 set_u32(spell, 14, 0x2)
+            if spell_id == 29593:
+                # Improved Defensive Stance: spell-damage reduction + enrage proc.
+                set_u32(spell, 12, 0x2)
+                set_u32(spell, 35, 50)
+                set_u32(spell, 71, 6)
+                set_u32(spell, 72, 6)
+                set_u32(spell, 95, 87)
+                set_u32(spell, 96, 42)
+                set_u32(spell, 117, 57516)
             if spell_id == 31935:
                 set_u32(spell, 71, 2)
                 set_u32(spell, 72, 6)
@@ -127,7 +141,7 @@ class TalentGeneratorTests(unittest.TestCase):
             (501, "ability_warrior_intensifyrage"),
             (502, "ability_warrior_secondwind"),
             (503, "Spell_deathknight_bloodboil"),
-            (504, "inv_boots_plate_04"),
+            (504, "ability_warstomp"),
         ):
             path = f"Interface\\Icons\\{name}".encode() + b"\0"
             offset = len(icon_strings)
@@ -152,31 +166,34 @@ class TalentGeneratorTests(unittest.TestCase):
 
     def test_spec_matches_current_drive_guardian_tree(self) -> None:
         expected = {
-            "tenacity": (0, 0, 5),
-            "steady_hand": (0, 2, 5),
-            "cicatrization": (1, 0, 3),
-            "threatening_presence": (1, 1, 3),
+            "tenacity": (0, 0, 3),
+            "shield_specialization": (0, 1, 5),
+            "steady_footing": (0, 2, 2),
+            "cicatrization": (1, 0, 2),
+            "iron_will": (1, 1, 3),
             "deflection": (1, 2, 3),
-            "nerves_of_steel": (2, 0, 2),
-            "consistency": (2, 1, 5),
+            "threatening_presence": (2, 0, 3),
             "riposte": (2, 2, 1),
-            "shield_specialization": (2, 3, 5),
-            "last_stand": (3, 0, 1),
-            "one_handed_weapon_specialization": (3, 2, 3),
-            "steady_footing": (4, 1, 2),
-            "critical_block": (4, 3, 3),
-            "bulwark": (5, 1, 3),
+            "steady_hand": (2, 3, 5),
+            "nerves_of_steel": (3, 1, 2),
+            "ardent_defender": (3, 2, 3),
+            "last_stand": (4, 0, 1),
+            "consistency": (4, 1, 5),
+            "one_handed_weapon_specialization": (4, 2, 5),
+            "unbreakable_will": (4, 3, 5),
+            "shield_mastery": (5, 1, 2),
             "spell_deflection": (5, 2, 3),
-            "ardent_defender": (6, 0, 3),
-            "shield_mastery": (6, 3, 2),
-            "unbreakable_will": (7, 0, 5),
-            "sweeping_strikes": (7, 2, 1),
-            "vitality": (8, 0, 3),
-            "improved_mortal_strike": (8, 1, 3),
-            "damage_shield": (8, 3, 2),
-            "acclimation": (9, 1, 3),
-            "mortal_strike": (9, 2, 1),
-            "throw_shield": (10, 3, 1),
+            "vitality": (5, 3, 3),
+            "focused_rage": (6, 0, 3),
+            "prayer": (6, 1, 2),
+            "acclimation": (6, 2, 3),
+            "sweeping_strikes": (6, 3, 1),
+            "bulwark": (7, 1, 3),
+            "damage_shield": (8, 1, 2),
+            "improved_mortal_strike": (8, 2, 3),
+            "mortal_strike": (8, 3, 1),
+            "demolition_machine": (9, 1, 5),
+            "throw_shield": (10, 1, 1),
         }
         actual = {
             definition["key"]: (
@@ -187,10 +204,10 @@ class TalentGeneratorTests(unittest.TestCase):
             for definition in self.spec["talents"]
         }
         self.assertEqual(actual, expected)
-        self.assertEqual(len(actual), 25)
-        self.assertEqual(sum(rank_count for _row, _col, rank_count in actual.values()), 71)
-        self.assertEqual(self.spec["guardian_points"], 71)
-        self.assertEqual(self.definition("steady_footing")[1]["icon"], "inv_boots_plate_04")
+        self.assertEqual(len(actual), 28)
+        self.assertEqual(sum(rank_count for _row, _col, rank_count in actual.values()), 80)
+        self.assertEqual(self.spec["guardian_points"], 80)
+        self.assertEqual(self.definition("steady_footing")[1]["icon"], "ability_warstomp")
 
     def test_builds_native_tabs_and_exact_guardian_count(self) -> None:
         result = patch_talent_directory(self.dbc_dir)
@@ -204,7 +221,7 @@ class TalentGeneratorTests(unittest.TestCase):
 
         talents = DBC.read(self.dbc_dir / "Talent.dbc")
         generated = [r for r in talents.records if 5000 <= u32(r, 0) < 6000]
-        self.assertEqual(len(generated), 25)
+        self.assertEqual(len(generated), 28)
         self.assertFalse(any(u32(r, 0) == 5999 for r in talents.records))
 
     def test_script_sensitive_native_passives_reuse_blizzard_spell_ids(self) -> None:
@@ -214,6 +231,7 @@ class TalentGeneratorTests(unittest.TestCase):
         scripted = {
             "ardent_defender": [31850, 31851, 31852],
             "damage_shield": [58872, 58874],
+            "focused_rage": [29787, 29790, 29792],
         }
         for key, expected in scripted.items():
             _index, definition, talent = self.generated_talent(talents, key)
@@ -268,7 +286,7 @@ class TalentGeneratorTests(unittest.TestCase):
             spell = next(r for r in spells.records if u32(r, 0) == spell_id)
             self.assertEqual(u32(spell, SPELL_EFFECT_APPLY_AURA_FIELDS[0]), 47)
             self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), value - 1)
-            self.assertEqual(dbc_string(spells, u32(spell, SPELL_NAME_START + 7)), "Desvio")
+            self.assertEqual(dbc_string(spells, u32(spell, SPELL_NAME_START + 7)), "Desvío")
 
     def test_consistency_supports_signed_slow_duration_values(self) -> None:
         patch_talent_directory(self.dbc_dir)
@@ -314,18 +332,56 @@ class TalentGeneratorTests(unittest.TestCase):
             self.assertEqual(u32(spell, SPELL_EFFECT_APPLY_AURA_FIELDS[1]), 0)
             self.assertEqual(u32(spell, SPELL_EFFECT_TRIGGER_SPELL_FIELDS[1]), 0)
 
-    def test_critical_block_removes_shield_slam_crit_component(self) -> None:
+    def test_iron_will_is_three_rank_7_14_20_duration_reduction(self) -> None:
         patch_talent_directory(self.dbc_dir)
         talents = DBC.read(self.dbc_dir / "Talent.dbc")
         spells = DBC.read(self.dbc_dir / "Spell.dbc")
-        _index, _definition, talent = self.generated_talent(talents, "critical_block")
+        _index, _definition, talent = self.generated_talent(talents, "iron_will")
 
         self.assertEqual(len(self.rank_ids(talent)), 3)
-        for spell_id in self.rank_ids(talent):
+        for spell_id, value in zip(self.rank_ids(talent), (-7, -14, -20)):
             spell = next(r for r in spells.records if u32(r, 0) == spell_id)
-            self.assertNotEqual(u32(spell, SPELL_EFFECT_FIELDS[0]), 0)
-            self.assertEqual(u32(spell, SPELL_EFFECT_FIELDS[1]), 0)
-            self.assertEqual(u32(spell, SPELL_EFFECT_APPLY_AURA_FIELDS[1]), 0)
+            self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), value - 1)
+            self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[1]), value - 1)
+
+    def test_prayer_is_two_rank_global_instant_mana_cost_reduction(self) -> None:
+        patch_talent_directory(self.dbc_dir)
+        talents = DBC.read(self.dbc_dir / "Talent.dbc")
+        spells = DBC.read(self.dbc_dir / "Spell.dbc")
+        _index, _definition, talent = self.generated_talent(talents, "prayer")
+
+        for spell_id, value in zip(self.rank_ids(talent), (-5, -10)):
+            spell = next(r for r in spells.records if u32(r, 0) == spell_id)
+            self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), value - 1)
+            for field in (208, 209, 210, 211):
+                self.assertEqual(u32(spell, field), 0)
+
+    def test_demolition_machine_is_stanceless_enrage_proc_only(self) -> None:
+        patch_talent_directory(self.dbc_dir)
+        talents = DBC.read(self.dbc_dir / "Talent.dbc")
+        spells = DBC.read(self.dbc_dir / "Spell.dbc")
+        _index, _definition, talent = self.generated_talent(talents, "demolition_machine")
+
+        for spell_id, proc_chance in zip(self.rank_ids(talent), (15, 30, 45, 60, 75)):
+            spell = next(r for r in spells.records if u32(r, 0) == spell_id)
+            self.assertEqual(u32(spell, 35), proc_chance)
+            self.assertEqual(u32(spell, SPELL_EFFECT_FIELDS[0]), 0)
+            self.assertEqual(u32(spell, SPELL_EFFECT_APPLY_AURA_FIELDS[0]), 0)
+            self.assertNotEqual(u32(spell, SPELL_EFFECT_FIELDS[1]), 0)
+            self.assertNotEqual(u32(spell, SPELL_EFFECT_TRIGGER_SPELL_FIELDS[1]), 0)
+            for field in (12, 13, 14, 15):
+                self.assertEqual(u32(spell, field), 0)
+
+    def test_one_handed_specialization_is_five_rank_2_to_10_percent(self) -> None:
+        patch_talent_directory(self.dbc_dir)
+        talents = DBC.read(self.dbc_dir / "Talent.dbc")
+        spells = DBC.read(self.dbc_dir / "Spell.dbc")
+        _index, _definition, talent = self.generated_talent(talents, "one_handed_weapon_specialization")
+
+        self.assertEqual(len(self.rank_ids(talent)), 5)
+        for spell_id, value in zip(self.rank_ids(talent), (2, 4, 6, 8, 10)):
+            spell = next(r for r in spells.records if u32(r, 0) == spell_id)
+            self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), value - 1)
 
     def test_throw_shield_is_physical_zero_base_damage_ap_template(self) -> None:
         patch_talent_directory(self.dbc_dir)
