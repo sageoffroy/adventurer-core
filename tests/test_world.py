@@ -50,6 +50,9 @@ class WorldUpdateTests(unittest.TestCase):
             self.assertIn("0.24", guardian_sql)
             self.assertIn("290050", guardian_sql)
             self.assertIn("spell_warr_last_stand", guardian_sql)
+            for spell_id in (290150, 290151, 290152):
+                self.assertIn(str(spell_id), guardian_sql)
+            self.assertIn("spell_pal_ardent_defender", guardian_sql)
 
             results_again = world.install(core)
             self.assertEqual(len(results_again), 3)
