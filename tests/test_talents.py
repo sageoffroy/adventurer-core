@@ -29,7 +29,6 @@ from talents import (  # noqa: E402
     custom_talent_id,
     custom_trigger_spell_id,
     dbc_string,
-    f32,
     i32,
     load_specs,
     patch_talent_directory,
@@ -81,6 +80,12 @@ class TalentGeneratorTests(unittest.TestCase):
             spell = row(234, {0: spell_id, 4: 0x11, 71: 6, 80: 0, 133: 1, 225: 1})
 
             # Guardian structural fixtures.
+            if spell_id == 19584:
+                set_u32(spell, 71, 6); set_u32(spell, 72, 6)
+                set_u32(spell, 95, 8); set_u32(spell, 96, 133)
+            if spell_id == 63650:
+                set_u32(spell, 71, 6); set_u32(spell, 72, 6)
+                set_u32(spell, 95, 135); set_u32(spell, 96, 118)
             if spell_id == 20060:
                 set_u32(spell, 95, 47)
             if spell_id == 21156:
@@ -90,12 +95,17 @@ class TalentGeneratorTests(unittest.TestCase):
                 set_u32(spell, 71, 6); set_u32(spell, 72, 6)
                 set_u32(spell, 95, 51); set_u32(spell, 96, 42)
                 set_u32(spell, 117, 99999)
-            if spell_id == 12300:
-                set_u32(spell, 71, 6); set_u32(spell, 72, 6)
-                set_u32(spell, 95, 232); set_u32(spell, 96, 232)
             if spell_id == 12764:
                 set_u32(spell, 71, 6); set_u32(spell, 72, 6)
                 set_i32(spell, 80, 9); set_i32(spell, 81, -31)
+            if spell_id == 31382:
+                set_u32(spell, 71, 6); set_u32(spell, 95, 87)
+            if spell_id in {47294, 47295, 47296}:
+                set_u32(spell, 71, 6); set_u32(spell, 72, 6)
+                set_u32(spell, 95, 251); set_u32(spell, 96, 107)
+            if spell_id in {33853, 33855, 33856}:
+                set_u32(spell, 71, 6); set_u32(spell, 72, 6); set_u32(spell, 73, 3)
+                set_u32(spell, 95, 80); set_u32(spell, 96, 125)
             if spell_id == 20101:
                 set_u32(spell, 208, 10); set_u32(spell, 209, 0x1234)
                 set_u32(spell, 210, 0x5678); set_u32(spell, 211, 0x9ABC)
@@ -158,6 +168,7 @@ class TalentGeneratorTests(unittest.TestCase):
             (502, "ability_warrior_secondwind"),
             (503, "Spell_deathknight_bloodboil"),
             (504, "ability_warstomp"),
+            (505, "ability_backstab"),
         ):
             path = f"Interface\\Icons\\{name}".encode() + b"\0"
             offset = len(icon_strings)
@@ -195,7 +206,7 @@ class TalentGeneratorTests(unittest.TestCase):
         talents = DBC.read(self.dbc_dir / "Talent.dbc")
         guardian = [r for r in talents.records if 5000 <= u32(r, 0) < 6000]
         champion = [r for r in talents.records if 6000 <= u32(r, 0) < 7000]
-        self.assertEqual(len(guardian), 28)
+        self.assertEqual(len(guardian), 26)
         self.assertEqual(len(champion), 28)
         self.assertFalse(any(u32(r, 0) in {5999, 6999} for r in talents.records))
 
@@ -204,7 +215,7 @@ class TalentGeneratorTests(unittest.TestCase):
                 talent = next(r for r in talents.records if u32(r, 0) == custom_talent_id(spec, index))
                 self.assertEqual(u32(talent, 1), expected_tab)
 
-    def test_guardian_regressions_remain_intact(self) -> None:
+    def test_guardian_redesign_generates_the_custom_mechanics(self) -> None:
         patch_talent_directory(self.dbc_dir)
         talents = DBC.read(self.dbc_dir / "Talent.dbc")
         spells = DBC.read(self.dbc_dir / "Spell.dbc")
@@ -218,6 +229,12 @@ class TalentGeneratorTests(unittest.TestCase):
             self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[1]), defense - 1)
             self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[2]), defense - 1)
 
+        _index, _definition, consistency = self.generated_talent(talents, self.spec, "consistency")
+        for spell_id in self.rank_ids(consistency):
+            spell = next(r for r in spells.records if u32(r, 0) == spell_id)
+            self.assertEqual(u32(spell, SPELL_EFFECT_APPLY_AURA_FIELDS[0]), 4)  # runtime marker
+            self.assertEqual(u32(spell, SPELL_EFFECT_FIELDS[1]), 0)
+
         _index, _definition, prayer = self.generated_talent(talents, self.spec, "prayer")
         for spell_id, value in zip(self.rank_ids(prayer), (-5, -10)):
             spell = next(r for r in spells.records if u32(r, 0) == spell_id)
@@ -226,17 +243,26 @@ class TalentGeneratorTests(unittest.TestCase):
                 self.assertEqual(u32(spell, field), 0)
 
         _index, _definition, demolition = self.generated_talent(talents, self.spec, "demolition_machine")
-        for spell_id, proc in zip(self.rank_ids(demolition), (15, 30, 45, 60, 75)):
+        for spell_id, proc in zip(self.rank_ids(demolition), (25, 50, 75)):
             spell = next(r for r in spells.records if u32(r, 0) == spell_id)
             self.assertEqual(u32(spell, 35), proc)
             self.assertEqual(u32(spell, SPELL_EFFECT_FIELDS[0]), 0)
             self.assertNotEqual(u32(spell, SPELL_EFFECT_TRIGGER_SPELL_FIELDS[1]), 0)
 
         index, _definition, throw = self.generated_talent(talents, self.spec, "throw_shield")
+        self.assertEqual(index, 24)
         spell = next(r for r in spells.records if u32(r, 0) == custom_spell_id(self.spec, index, 0))
+        self.assertEqual(u32(spell, 0), 290240)
         self.assertEqual(u32(spell, SPELL_SCHOOL_MASK_FIELD), 1)
         self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), -1)
         self.assertEqual(u32(spell, 104), 3)
+
+        _index, impact_definition, impact = self.generated_talent(talents, self.spec, "painful_impacts")
+        self.assertEqual(impact_definition["icon"], "ability_backstab")
+        for spell_id, value in zip(self.rank_ids(impact), (5, 10, 15)):
+            spell = next(r for r in spells.records if u32(r, 0) == spell_id)
+            self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), value - 1)
+            self.assertEqual(i32(spell, SPELL_EFFECT_MISC_VALUE_FIELDS[0]), 1)
 
     def test_champion_heart_strike_uses_rage_and_has_no_dk_resource(self) -> None:
         patch_talent_directory(self.dbc_dir)
@@ -304,7 +330,7 @@ class TalentGeneratorTests(unittest.TestCase):
         active = {"hemorrhage", "ancestral_rage", "heart_strike", "bladestorm"}
 
         for key, required in expected_requires.items():
-            index, definition, talent = self.generated_talent(talents, self.champion, key)
+            _index, definition, talent = self.generated_talent(talents, self.champion, key)
             required_index, _ = self.definition(self.champion, required)
             self.assertEqual(u32(talent, TALENT_PREREQ_TALENT_FIELDS[0]), custom_talent_id(self.champion, required_index))
             self.assertEqual(definition["requires"], required)
