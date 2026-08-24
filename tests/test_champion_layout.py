@@ -82,6 +82,11 @@ class ChampionLayoutTests(unittest.TestCase):
         hack = self.definitions["hack_and_slash"]
         self.assertEqual(hack["spell_source_ids"], [13960, 13961, 13962, 13963, 13964])
 
+        elemental = self.definitions["elemental_weapons"]
+        self.assertEqual(elemental["effect_values"]["0"], [10, 20, 30])
+        self.assertEqual(elemental["effect_values"]["1"], [10, 20, 30])
+        self.assertEqual(elemental["effect_values"]["2"], [13, 27, 40])
+
         weakness = self.definitions["find_weakness"]
         self.assertEqual(weakness["effect_values"]["0"], [2, 4, 6])
         self.assertEqual(weakness["effect_misc_values"]["0"], 127)
@@ -97,6 +102,7 @@ class ChampionLayoutTests(unittest.TestCase):
 
         energy = self.definitions["overflowing_energy"]
         self.assertEqual(energy["spell_source_ids"], [31122, 31123, 61329])
+        self.assertFalse(energy.get("reuse_native_spells", False))
 
 
 if __name__ == "__main__":
