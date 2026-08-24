@@ -84,9 +84,9 @@
       "enUS": "Elemental Weapons",
       "esMX": "Armas elementales",
       "spell_source_ids": [16266, 16266, 16266],
-      "effect_values": {"0": [13, 27, 40], "1": [10, 20, 30], "2": [10, 20, 30]},
-      "description_enUS": "Increases the damage of your Windfury Weapon effect by $s1%, the spell damage of your Flametongue Weapon by $s2%, and the healing bonus of your Earthliving Weapon by $s3%.",
-      "description_esMX": "Aumenta el daño de tu efecto de Arma Viento Furioso un $s1%, el daño con hechizos de Arma Lengua de Fuego un $s2% y el bonus de sanación de Arma de Vida terrestre un $s3%."
+      "effect_values": {"0": [10, 20, 30], "1": [10, 20, 30], "2": [13, 27, 40]},
+      "description_enUS": "Increases the damage of your Windfury Weapon effect by $s3%, the spell damage of your Flametongue Weapon by $s2%, and the healing bonus of your Earthliving Weapon by $s1%.",
+      "description_esMX": "Aumenta el daño de tu efecto de Arma Viento Furioso un $s3%, el daño con hechizos de Arma Lengua de Fuego un $s2% y el bonus de sanación de Arma de Vida terrestre un $s1%."
     },
     {
       "key": "endless_rage",
