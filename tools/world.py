@@ -39,6 +39,10 @@ WORLD_UPDATES: tuple[WorldUpdate, ...] = (
         ROOT / "sql" / "world" / "004_guardian_talents.sql",
         "rev_1787446800000000002.sql",
     ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "005_guardian_survivor.sql",
+        "rev_1787446800000000003.sql",
+    ),
 )
 
 # Kept as aliases for older callers/tests that referenced the single-update API.
@@ -138,7 +142,8 @@ def cleanup_database(core: Path, conf: Path | None = None) -> None:
 DELETE FROM `spell_script_names`
 WHERE (`spell_id` = 290050 AND `ScriptName` = 'spell_warr_last_stand')
    OR (`spell_id` = 290090 AND `ScriptName` = 'spell_warr_last_stand')
-   OR (`spell_id` = 290180 AND `ScriptName` = 'spell_warr_sweeping_strikes');
+   OR (`spell_id` = 290180 AND `ScriptName` = 'spell_warr_sweeping_strikes')
+   OR (`spell_id` IN (290150, 290151, 290152) AND `ScriptName` = 'spell_pal_ardent_defender');
 
 DELETE FROM `spell_bonus_data`
 WHERE `entry` = 290240;
@@ -153,7 +158,8 @@ WHERE `name` IN ({names});
         "SELECT COUNT(*) FROM `spell_script_names` WHERE "
         "(`spell_id`=290050 AND `ScriptName`='spell_warr_last_stand') OR "
         "(`spell_id`=290090 AND `ScriptName`='spell_warr_last_stand') OR "
-        "(`spell_id`=290180 AND `ScriptName`='spell_warr_sweeping_strikes')",
+        "(`spell_id`=290180 AND `ScriptName`='spell_warr_sweeping_strikes') OR "
+        "(`spell_id` IN (290150,290151,290152) AND `ScriptName`='spell_pal_ardent_defender')",
     ))
     bonus_count = int(query_scalar(
         db,
