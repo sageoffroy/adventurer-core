@@ -16,6 +16,19 @@ WHERE `spell_id` = 290090
 INSERT INTO `spell_script_names` (`spell_id`, `ScriptName`)
 VALUES (290090, 'spell_warr_last_stand');
 
+-- Superviviente owns Adventurer-localized clones of all three Ardent Defender
+-- ranks. Bind each custom spell to AzerothCore's proven absorb/death-save
+-- script; the native Paladin spell rows and names remain untouched.
+DELETE FROM `spell_script_names`
+WHERE `spell_id` IN (290150, 290151, 290152)
+  AND `ScriptName` = 'spell_pal_ardent_defender';
+
+INSERT INTO `spell_script_names` (`spell_id`, `ScriptName`)
+VALUES
+(290150, 'spell_pal_ardent_defender'),
+(290151, 'spell_pal_ardent_defender'),
+(290152, 'spell_pal_ardent_defender');
+
 -- Golpes de barrido keeps Blizzard's Sweeping Strikes proc logic but its custom
 -- Spell.dbc row removes the Warrior stance requirement for Adventurer.
 DELETE FROM `spell_script_names`
