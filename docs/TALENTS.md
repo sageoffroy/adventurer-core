@@ -43,7 +43,7 @@ Important Adventurer customizations:
 - **Especialización con escudo** reuses the native WotLK Warrior rank spells so the original +1% block per rank and 20% per-rank chance to generate 5 Rage on block/dodge/parry remain intact.
 - **Bloqueo crítico** keeps the 20/40/60% double-block mechanic but removes the Shield Slam-specific critical-strike rider.
 - **Indomable** keeps Survival of the Fittest's +2/4/6% attributes and -2/4/6% melee critical-hit chance taken while removing the Bear-only armor rider.
-- **Superviviente** is Ardent Defender renamed and intentionally reuses its native script-sensitive ranks.
+- **Superviviente** clones the three Ardent Defender rank rows as Adventurer-owned spells `290150`–`290152`, so the client can show the new name without altering Paladin data. The world update binds all three clones to AzerothCore's proven `spell_pal_ardent_defender` runtime script.
 - **Ventaja desleal** intentionally reuses the native proc-sensitive ranks.
 
 ### Rows 7–11
