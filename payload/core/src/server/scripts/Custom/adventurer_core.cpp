@@ -5,6 +5,7 @@
 #include "Player.h"
 #include "ScriptDefines/PlayerScript.h"
 #include "SharedDefines.h"
+#include "SpellAuraEffects.h"
 #include "WorldPacket.h"
 
 #include <algorithm>
@@ -25,10 +26,15 @@ constexpr uint32 APPRENTICE_RIDING_VALUE = 75;
 constexpr uint32 ADVENTURER_MAX_RAGE = 1000;
 constexpr uint32 ADVENTURER_MAX_ENERGY = 100;
 
-// Guardian Consistency owns these stable custom rank spell IDs. The talent is
-// intentionally kept at Guardian definition index 6 so this range never moves.
+// Guardian custom-rank spell ranges are intentionally stable because the DBC
+// generator derives custom IDs from definition order. Existing ranges must not
+// move when deeper talents are added to the tree.
 constexpr uint32 CONSISTENCY_RANK_1 = 290060;
 constexpr uint8 CONSISTENCY_RANKS = 5;
+constexpr uint32 ARMORED_TO_THE_TEETH_RANK_1 = 290260;
+constexpr uint8 ARMORED_TO_THE_TEETH_RANKS = 3;
+constexpr uint32 BLOOD_GORGED_RANK_1 = 290290;
+constexpr uint8 BLOOD_GORGED_RANKS = 5;
 constexpr uint32 CONSISTENCY_ARMOR_SYNC_INTERVAL_MS = 500;
 
 // The 3.3.5a client refuses to expose combo points through GetComboPoints for a
@@ -96,16 +102,21 @@ bool IsAdventurer(Player const* player)
     return player && player->getClass() == CLASS_ADVENTURER;
 }
 
-uint8 GetConsistencyRank(Player const* player)
+uint8 GetCustomTalentRank(Player const* player, uint32 rankOneSpell, uint8 rankCount)
 {
     if (!IsAdventurer(player))
         return 0;
 
-    for (uint8 rank = CONSISTENCY_RANKS; rank > 0; --rank)
-        if (player->HasAura(CONSISTENCY_RANK_1 + rank - 1))
+    for (uint8 rank = rankCount; rank > 0; --rank)
+        if (player->HasAura(rankOneSpell + rank - 1))
             return rank;
 
     return 0;
+}
+
+uint8 GetConsistencyRank(Player const* player)
+{
+    return GetCustomTalentRank(player, CONSISTENCY_RANK_1, CONSISTENCY_RANKS);
 }
 
 uint32 GetEffectiveItemArmor(Player* player, ItemTemplate const* proto)
@@ -203,6 +214,28 @@ void RefreshConsistencyArmor(Player* player, uint32 diff = 0, bool force = false
         player->HandleStatFlatModifier(UNIT_MOD_ARMOR, BASE_VALUE, desiredBonus, true);
 
     state.appliedBonus = desiredBonus;
+}
+
+void RefreshBloodGorged(Player* player)
+{
+    if (!IsAdventurer(player) || !player->IsInWorld())
+        return;
+
+    for (uint8 rank = BLOOD_GORGED_RANKS; rank > 0; --rank)
+    {
+        Aura* aura = player->GetAura(BLOOD_GORGED_RANK_1 + rank - 1);
+        if (!aura)
+            continue;
+
+        AuraEffect* damageEffect = aura->GetEffect(EFFECT_0);
+        if (!damageEffect)
+            return;
+
+        int32 desiredAmount = player->GetHealthPct() > 75.0f ? int32(rank * 2) : 0;
+        if (damageEffect->GetAmount() != desiredAmount)
+            damageEffect->ChangeAmount(desiredAmount);
+        return;
+    }
 }
 
 void SendVisibleComboPoints(Player* player, uint8 points)
@@ -384,6 +417,7 @@ public:
         PLAYERHOOK_ON_LEVEL_CHANGED,
         PLAYERHOOK_ON_UPDATE,
         PLAYERHOOK_ON_AFTER_UPDATE_MAX_POWER,
+        PLAYERHOOK_ON_AFTER_UPDATE_ATTACK_POWER_AND_DAMAGE,
         PLAYERHOOK_ON_PLAYER_HAS_ACTIVE_POWER_TYPE
     }) { }
 
@@ -400,6 +434,7 @@ public:
             comboSyncStates.erase(player->GetGUID().GetRawValue());
             consistencyArmorStates.erase(player->GetGUID().GetRawValue());
             RefreshConsistencyArmor(player, 0, true);
+            RefreshBloodGorged(player);
         }
     }
 
@@ -413,6 +448,7 @@ public:
     {
         UpdateComboPointSync(player, diff);
         RefreshConsistencyArmor(player, diff);
+        RefreshBloodGorged(player);
     }
 
     void OnPlayerLevelChanged(Player* player, uint8 /*oldLevel*/) override
@@ -421,6 +457,7 @@ public:
         {
             ApplyRuntimeCapabilities(player);
             RefreshConsistencyArmor(player, 0, true);
+            RefreshBloodGorged(player);
         }
     }
 
@@ -442,6 +479,25 @@ public:
             default:
                 break;
         }
+    }
+
+    void OnPlayerAfterUpdateAttackPowerAndDamage(
+        Player* player, float& /*level*/, float& /*baseAttackPower*/, float& attackPowerMod,
+        float& /*attackPowerMultiplier*/, bool ranged) override
+    {
+        if (!IsAdventurer(player) || ranged)
+            return;
+
+        uint8 rank = GetCustomTalentRank(
+            player, ARMORED_TO_THE_TEETH_RANK_1, ARMORED_TO_THE_TEETH_RANKS);
+        if (!rank)
+            return;
+
+        // Aventurer's buffed version grants 2/4/6 AP per 150 final armor.
+        // Using the AP calculation hook keeps the ratio exact, including armor
+        // gained from Consistency and temporary armor effects.
+        attackPowerMod += std::floor(
+            float(player->GetArmor()) * float(rank * 2) / 150.0f);
     }
 
     bool OnPlayerHasActivePowerType(Player const* player, Powers power) override
