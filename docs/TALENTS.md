@@ -10,51 +10,76 @@ Each authored tree has its own JSON spec and its own Adventurer-owned Talent/Spe
 
 ## Build-depth rule
 
-Talent trees are designed around viable builds rather than around filling an arbitrary rank total.
+Talent trees are designed around viable builds rather than around filler.
 
 - level 60: 51 points; 31/20, 30/21 and comparable hybrids must work;
 - level 70: 61 points;
 - level 80: 71 points;
 - roughly 10 points is a dip, 20 points is a functional secondary package, and 30 points should already provide a complete tree identity;
-- 40+ points are advanced specialization and the deepest rows are optional luxury/capstone territory.
+- 40+ points are advanced specialization and the deepest rows are optional specialization/capstone territory.
 
-A tree therefore does **not** need 80 available ranks. Weak 5/5 filler and mandatory corridors are deliberately avoided. Prerequisites are used only when the mechanical relationship is obvious.
+A tree may contain 80 available ranks when every slot is intentional; the number itself is not a target. Weak filler and mandatory corridors are still avoided. Adventurer trees use **two deepest-row ultimates** so different versions of the same broad archetype can finish in distinct ways.
 
-## Guardian v1
+## Guardian final layout
 
-Guardian contains **26 talents and 73 available ranks** across 11 WotLK rows. The first six rows contain 57 available ranks and are the build-complete core; the last five rows become progressively sparser.
+Guardian contains **32 talents and 80 available ranks** across 11 WotLK rows. Rows 1–6 contain 53 available ranks and form the level-60 build core. The deep half then branches into shield defense, avoidance/reactive defense, heavy weapons and group protection rather than becoming one mandatory corridor.
 
 ### Rows 1–6
 
-1. **Vitalidad 5**, **Consistencia 5**, **Fuerza descomunal 5**.
+1. **Vitalidad 5**, **Consistencia 5**, **Fuerza descomunal 1**.
 2. **Especialización con escudo 5**, **Cicatrización 2**, **Desvío 3**.
 3. **Impactos dolorosos 3**, **Contestación 1**, **Impasibilidad 2**.
 4. **Bloqueo crítico 3**, **Última Carga 1**, **Desvío de hechizos 3**, **Especialización en armas de una mano 5**.
 5. **Paso firme 2**, **Superviviente 3**, **Ventaja desleal 2**.
-6. **Indomable 3**, **Aclimatación 3**, **Golpes de barrido 1**.
+6. **Armado hasta los dientes 3**, **Aclimatación 3**, **Golpes de barrido 1**.
 
-The opening rows stay generic. By rows 5–6 the player can complete very different defensive identities: shield/block, avoidance and counterattack, raw-health survival, magic adaptation, or hybrids such as an evasive rogue-like tank.
+The opening rows stay generic. By rows 5–6 the player can complete very different defensive identities: shield/block, avoidance and counterattack, raw-health survival, magic adaptation, armor scaling, or hybrids such as an evasive rogue-like tank.
 
 Important Adventurer customizations:
 
-- **Vitalidad** gives +2% maximum health per rank, +10% at 5/5.
+- **Vitalidad** gives +2/4/6/8/10% maximum health and uses `spell_nature_abolishmagic`.
 - **Consistencia** is armor-type aware: each rank adds 4% of cloth/leather item armor, 3% of mail item armor and 2% of plate item armor. Shields are excluded. The runtime script recalculates this from equipped effective item armor so the DBC marker itself does not apply a generic armor multiplier.
-- **Impactos dolorosos** adds 5/10/15% threat only to Physical attacks and abilities and uses the stock `ability_backstab` icon.
-- **Especialización con escudo** reuses the native WotLK Warrior rank spells so the original +1% block per rank and 20% per-rank chance to generate 5 Rage on block/dodge/parry remain intact.
+- **Fuerza descomunal** is now a single 1/1 foundation talent that grants +15% total Strength and uses `inv_gauntlets_19`.
+- **Cicatrización** gives +3/6% healing received and uses `spell_shadow_lifedrain`.
+- **Impactos dolorosos** adds 5/10/15% threat only to Physical attacks and abilities and uses `ability_backstab`.
+- **Especialización con escudo** reuses the native WotLK Warrior rank spells so the original +1% block per rank and 20%-per-rank chance to generate 5 Rage on block/dodge/parry remain intact.
 - **Bloqueo crítico** keeps the 20/40/60% double-block mechanic but removes the Shield Slam-specific critical-strike rider.
-- **Indomable** keeps Survival of the Fittest's +2/4/6% attributes and -2/4/6% melee critical-hit chance taken while removing the Bear-only armor rider.
-- **Superviviente** clones the three Ardent Defender rank rows as Adventurer-owned spells `290150`–`290152`, so the client can show the new name without altering Paladin data. The world update binds all three clones to AzerothCore's proven `spell_pal_ardent_defender` runtime script.
+- **Superviviente** clones the three Ardent Defender rank rows as Adventurer-owned spells `290150`–`290152`, uses `spell_misc_emotionangry`, and is bound by the versioned world update to AzerothCore's proven `spell_pal_ardent_defender` runtime script.
 - **Ventaja desleal** intentionally reuses the native proc-sensitive ranks.
+- **Armado hasta los dientes** is Adventurer's buffed adaptation of the WotLK talent: +2/4/6 Attack Power per 150 final Armor. Its custom rank markers are `290260`–`290262`; the runtime AP hook uses the final armor value, so it naturally synergizes with Consistencia and temporary armor buffs without inheriting Warrior-only spell-family data.
 
 ### Rows 7–11
 
-7. **Nervios de acero 2**, **Oración 2**, **Ira enfocada 3**.
-8. **Baluarte 3**.
-9. **Escudo de daño 2**.
-10. **Máquina de demolición 3** — 25/50/75% proc chance on block/parry/dodge for the existing +5% Physical damage Enrage.
-11. **Arrojar escudo 1**.
+7. **Oración 2**, **Ira enfocada 2**, **Nervios de acero 2**.
+8. **Baluarte 3**, **Indomable 3**, **Arremetida de conmoción 1**.
+9. **Escudo de daño 2**, **Máquina de demolición 3**, **Empuñadura de titán 1**.
+10. **Atracarse de sangre 5**, **Vigilancia 1**.
+11. **Arrojar escudo 1**, **Ola de choque 1**.
 
-The deep shield chain is optional. A non-shield Guardian is expected to be functional well before it and can spend the remaining level-60 points in another tree. `Arrojar escudo` remains Guardian definition index 24 so its custom spell ID stays stable at **290240**.
+Deep Guardian deliberately supports several fantasies at once:
+
+- the shield lane is **Baluarte -> Escudo de daño -> Arrojar escudo**;
+- the group/control lane is **Arremetida de conmoción -> Vigilancia**;
+- the heavy-weapon lane is **Empuñadura de titán -> Ola de choque**;
+- **Indomable**, **Máquina de demolición** and **Atracarse de sangre** remain useful to avoidance/reactive and hybrid Guardians without forcing a shield.
+
+The approved prerequisite arrows are exactly:
+
+- Desvío -> Contestación;
+- Especialización con escudo -> Bloqueo crítico;
+- Especialización en armas de una mano -> Golpes de barrido;
+- Baluarte -> Escudo de daño -> Arrojar escudo;
+- Arremetida de conmoción -> Vigilancia;
+- Empuñadura de titán -> Ola de choque.
+
+Deep WotLK mechanics are adapted conservatively:
+
+- **Arremetida de conmoción**, **Empuñadura de titán**, **Vigilancia** and **Ola de choque** reuse their native WotLK spell rows so AzerothCore's proven stun/AP, Titan Grip, threat-transfer and cone/stun behavior stays intact.
+- **Atracarse de sangre** cannot safely reuse the DK child auras because their spell-family masks only affect DK attacks. Guardian therefore owns custom ranks `290290`–`290294`: armor penetration is always active at 2/4/6/8/10%, while the matching all-damage bonus is enabled only above 75% health by the Adventurer runtime.
+- **Máquina de demolición** remains the custom 25/50/75% proc on block/parry/dodge for +5% Physical damage for 12 sec.
+- **Arrojar escudo** remains Guardian definition index 24 so its custom spell ID stays stable at **290240**. Its approved icon is `inv_jewelry_trinketpvp_02`.
+
+Guardian's two row-11 ultimates are therefore **Arrojar escudo** and **Ola de choque**.
 
 ## Champion v0
 
