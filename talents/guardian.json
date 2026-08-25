@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "point_total": 73,
+  "point_total": 80,
   "tabs": [
     {
       "id": 5000,
@@ -50,8 +50,8 @@
       "enUS": "Overwhelming Strength",
       "esMX": "Fuerza descomunal",
       "icon": "inv_gauntlets_19",
-      "spell_source_ids": [20266,20266,20266,20266,20266],
-      "effect_values": {"0": [3,6,9,12,15]},
+      "spell_source_ids": [20266],
+      "effect_values": {"0": [15]},
       "description_enUS": "Increases your total Strength by $s1%.",
       "description_esMX": "Aumenta tu fuerza total un $s1%."
     },
@@ -95,7 +95,7 @@
     {
       "key": "nerves_of_steel",
       "row": 6,
-      "col": 0,
+      "col": 2,
       "enUS": "Nerves of Steel",
       "esMX": "Nervios de acero",
       "spell_source_ids": [31130,31131],
@@ -222,8 +222,8 @@
     },
     {
       "key": "indomitable",
-      "row": 5,
-      "col": 0,
+      "row": 7,
+      "col": 1,
       "enUS": "Indomitable",
       "esMX": "Indomable",
       "icon": "ability_warrior_intensifyrage",
@@ -257,7 +257,7 @@
     {
       "key": "prayer",
       "row": 6,
-      "col": 1,
+      "col": 0,
       "enUS": "Prayer",
       "esMX": "Oración",
       "spell_source_ids": [20101,20101],
@@ -279,7 +279,7 @@
     {
       "key": "acclimation",
       "row": 5,
-      "col": 1,
+      "col": 2,
       "enUS": "Acclimation",
       "esMX": "Aclimatación",
       "spell_source_ids": [49200,50151,50152],
@@ -287,8 +287,8 @@
     },
     {
       "key": "demolition_machine",
-      "row": 9,
-      "col": 2,
+      "row": 8,
+      "col": 1,
       "enUS": "Demolition Machine",
       "esMX": "Máquina de demolición",
       "spell_source_ids": [29593,29593,29593],
@@ -303,6 +303,7 @@
       "col": 0,
       "enUS": "Throw Shield",
       "esMX": "Arrojar escudo",
+      "icon": "inv_jewelry_trinketpvp_02",
       "spell_source_ids": [31935],
       "add_to_spellbook": true,
       "effect_values": {"0": [0]},
@@ -316,11 +317,80 @@
     {
       "key": "focused_rage",
       "row": 6,
-      "col": 3,
+      "col": 1,
       "enUS": "Focused Rage",
       "esMX": "Ira enfocada",
-      "spell_source_ids": [29787,29790,29792],
+      "spell_source_ids": [29787,29790],
       "reuse_native_spells": true
+    },
+    {
+      "key": "armored_to_the_teeth",
+      "row": 5,
+      "col": 0,
+      "enUS": "Armored to the Teeth",
+      "esMX": "Armado hasta los dientes",
+      "icon": "inv_shoulder_22",
+      "spell_source_ids": [61216,61221,61222],
+      "effect_values": {"0": [2,4,6]},
+      "disable_effects": [1],
+      "spell_u32_values": {"71": 6, "95": 4, "208": 0, "209": 0, "210": 0, "211": 0},
+      "description_enUS": "Increases your attack power by $s1 for every 150 points of armor you have.",
+      "description_esMX": "Aumenta tu poder de ataque $s1 p. por cada 150 p. de tu valor de armadura."
+    },
+    {
+      "key": "concussion_blow",
+      "row": 7,
+      "col": 3,
+      "enUS": "Concussion Blow",
+      "esMX": "Arremetida de conmoción",
+      "spell_source_ids": [12809],
+      "reuse_native_spells": true,
+      "add_to_spellbook": true
+    },
+    {
+      "key": "titans_grip",
+      "row": 8,
+      "col": 2,
+      "enUS": "Titan's Grip",
+      "esMX": "Empuñadura de titán",
+      "spell_source_ids": [46917],
+      "reuse_native_spells": true
+    },
+    {
+      "key": "blood_gorged",
+      "row": 9,
+      "col": 1,
+      "enUS": "Blood Gorged",
+      "esMX": "Atracarse de sangre",
+      "icon": "spell_nature_reincarnation",
+      "spell_source_ids": [50096,50096,50096,50096,50096],
+      "effect_values": {"0": [2,4,6,8,10], "1": [2,4,6,8,10]},
+      "effect_misc_values": {"0": 127},
+      "spell_u32_values": {"71": 6, "72": 6, "73": 0, "95": 79, "96": 280, "97": 0, "208": 0, "209": 0, "210": 0, "211": 0},
+      "description_enUS": "When you are above 75% health, you deal $s1% more damage. In addition, your attacks ignore up to $s2% of your opponent's armor at all times.",
+      "description_esMX": "Cuando tienes más del 75% de salud, infliges un $s1% de daño más. Además, tus ataques ignoran hasta un $s2% de la armadura de tu oponente en todo momento."
+    },
+    {
+      "key": "vigilance",
+      "row": 9,
+      "col": 3,
+      "enUS": "Vigilance",
+      "esMX": "Vigilancia",
+      "spell_source_ids": [50720],
+      "reuse_native_spells": true,
+      "add_to_spellbook": true,
+      "requires": "concussion_blow"
+    },
+    {
+      "key": "shockwave",
+      "row": 10,
+      "col": 2,
+      "enUS": "Shockwave",
+      "esMX": "Ola de choque",
+      "spell_source_ids": [46968],
+      "reuse_native_spells": true,
+      "add_to_spellbook": true,
+      "requires": "titans_grip"
     }
   ]
 }
