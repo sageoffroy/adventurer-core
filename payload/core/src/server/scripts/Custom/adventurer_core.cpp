@@ -1,3 +1,4 @@
+#include "Config.h"
 #include "DatabaseEnv.h"
 #include "Language.h"
 #include "Opcodes.h"
@@ -11,7 +12,11 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
+#include <fstream>
+#include <iostream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -25,36 +30,26 @@ constexpr uint32 SPELL_BROWN_HORSE = 458;
 constexpr uint32 SPELL_DUAL_WIELD = 674;
 constexpr uint32 APPRENTICE_RIDING_VALUE = 75;
 
-// Rage is stored at ten times the value shown by the 3.3.5a client. Energy is
-// stored 1:1. Mana remains the Adventurer's native primary pool.
 constexpr uint32 ADVENTURER_MAX_RAGE = 1000;
 constexpr uint32 ADVENTURER_MAX_ENERGY = 100;
 
-// The 3.3.5a client refuses to expose combo points through GetComboPoints for a
-// non-Rogue/non-Druid class even though AzerothCore's Unit combo-point backend
-// is class agnostic. Keep Blizzard's target ComboFrame, but mirror the visible
-// server count over the addon-message channel so FrameXML can feed that native
-// frame for class 10.
 constexpr uint32 ADVENTURER_COMBO_SYNC_INTERVAL_MS = 100;
 constexpr char ADVENTURER_COMBO_PREFIX[] = "AdventurerCP";
 
 // ---------------------------------------------------------------------------
-// SpellDraft v1 protocol/state
+// SpellDraft runtime protocol/state
 // ---------------------------------------------------------------------------
-//
-// Cards, rather than individual spells, are the unit of the draft. A card may
-// teach one or several spells, may have progressive passive ranks, and may be
-// gated by other cards. Rarity and weight are deliberately separate: rarity is
-// the broad quality bucket while weight changes the relative chance inside the
-// eligible pool. Example: Charge is Common but receives weight 500 (x5 the
-// standard 100) once Battle Stance makes it eligible.
 constexpr char ADVENTURER_DRAFT_PREFIX[] = "AdventurerDraft";
 constexpr char ADVENTURER_DRAFT_SETTINGS_SOURCE[] = "adventurer_draft_v1";
-constexpr uint32 ADVENTURER_DRAFT_SCHEMA = 1;
+constexpr uint32 ADVENTURER_DRAFT_SCHEMA = 2;
 constexpr uint32 ADVENTURER_DRAFT_STANDARD_WEIGHT = 100;
+constexpr uint32 ADVENTURER_DRAFT_MAX_OFFER_SIZE = 3;
 
 constexpr char DRAFT_READY_MESSAGE[] = "ADRAFT_READY";
 constexpr char DRAFT_PICK_PREFIX[] = "ADRAFT_PICK:";
+constexpr char DRAFT_REROLL_MESSAGE[] = "ADRAFT_REROLL";
+constexpr char DRAFT_BLESS_PREFIX[] = "ADRAFT_BLESS:";
+constexpr char DRAFT_DESTROY_PREFIX[] = "ADRAFT_DESTROY:";
 
 enum class DraftCardType : uint8
 {
@@ -74,26 +69,57 @@ enum class DraftRarity : uint8
 
 struct DraftRequirement
 {
-    uint32 cardId;
-    uint8 minimumRank;
+    uint32 cardId = 0;
+    uint8 minimumRank = 1;
 };
 
 struct DraftCard
 {
-    uint32 id;
-    DraftCardType type;
-    DraftRarity rarity;
-    uint32 weight;
-
-    // Each vector entry is one selectable rank. Active cards normally contain
-    // one rank; passive cards may contain several. A rank may grant more than
-    // one spell, which is how low-value/required abilities can be bundled into
-    // one useful card without costing extra draft picks.
+    uint32 id = 0;
+    std::string key;
+    DraftCardType type = DraftCardType::None;
+    uint8 sourceLevel = 1;
+    DraftRarity rarity = DraftRarity::Common;
+    uint32 weight = ADVENTURER_DRAFT_STANDARD_WEIGHT;
     std::vector<std::vector<uint32>> rankGrants;
+    std::vector<DraftRequirement> requirementsAll;
+    std::vector<DraftRequirement> requirementsAny;
+    std::vector<uint32> unlocks;
+    bool replacesPreviousRank = false;
+    std::string name;
+};
 
-    std::vector<DraftRequirement> requirements;
-    std::vector<uint32> unlocks; // design/debug graph; eligibility uses requirements
-    bool replacesPreviousRank;
+struct DraftRuntimeConfig
+{
+    uint8 offerSize = 3;
+    uint16 initialActivePicks = 3;
+    uint8 initialActiveSourceLevelCap = 8;
+    uint8 activeDraftFirstLevel = 5;
+    uint8 activeDraftEveryLevels = 5;
+    uint8 talentDraftFirstLevel = 10;
+    uint8 talentDraftEveryLevels = 1;
+
+    std::array<uint32, 5> rarityMultipliers = { 100, 55, 25, 10, 3 };
+
+    uint16 rerollStartingCharges = 2;
+    uint8 rerollGainEveryLevels = 5;
+    uint16 rerollGainAmount = 1;
+    uint16 rerollMaxCharges = 0;
+
+    uint8 blessMaxActive = 1;
+    uint32 blessWeightMultiplierPercent = 300;
+
+    uint16 destroyStartingCharges = 1;
+    uint8 destroyGainEveryLevels = 10;
+    uint16 destroyGainAmount = 1;
+    uint16 destroyMaxCharges = 0;
+};
+
+struct DraftRuntimeData
+{
+    bool loaded = false;
+    DraftRuntimeConfig config;
+    std::vector<DraftCard> cards;
 };
 
 struct DraftState
@@ -102,19 +128,25 @@ struct DraftState
     uint16 pendingActive = 0;
     uint16 pendingTalent = 0;
     DraftCardType offerType = DraftCardType::None;
-    std::array<uint32, 3> offeredCards = { 0, 0, 0 };
+    std::array<uint32, ADVENTURER_DRAFT_MAX_OFFER_SIZE> offeredCards = { 0, 0, 0 };
     std::map<uint32, uint8> ownedRanks;
+
+    uint16 rerollCharges = 0;
+    uint16 destroyCharges = 0;
+    uint32 blessedCardId = 0;
+    std::set<uint32> destroyedCards;
 };
 
 struct ComboSyncState
 {
     uint32 elapsed = 0;
     ObjectGuid selectedTarget = ObjectGuid::Empty;
-    uint8 points = 0xFF; // impossible sentinel: force the first sync
+    uint8 points = 0xFF;
 };
 
 std::unordered_map<uint64, ComboSyncState> comboSyncStates;
 std::unordered_map<uint64, DraftState> draftStates;
+DraftRuntimeData draftRuntime;
 
 constexpr uint32 UNIVERSAL_SKILLS[] =
 {
@@ -124,19 +156,19 @@ constexpr uint32 UNIVERSAL_SKILLS[] =
 
 constexpr uint32 UNIVERSAL_SPELLS[] =
 {
-    81,    // Dodge (Passive)
-    107,   // Block
-    3127,  // Parry (Passive)
+    81,
+    107,
+    3127,
     SPELL_DUAL_WIELD,
 
-    9078, 9077, 8737, 750, // Cloth, Leather, Mail, Plate
+    9078, 9077, 8737, 750,
 
     196, 197, 198, 199, 201, 202, 227, 1180, 200, 15590,
     264, 5011, 266, 2567, 5009,
 
-    75,    // Auto Shot
-    5019,  // Shoot
-    2764,  // Throw
+    75,
+    5019,
+    2764,
     SPELL_APPRENTICE_RIDING,
     SPELL_BROWN_HORSE
 };
@@ -165,7 +197,7 @@ void SendAddonPayload(Player* player, std::string const& prefix, std::string con
     std::string message = prefix + "\t" + payload;
 
     WorldPacket data(SMSG_MESSAGECHAT, 100 + message.length());
-    data << uint8(0); // CHAT_MSG_ADDON
+    data << uint8(0);
     data << int32(LANG_ADDON);
     data << player->GetGUID();
     data << uint32(0);
@@ -283,8 +315,6 @@ void ApplyUniversalResources(Player* player, bool initializeCurrent = false)
     if (!IsAdventurer(player))
         return;
 
-    // Mana remains native. Rage and Energy are the only auxiliary resource
-    // pools owned by Adventurer Core.
     if (player->GetMaxPower(POWER_RAGE) < ADVENTURER_MAX_RAGE)
         player->SetMaxPower(POWER_RAGE, ADVENTURER_MAX_RAGE);
     if (player->GetMaxPower(POWER_ENERGY) < ADVENTURER_MAX_ENERGY)
@@ -325,56 +355,405 @@ void FinalizeNewAdventurer(Player* player)
     SetRacialLanguages(player);
     ApplyRuntimeCapabilities(player);
     ApplyUniversalResources(player, true);
-
-    // PLAYERHOOK_ON_CREATE runs after AzerothCore's original creation
-    // transaction. Persist the completed class baseline before the temporary
-    // Player object is destroyed.
     player->SaveToDB(false, false);
 }
 
 // ---------------------------------------------------------------------------
-// Draft card catalog
+// External SpellDraft runtime data
 // ---------------------------------------------------------------------------
+std::string Trim(std::string value)
+{
+    auto notSpace = [](unsigned char c) { return !std::isspace(c); };
+    value.erase(value.begin(), std::find_if(value.begin(), value.end(), notSpace));
+    value.erase(std::find_if(value.rbegin(), value.rend(), notSpace).base(), value.end());
+    return value;
+}
+
+std::string Lower(std::string value)
+{
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c)
+    {
+        return static_cast<char>(std::tolower(c));
+    });
+    return value;
+}
+
+std::vector<std::string> Split(std::string const& value, char separator)
+{
+    std::vector<std::string> result;
+    std::stringstream input(value);
+    std::string token;
+    while (std::getline(input, token, separator))
+        result.push_back(token);
+    if (!value.empty() && value.back() == separator)
+        result.emplace_back();
+    return result;
+}
+
+bool ParseUInt(std::string const& raw, uint32& value)
+{
+    try
+    {
+        size_t consumed = 0;
+        unsigned long parsed = std::stoul(Trim(raw), &consumed);
+        std::string clean = Trim(raw);
+        if (clean.empty() || consumed != clean.size())
+            return false;
+        value = static_cast<uint32>(parsed);
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
+std::string DraftRuntimeDirectory()
+{
+    std::string dataDir = sConfigMgr->GetOption<std::string>("DataDir", ".");
+    if (dataDir.empty())
+        dataDir = ".";
+    char last = dataDir.back();
+    if (last != '/' && last != '\\')
+        dataDir += '/';
+    return dataDir + "spelldraft/";
+}
+
+uint32 ReadOption(std::unordered_map<std::string, std::string> const& values, std::string const& key, uint32 fallback)
+{
+    auto itr = values.find(key);
+    if (itr == values.end())
+        return fallback;
+    uint32 parsed = fallback;
+    return ParseUInt(itr->second, parsed) ? parsed : fallback;
+}
+
+bool LoadDraftConfig(std::string const& path, DraftRuntimeConfig& config, std::string& error)
+{
+    std::ifstream input(path);
+    if (!input.is_open())
+    {
+        error = "cannot open " + path;
+        return false;
+    }
+
+    std::unordered_map<std::string, std::string> values;
+    std::string section;
+    std::string line;
+    while (std::getline(input, line))
+    {
+        line = Trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == ';')
+            continue;
+        if (line.front() == '[' && line.back() == ']')
+        {
+            section = Trim(line.substr(1, line.size() - 2));
+            continue;
+        }
+        size_t equal = line.find('=');
+        if (equal == std::string::npos || section.empty())
+            continue;
+        std::string key = section + "." + Trim(line.substr(0, equal));
+        values[key] = Trim(line.substr(equal + 1));
+    }
+
+    DraftRuntimeConfig parsed;
+    parsed.offerSize = static_cast<uint8>(std::min<uint32>(ADVENTURER_DRAFT_MAX_OFFER_SIZE,
+        std::max<uint32>(1, ReadOption(values, "Draft.OfferSize", parsed.offerSize))));
+    parsed.initialActivePicks = static_cast<uint16>(ReadOption(values, "Draft.InitialActivePicks", parsed.initialActivePicks));
+    parsed.initialActiveSourceLevelCap = static_cast<uint8>(ReadOption(values, "Draft.InitialActiveSourceLevelCap", parsed.initialActiveSourceLevelCap));
+    parsed.activeDraftFirstLevel = static_cast<uint8>(ReadOption(values, "Draft.ActiveDraftFirstLevel", parsed.activeDraftFirstLevel));
+    parsed.activeDraftEveryLevels = static_cast<uint8>(ReadOption(values, "Draft.ActiveDraftEveryLevels", parsed.activeDraftEveryLevels));
+    parsed.talentDraftFirstLevel = static_cast<uint8>(ReadOption(values, "Draft.TalentDraftFirstLevel", parsed.talentDraftFirstLevel));
+    parsed.talentDraftEveryLevels = static_cast<uint8>(ReadOption(values, "Draft.TalentDraftEveryLevels", parsed.talentDraftEveryLevels));
+
+    parsed.rarityMultipliers[0] = ReadOption(values, "Rarity.CommonWeightMultiplier", parsed.rarityMultipliers[0]);
+    parsed.rarityMultipliers[1] = ReadOption(values, "Rarity.UncommonWeightMultiplier", parsed.rarityMultipliers[1]);
+    parsed.rarityMultipliers[2] = ReadOption(values, "Rarity.RareWeightMultiplier", parsed.rarityMultipliers[2]);
+    parsed.rarityMultipliers[3] = ReadOption(values, "Rarity.EpicWeightMultiplier", parsed.rarityMultipliers[3]);
+    parsed.rarityMultipliers[4] = ReadOption(values, "Rarity.LegendaryWeightMultiplier", parsed.rarityMultipliers[4]);
+
+    parsed.rerollStartingCharges = static_cast<uint16>(ReadOption(values, "Reroll.StartingCharges", parsed.rerollStartingCharges));
+    parsed.rerollGainEveryLevels = static_cast<uint8>(ReadOption(values, "Reroll.GainEveryLevels", parsed.rerollGainEveryLevels));
+    parsed.rerollGainAmount = static_cast<uint16>(ReadOption(values, "Reroll.GainAmount", parsed.rerollGainAmount));
+    parsed.rerollMaxCharges = static_cast<uint16>(ReadOption(values, "Reroll.MaxCharges", parsed.rerollMaxCharges));
+
+    parsed.blessMaxActive = static_cast<uint8>(ReadOption(values, "Bless.MaxActive", parsed.blessMaxActive));
+    parsed.blessWeightMultiplierPercent = ReadOption(values, "Bless.WeightMultiplierPercent", parsed.blessWeightMultiplierPercent);
+
+    parsed.destroyStartingCharges = static_cast<uint16>(ReadOption(values, "Destroy.StartingCharges", parsed.destroyStartingCharges));
+    parsed.destroyGainEveryLevels = static_cast<uint8>(ReadOption(values, "Destroy.GainEveryLevels", parsed.destroyGainEveryLevels));
+    parsed.destroyGainAmount = static_cast<uint16>(ReadOption(values, "Destroy.GainAmount", parsed.destroyGainAmount));
+    parsed.destroyMaxCharges = static_cast<uint16>(ReadOption(values, "Destroy.MaxCharges", parsed.destroyMaxCharges));
+
+    config = parsed;
+    return true;
+}
+
+bool ParseRarity(std::string const& raw, DraftRarity& rarity)
+{
+    std::string value = Lower(Trim(raw));
+    if (value == "common") rarity = DraftRarity::Common;
+    else if (value == "uncommon") rarity = DraftRarity::Uncommon;
+    else if (value == "rare") rarity = DraftRarity::Rare;
+    else if (value == "epic") rarity = DraftRarity::Epic;
+    else if (value == "legendary") rarity = DraftRarity::Legendary;
+    else return false;
+    return true;
+}
+
+bool ParseCardType(std::string const& raw, DraftCardType& type)
+{
+    std::string value = Lower(Trim(raw));
+    if (value == "active") type = DraftCardType::Active;
+    else if (value == "talent") type = DraftCardType::Talent;
+    else return false;
+    return true;
+}
+
+bool ParseRankGrants(std::string const& raw, std::vector<std::vector<uint32>>& ranks)
+{
+    ranks.clear();
+    for (std::string const& rankRaw : Split(Trim(raw), '/'))
+    {
+        if (Trim(rankRaw).empty())
+            return false;
+        std::vector<uint32> grants;
+        for (std::string const& spellRaw : Split(rankRaw, '+'))
+        {
+            uint32 spellId = 0;
+            if (!ParseUInt(spellRaw, spellId) || !spellId)
+                return false;
+            grants.push_back(spellId);
+        }
+        if (grants.empty())
+            return false;
+        ranks.push_back(grants);
+    }
+    return !ranks.empty();
+}
+
+bool ParseRequirements(std::string const& raw, char separator, std::vector<DraftRequirement>& requirements)
+{
+    requirements.clear();
+    std::string clean = Trim(raw);
+    if (clean.empty())
+        return true;
+
+    for (std::string const& itemRaw : Split(clean, separator))
+    {
+        std::string item = Trim(itemRaw);
+        if (item.empty())
+            continue;
+        size_t colon = item.find(':');
+        if (colon == std::string::npos)
+            return false;
+        uint32 cardId = 0;
+        uint32 rank = 0;
+        if (!ParseUInt(item.substr(0, colon), cardId) || !ParseUInt(item.substr(colon + 1), rank) || !cardId || !rank || rank > 255)
+            return false;
+        requirements.push_back({ cardId, static_cast<uint8>(rank) });
+    }
+    return true;
+}
+
+bool ParseUnlocks(std::string const& raw, std::vector<uint32>& unlocks)
+{
+    unlocks.clear();
+    std::string clean = Trim(raw);
+    if (clean.empty())
+        return true;
+    for (std::string const& item : Split(clean, ','))
+    {
+        uint32 cardId = 0;
+        if (!ParseUInt(item, cardId) || !cardId)
+            return false;
+        unlocks.push_back(cardId);
+    }
+    return true;
+}
+
+bool LoadDraftCards(std::string const& path, std::vector<DraftCard>& cards, std::string& error)
+{
+    std::ifstream input(path);
+    if (!input.is_open())
+    {
+        error = "cannot open " + path;
+        return false;
+    }
+
+    std::string header;
+    if (!std::getline(input, header) || header.find("id;key;type;source_level;rarity;weight;rank_grants;") != 0)
+    {
+        error = "unexpected cards.csv header";
+        return false;
+    }
+
+    std::vector<DraftCard> parsed;
+    std::set<uint32> ids;
+    std::set<std::string> keys;
+    std::string line;
+    uint32 lineNumber = 1;
+    while (std::getline(input, line))
+    {
+        ++lineNumber;
+        if (Trim(line).empty() || Trim(line).front() == '#')
+            continue;
+
+        std::vector<std::string> fields = Split(line, ';');
+        if (fields.size() != 12)
+        {
+            error = "cards.csv line " + std::to_string(lineNumber) + " must contain 12 fields";
+            return false;
+        }
+
+        DraftCard card;
+        uint32 sourceLevel = 0;
+        uint32 weight = 0;
+        uint32 cardId = 0;
+        if (!ParseUInt(fields[0], cardId) || !cardId || !ids.insert(cardId).second)
+        {
+            error = "invalid/duplicate card id at line " + std::to_string(lineNumber);
+            return false;
+        }
+        card.id = cardId;
+        card.key = Trim(fields[1]);
+        if (card.key.empty() || !keys.insert(card.key).second)
+        {
+            error = "invalid/duplicate card key at line " + std::to_string(lineNumber);
+            return false;
+        }
+        if (!ParseCardType(fields[2], card.type) || !ParseUInt(fields[3], sourceLevel) || sourceLevel == 0 || sourceLevel > 255)
+        {
+            error = "invalid type/source level at line " + std::to_string(lineNumber);
+            return false;
+        }
+        card.sourceLevel = static_cast<uint8>(sourceLevel);
+        if (!ParseRarity(fields[4], card.rarity) || !ParseUInt(fields[5], weight) || !weight)
+        {
+            error = "invalid rarity/weight at line " + std::to_string(lineNumber);
+            return false;
+        }
+        card.weight = weight;
+        if (!ParseRankGrants(fields[6], card.rankGrants)
+            || !ParseRequirements(fields[7], ',', card.requirementsAll)
+            || !ParseRequirements(fields[8], '|', card.requirementsAny)
+            || !ParseUnlocks(fields[9], card.unlocks))
+        {
+            error = "invalid grants/requirements/unlocks at line " + std::to_string(lineNumber);
+            return false;
+        }
+        std::string replace = Lower(Trim(fields[10]));
+        card.replacesPreviousRank = (replace == "1" || replace == "true" || replace == "yes");
+        card.name = Trim(fields[11]);
+        parsed.push_back(card);
+    }
+
+    if (parsed.empty())
+    {
+        error = "cards.csv contains no cards";
+        return false;
+    }
+
+    for (DraftCard const& card : parsed)
+    {
+        for (DraftRequirement const& requirement : card.requirementsAll)
+            if (!ids.count(requirement.cardId))
+            {
+                error = "card " + std::to_string(card.id) + " requires missing card " + std::to_string(requirement.cardId);
+                return false;
+            }
+        for (DraftRequirement const& requirement : card.requirementsAny)
+            if (!ids.count(requirement.cardId))
+            {
+                error = "card " + std::to_string(card.id) + " requires missing card " + std::to_string(requirement.cardId);
+                return false;
+            }
+        for (uint32 unlock : card.unlocks)
+            if (!ids.count(unlock))
+            {
+                error = "card " + std::to_string(card.id) + " unlocks missing card " + std::to_string(unlock);
+                return false;
+            }
+    }
+
+    cards = std::move(parsed);
+    return true;
+}
+
+std::vector<DraftCard> BuildFallbackDraftCards()
+{
+    return
+    {
+        { 1, "battle_stance", DraftCardType::Active, 1, DraftRarity::Common, 100, {{2457}}, {}, {}, {11, 106}, false, "Battle Stance" },
+        { 2, "fireball", DraftCardType::Active, 1, DraftRarity::Common, 100, {{133}}, {}, {}, {104}, false, "Fireball" },
+        { 3, "frostbolt", DraftCardType::Active, 4, DraftRarity::Common, 100, {{116}}, {}, {}, {105}, false, "Frostbolt" },
+        { 4, "shadow_bolt", DraftCardType::Active, 1, DraftRarity::Common, 100, {{686}}, {}, {}, {}, false, "Shadow Bolt" },
+        { 5, "smite", DraftCardType::Active, 1, DraftRarity::Common, 100, {{585}}, {}, {}, {}, false, "Smite" },
+        { 6, "lightning_bolt", DraftCardType::Active, 1, DraftRarity::Common, 100, {{403}}, {}, {}, {}, false, "Lightning Bolt" },
+        { 7, "wrath", DraftCardType::Active, 1, DraftRarity::Common, 100, {{5176}}, {}, {}, {}, false, "Wrath" },
+        { 8, "heroic_strike", DraftCardType::Active, 1, DraftRarity::Common, 110, {{78}}, {}, {}, {107}, false, "Heroic Strike" },
+        { 9, "rejuvenation", DraftCardType::Active, 4, DraftRarity::Common, 100, {{774}}, {}, {}, {}, false, "Rejuvenation" },
+        { 10, "stealth_kit", DraftCardType::Active, 1, DraftRarity::Uncommon, 120, {{1784, 921}}, {}, {}, {}, false, "Stealth + Pick Pocket" },
+        { 11, "charge", DraftCardType::Active, 4, DraftRarity::Common, 500, {{100}}, {{1, 1}}, {}, {}, false, "Charge" },
+        { 12, "arcane_intellect", DraftCardType::Active, 1, DraftRarity::Common, 90, {{1459}}, {}, {}, {}, false, "Arcane Intellect" },
+        { 13, "healing_wave", DraftCardType::Active, 1, DraftRarity::Common, 100, {{331}}, {}, {}, {}, false, "Healing Wave" },
+        { 14, "sinister_strike", DraftCardType::Active, 1, DraftRarity::Common, 100, {{1752}}, {}, {}, {}, false, "Sinister Strike" },
+        { 101, "cruelty", DraftCardType::Talent, 10, DraftRarity::Common, 120, {{12320},{12852},{12853},{12855},{12856}}, {}, {}, {}, true, "Cruelty" },
+        { 102, "deflection", DraftCardType::Talent, 10, DraftRarity::Common, 100, {{16462},{16463},{16464},{16465},{16466}}, {}, {}, {}, true, "Deflection" },
+        { 103, "anticipation", DraftCardType::Talent, 10, DraftRarity::Common, 90, {{12297},{12750},{12751},{12752},{12753}}, {}, {}, {}, true, "Anticipation" },
+        { 104, "improved_fireball", DraftCardType::Talent, 10, DraftRarity::Uncommon, 180, {{11069},{12338},{12339},{12340},{12341}}, {{2,1}}, {}, {}, true, "Improved Fireball" },
+        { 105, "improved_frostbolt", DraftCardType::Talent, 10, DraftRarity::Uncommon, 180, {{11070},{12473},{16763},{16765},{16766}}, {{3,1}}, {}, {}, true, "Improved Frostbolt" },
+        { 106, "tactical_mastery", DraftCardType::Talent, 10, DraftRarity::Uncommon, 250, {{12295},{12676},{12677}}, {{1,1}}, {}, {}, true, "Tactical Mastery" },
+        { 107, "improved_heroic_strike", DraftCardType::Talent, 10, DraftRarity::Uncommon, 180, {{12282},{12663},{12664}}, {{8,1}}, {}, {}, true, "Improved Heroic Strike" },
+    };
+}
+
+void ReloadDraftRuntimeData()
+{
+    std::string directory = DraftRuntimeDirectory();
+
+    DraftRuntimeConfig nextConfig = draftRuntime.loaded ? draftRuntime.config : DraftRuntimeConfig{};
+    std::string configError;
+    DraftRuntimeConfig parsedConfig;
+    if (LoadDraftConfig(directory + "spelldraft.conf", parsedConfig, configError))
+        nextConfig = parsedConfig;
+    else if (!draftRuntime.loaded)
+        std::cerr << "Adventurer SpellDraft: " << configError << "; using compiled defaults\n";
+
+    std::vector<DraftCard> nextCards;
+    std::string cardsError;
+    bool cardsLoaded = LoadDraftCards(directory + "cards.csv", nextCards, cardsError);
+    if (!cardsLoaded)
+    {
+        if (draftRuntime.cards.empty())
+            nextCards = BuildFallbackDraftCards();
+        else
+            nextCards = draftRuntime.cards;
+        std::cerr << "Adventurer SpellDraft: " << cardsError << "; keeping last valid catalog\n";
+    }
+
+    draftRuntime.config = nextConfig;
+    draftRuntime.cards = std::move(nextCards);
+    draftRuntime.loaded = true;
+}
+
+void EnsureDraftRuntimeLoaded()
+{
+    if (!draftRuntime.loaded)
+        ReloadDraftRuntimeData();
+}
+
+DraftRuntimeConfig const& GetDraftConfig()
+{
+    EnsureDraftRuntimeLoaded();
+    return draftRuntime.config;
+}
+
 std::vector<DraftCard> const& GetDraftCards()
 {
-    static std::vector<DraftCard> const cards =
-    {
-        // ACTIVE ROOTS -------------------------------------------------------
-        // id, type, rarity, weight, rank grants, requirements, unlocks, replace
-        { 1,  DraftCardType::Active, DraftRarity::Common,   100, {{2457}},      {},          {11, 106}, false }, // Battle Stance
-        { 2,  DraftCardType::Active, DraftRarity::Common,   100, {{133}},       {},          {104},     false }, // Fireball
-        { 3,  DraftCardType::Active, DraftRarity::Common,   100, {{116}},       {},          {105},     false }, // Frostbolt
-        { 4,  DraftCardType::Active, DraftRarity::Common,   100, {{686}},       {},          {},        false }, // Shadow Bolt
-        { 5,  DraftCardType::Active, DraftRarity::Common,   100, {{585}},       {},          {},        false }, // Smite
-        { 6,  DraftCardType::Active, DraftRarity::Common,   100, {{403}},       {},          {},        false }, // Lightning Bolt
-        { 7,  DraftCardType::Active, DraftRarity::Common,   100, {{5176}},      {},          {},        false }, // Wrath
-        { 8,  DraftCardType::Active, DraftRarity::Common,   110, {{78}},        {},          {107},     false }, // Heroic Strike
-        { 9,  DraftCardType::Active, DraftRarity::Common,   100, {{774}},       {},          {},        false }, // Rejuvenation
-        { 10, DraftCardType::Active, DraftRarity::Uncommon, 120, {{1784, 921}}, {},          {},        false }, // Stealth + Pick Pocket bundle
-        { 11, DraftCardType::Active, DraftRarity::Common,   500, {{100}},       {{1, 1}},    {},        false }, // Charge: x5 weight after Battle Stance
-        { 12, DraftCardType::Active, DraftRarity::Common,    90, {{1459}},      {},          {},        false }, // Arcane Intellect
-        { 13, DraftCardType::Active, DraftRarity::Common,   100, {{331}},       {},          {},        false }, // Healing Wave
-        { 14, DraftCardType::Active, DraftRarity::Common,   100, {{1752}},      {},          {},        false }, // Sinister Strike
-
-        // PASSIVE / TALENT CARDS -------------------------------------------
-        // Passive ranks are separate draft investments. Higher ranks replace
-        // the previous rank spell so their auras never stack accidentally.
-        { 101, DraftCardType::Talent, DraftRarity::Common,   120,
-            {{12320}, {12852}, {12853}, {12855}, {12856}}, {}, {}, true }, // Cruelty 1/5 -> 5/5
-        { 102, DraftCardType::Talent, DraftRarity::Common,   100,
-            {{16462}, {16463}, {16464}, {16465}, {16466}}, {}, {}, true }, // Deflection 1/5 -> 5/5
-        { 103, DraftCardType::Talent, DraftRarity::Common,    90,
-            {{12297}, {12750}, {12751}, {12752}, {12753}}, {}, {}, true }, // Anticipation 1/5 -> 5/5
-        { 104, DraftCardType::Talent, DraftRarity::Uncommon, 180,
-            {{11069}, {12338}, {12339}, {12340}, {12341}}, {{2, 1}}, {}, true }, // Improved Fireball
-        { 105, DraftCardType::Talent, DraftRarity::Uncommon, 180,
-            {{11070}, {12473}, {16763}, {16765}, {16766}}, {{3, 1}}, {}, true }, // Improved Frostbolt
-        { 106, DraftCardType::Talent, DraftRarity::Uncommon, 250,
-            {{12295}, {12676}, {12677}}, {{1, 1}}, {}, true }, // Tactical Mastery after Battle Stance
-        { 107, DraftCardType::Talent, DraftRarity::Uncommon, 180,
-            {{12282}, {12663}, {12664}}, {{8, 1}}, {}, true }, // Improved Heroic Strike
-    };
-    return cards;
+    EnsureDraftRuntimeLoaded();
+    return draftRuntime.cards;
 }
 
 DraftCard const* FindDraftCard(uint32 cardId)
@@ -391,21 +770,47 @@ uint8 GetOwnedRank(DraftState const& state, uint32 cardId)
     return itr == state.ownedRanks.end() ? 0 : itr->second;
 }
 
+bool RequirementMet(DraftState const& state, DraftRequirement const& requirement)
+{
+    return GetOwnedRank(state, requirement.cardId) >= requirement.minimumRank;
+}
+
 bool MeetsRequirements(DraftState const& state, DraftCard const& card)
 {
-    for (DraftRequirement const& requirement : card.requirements)
-        if (GetOwnedRank(state, requirement.cardId) < requirement.minimumRank)
+    for (DraftRequirement const& requirement : card.requirementsAll)
+        if (!RequirementMet(state, requirement))
             return false;
+
+    if (!card.requirementsAny.empty())
+    {
+        bool any = false;
+        for (DraftRequirement const& requirement : card.requirementsAny)
+            if (RequirementMet(state, requirement))
+            {
+                any = true;
+                break;
+            }
+        if (!any)
+            return false;
+    }
+
     return true;
 }
 
-bool IsCardEligible(DraftState const& state, DraftCard const& card, DraftCardType type)
+bool IsCardEligible(Player const* player, DraftState const& state, DraftCard const& card, DraftCardType type)
 {
-    if (card.type != type || card.rankGrants.empty())
+    if (card.type != type || card.rankGrants.empty() || state.destroyedCards.count(card.id))
         return false;
 
     uint8 currentRank = GetOwnedRank(state, card.id);
     if (currentRank >= card.rankGrants.size())
+        return false;
+
+    uint32 playerLevel = player ? player->GetLevel() : 1;
+    uint32 sourceCap = playerLevel;
+    if (type == DraftCardType::Active)
+        sourceCap = std::max<uint32>(sourceCap, GetDraftConfig().initialActiveSourceLevelCap);
+    if (card.sourceLevel > sourceCap)
         return false;
 
     return MeetsRequirements(state, card);
@@ -413,46 +818,46 @@ bool IsCardEligible(DraftState const& state, DraftCard const& card, DraftCardTyp
 
 uint32 RarityWeightMultiplier(DraftRarity rarity)
 {
-    switch (rarity)
-    {
-        case DraftRarity::Common:    return 100;
-        case DraftRarity::Uncommon:  return 55;
-        case DraftRarity::Rare:      return 25;
-        case DraftRarity::Epic:      return 10;
-        case DraftRarity::Legendary: return 3;
-        default:                     return 1;
-    }
+    size_t index = static_cast<size_t>(rarity);
+    auto const& values = GetDraftConfig().rarityMultipliers;
+    return index < values.size() ? values[index] : 1;
 }
 
-uint32 EffectiveCardWeight(DraftCard const& card)
+uint32 EffectiveCardWeight(DraftState const& state, DraftCard const& card)
 {
     uint64 weighted = uint64(card.weight) * RarityWeightMultiplier(card.rarity);
-    return std::max<uint32>(1, static_cast<uint32>(weighted / ADVENTURER_DRAFT_STANDARD_WEIGHT));
+    weighted = std::max<uint64>(1, weighted / ADVENTURER_DRAFT_STANDARD_WEIGHT);
+
+    DraftRuntimeConfig const& config = GetDraftConfig();
+    if (config.blessMaxActive > 0 && state.blessedCardId == card.id)
+        weighted = std::max<uint64>(1, weighted * config.blessWeightMultiplierPercent / 100);
+
+    return static_cast<uint32>(std::min<uint64>(weighted, 0xFFFFFFFFull));
 }
 
-std::vector<uint32> SelectWeightedCards(DraftState const& state, DraftCardType type, uint32 count)
+std::vector<uint32> SelectWeightedCards(Player* player, DraftState const& state, DraftCardType type, uint32 count, std::set<uint32> const& excluded)
 {
     std::vector<DraftCard const*> candidates;
     for (DraftCard const& card : GetDraftCards())
-        if (IsCardEligible(state, card, type))
+        if (!excluded.count(card.id) && IsCardEligible(player, state, card, type))
             candidates.push_back(&card);
 
     std::vector<uint32> selected;
     while (!candidates.empty() && selected.size() < count)
     {
-        uint32 totalWeight = 0;
+        uint64 total64 = 0;
         for (DraftCard const* card : candidates)
-            totalWeight += EffectiveCardWeight(*card);
-
+            total64 += EffectiveCardWeight(state, *card);
+        uint32 totalWeight = static_cast<uint32>(std::min<uint64>(total64, 0xFFFFFFFFull));
         if (!totalWeight)
             break;
 
         uint32 roll = urand(1, totalWeight);
-        uint32 cursor = 0;
+        uint64 cursor = 0;
         size_t chosenIndex = 0;
         for (size_t i = 0; i < candidates.size(); ++i)
         {
-            cursor += EffectiveCardWeight(*candidates[i]);
+            cursor += EffectiveCardWeight(state, *candidates[i]);
             if (roll <= cursor)
             {
                 chosenIndex = i;
@@ -468,10 +873,10 @@ std::vector<uint32> SelectWeightedCards(DraftState const& state, DraftCardType t
 }
 
 // ---------------------------------------------------------------------------
-// Draft state persistence: use AzerothCore's existing character_settings table
-// instead of adding a prestige table or another schema dependency.
-// Format:
-// schema,processedLevel,pendingActive,pendingTalent,offerType,o1,o2,o3,card:rank...
+// Draft persistence
+// v1: schema,level,pendingA,pendingT,type,o1,o2,o3,card:rank...
+// v2: schema,level,pendingA,pendingT,type,o1,o2,o3,rerolls,destroys,blessed,
+//     oCARD:RANK...,xCARD...
 // ---------------------------------------------------------------------------
 std::string SerializeDraftState(DraftState const& state)
 {
@@ -483,28 +888,30 @@ std::string SerializeDraftState(DraftState const& state)
         << ',' << uint32(state.offerType)
         << ',' << state.offeredCards[0]
         << ',' << state.offeredCards[1]
-        << ',' << state.offeredCards[2];
+        << ',' << state.offeredCards[2]
+        << ',' << state.rerollCharges
+        << ',' << state.destroyCharges
+        << ',' << state.blessedCardId;
 
     for (auto const& [cardId, rank] : state.ownedRanks)
-        out << ',' << cardId << ':' << uint32(rank);
+        out << ",o" << cardId << ':' << uint32(rank);
+    for (uint32 cardId : state.destroyedCards)
+        out << ",x" << cardId;
 
     return out.str();
 }
 
 bool DeserializeDraftState(std::string const& data, DraftState& state)
 {
-    std::vector<std::string> tokens;
-    std::stringstream input(data);
-    std::string token;
-    while (std::getline(input, token, ','))
-        tokens.push_back(token);
-
+    EnsureDraftRuntimeLoaded();
+    std::vector<std::string> tokens = Split(data, ',');
     if (tokens.size() < 8)
         return false;
 
     try
     {
-        if (std::stoul(tokens[0]) != ADVENTURER_DRAFT_SCHEMA)
+        uint32 schema = std::stoul(tokens[0]);
+        if (schema != 1 && schema != ADVENTURER_DRAFT_SCHEMA)
             return false;
 
         state = DraftState{};
@@ -516,16 +923,56 @@ bool DeserializeDraftState(std::string const& data, DraftState& state)
         state.offeredCards[1] = static_cast<uint32>(std::stoul(tokens[6]));
         state.offeredCards[2] = static_cast<uint32>(std::stoul(tokens[7]));
 
-        for (size_t i = 8; i < tokens.size(); ++i)
+        size_t firstDynamic = 8;
+        if (schema == ADVENTURER_DRAFT_SCHEMA)
         {
-            size_t separator = tokens[i].find(':');
-            if (separator == std::string::npos)
+            if (tokens.size() < 11)
+                return false;
+            state.rerollCharges = static_cast<uint16>(std::stoul(tokens[8]));
+            state.destroyCharges = static_cast<uint16>(std::stoul(tokens[9]));
+            state.blessedCardId = static_cast<uint32>(std::stoul(tokens[10]));
+            firstDynamic = 11;
+        }
+        else
+        {
+            state.rerollCharges = GetDraftConfig().rerollStartingCharges;
+            state.destroyCharges = GetDraftConfig().destroyStartingCharges;
+        }
+
+        for (size_t i = firstDynamic; i < tokens.size(); ++i)
+        {
+            std::string token = tokens[i];
+            if (token.empty())
                 continue;
 
-            uint32 cardId = static_cast<uint32>(std::stoul(tokens[i].substr(0, separator)));
-            uint8 rank = static_cast<uint8>(std::stoul(tokens[i].substr(separator + 1)));
-            if (cardId && rank)
-                state.ownedRanks[cardId] = rank;
+            if (schema == 1)
+            {
+                size_t separator = token.find(':');
+                if (separator == std::string::npos)
+                    continue;
+                uint32 cardId = static_cast<uint32>(std::stoul(token.substr(0, separator)));
+                uint8 rank = static_cast<uint8>(std::stoul(token.substr(separator + 1)));
+                if (cardId && rank)
+                    state.ownedRanks[cardId] = rank;
+                continue;
+            }
+
+            if (token[0] == 'o')
+            {
+                size_t separator = token.find(':');
+                if (separator == std::string::npos)
+                    continue;
+                uint32 cardId = static_cast<uint32>(std::stoul(token.substr(1, separator - 1)));
+                uint8 rank = static_cast<uint8>(std::stoul(token.substr(separator + 1)));
+                if (cardId && rank)
+                    state.ownedRanks[cardId] = rank;
+            }
+            else if (token[0] == 'x')
+            {
+                uint32 cardId = static_cast<uint32>(std::stoul(token.substr(1)));
+                if (cardId)
+                    state.destroyedCards.insert(cardId);
+            }
         }
     }
     catch (...)
@@ -536,16 +983,45 @@ bool DeserializeDraftState(std::string const& data, DraftState& state)
     return true;
 }
 
+bool IsScheduledLevel(uint32 level, uint32 firstLevel, uint32 everyLevels)
+{
+    return everyLevels > 0 && level >= firstLevel && ((level - firstLevel) % everyLevels) == 0;
+}
+
+void AddCharge(uint16& charges, uint16 amount, uint16 maximum)
+{
+    uint32 next = uint32(charges) + amount;
+    if (maximum > 0)
+        next = std::min<uint32>(next, maximum);
+    charges = static_cast<uint16>(std::min<uint32>(next, 65535));
+}
+
+void ApplyLevelRewards(DraftState& state, uint32 level)
+{
+    DraftRuntimeConfig const& config = GetDraftConfig();
+    if (IsScheduledLevel(level, config.activeDraftFirstLevel, config.activeDraftEveryLevels))
+        ++state.pendingActive;
+    if (IsScheduledLevel(level, config.talentDraftFirstLevel, config.talentDraftEveryLevels))
+        ++state.pendingTalent;
+
+    if (config.rerollGainEveryLevels > 0 && level > 1 && (level % config.rerollGainEveryLevels) == 0)
+        AddCharge(state.rerollCharges, config.rerollGainAmount, config.rerollMaxCharges);
+    if (config.destroyGainEveryLevels > 0 && level > 1 && (level % config.destroyGainEveryLevels) == 0)
+        AddCharge(state.destroyCharges, config.destroyGainAmount, config.destroyMaxCharges);
+}
+
 DraftState BuildFreshDraftState(uint8 currentLevel)
 {
+    ReloadDraftRuntimeData();
+    DraftRuntimeConfig const& config = GetDraftConfig();
     DraftState state;
     state.processedLevel = currentLevel;
-    state.pendingActive = 3; // Level 1: three sequential active picks.
+    state.pendingActive = config.initialActivePicks;
+    state.rerollCharges = config.rerollStartingCharges;
+    state.destroyCharges = config.destroyStartingCharges;
 
-    for (uint32 level = 5; level <= currentLevel; level += 5)
-        ++state.pendingActive;
-    if (currentLevel >= 10)
-        state.pendingTalent = currentLevel - 9;
+    for (uint32 level = 1; level <= currentLevel; ++level)
+        ApplyLevelRewards(state, level);
 
     return state;
 }
@@ -594,20 +1070,13 @@ void QueueDraftProgressionToLevel(DraftState& state, uint8 currentLevel)
         return;
 
     for (uint32 level = uint32(state.processedLevel) + 1; level <= currentLevel; ++level)
-    {
-        if ((level % 5) == 0)
-            ++state.pendingActive;
-        if (level >= 10)
-            ++state.pendingTalent;
-    }
+        ApplyLevelRewards(state, level);
 
     state.processedLevel = currentLevel;
 }
 
 DraftCardType NextPendingDraftType(DraftState const& state)
 {
-    // At 10/15/20/etc. active always resolves first, so it can unlock a passive
-    // that is immediately eligible for the same level's talent draft.
     if (state.pendingActive > 0)
         return DraftCardType::Active;
     if (state.pendingTalent > 0)
@@ -621,9 +1090,20 @@ void ClearDraftOffer(DraftState& state)
     state.offeredCards = { 0, 0, 0 };
 }
 
-bool ExistingOfferIsValid(DraftState const& state, DraftCardType expectedType)
+uint32 OfferedCardCount(DraftState const& state)
+{
+    uint32 count = 0;
+    for (uint32 cardId : state.offeredCards)
+        if (cardId)
+            ++count;
+    return count;
+}
+
+bool ExistingOfferIsValid(Player* player, DraftState const& state, DraftCardType expectedType)
 {
     if (state.offerType != expectedType || state.offeredCards[0] == 0)
+        return false;
+    if (OfferedCardCount(state) != GetDraftConfig().offerSize)
         return false;
 
     for (uint32 cardId : state.offeredCards)
@@ -631,16 +1111,33 @@ bool ExistingOfferIsValid(DraftState const& state, DraftCardType expectedType)
         if (!cardId)
             continue;
         DraftCard const* card = FindDraftCard(cardId);
-        if (!card || !IsCardEligible(state, *card, expectedType))
+        if (!card || !IsCardEligible(player, state, *card, expectedType))
             return false;
     }
     return true;
 }
 
-void GenerateDraftOffer(DraftState& state, DraftCardType type)
+void GenerateDraftOffer(Player* player, DraftState& state, DraftCardType type, bool avoidCurrent)
 {
+    std::set<uint32> previous;
+    if (avoidCurrent)
+        for (uint32 cardId : state.offeredCards)
+            if (cardId)
+                previous.insert(cardId);
+
     ClearDraftOffer(state);
-    std::vector<uint32> selected = SelectWeightedCards(state, type, 3);
+    uint32 desired = GetDraftConfig().offerSize;
+    std::vector<uint32> selected = SelectWeightedCards(player, state, type, desired, previous);
+
+    if (selected.size() < desired && avoidCurrent)
+    {
+        std::set<uint32> excluded(selected.begin(), selected.end());
+        std::vector<uint32> fallback = SelectWeightedCards(player, state, type, desired - selected.size(), excluded);
+        for (uint32 cardId : fallback)
+            if (std::find(selected.begin(), selected.end(), cardId) == selected.end())
+                selected.push_back(cardId);
+    }
+
     if (selected.empty())
         return;
 
@@ -649,21 +1146,35 @@ void GenerateDraftOffer(DraftState& state, DraftCardType type)
         state.offeredCards[i] = selected[i];
 }
 
-void SendDraftClosed(Player* player)
+void SendDraftMeta(Player* player, DraftState const& state)
 {
-    SendAddonPayload(player, ADVENTURER_DRAFT_PREFIX, "C");
+    std::ostringstream payload;
+    payload << "M|" << state.rerollCharges
+            << '|' << state.destroyCharges
+            << '|' << state.blessedCardId
+            << '|' << (GetDraftConfig().blessMaxActive > 0 ? GetDraftConfig().blessWeightMultiplierPercent : 0);
+    SendAddonPayload(player, ADVENTURER_DRAFT_PREFIX, payload.str());
 }
 
-void SendDraftError(Player* player, char const* code)
+void SendDraftClosed(Player* player, DraftState const* state = nullptr)
+{
+    SendAddonPayload(player, ADVENTURER_DRAFT_PREFIX, "C");
+    if (state)
+        SendDraftMeta(player, *state);
+}
+
+void SendDraftError(Player* player, char const* code, DraftState const* state = nullptr)
 {
     SendAddonPayload(player, ADVENTURER_DRAFT_PREFIX, std::string("E|") + code);
+    if (state)
+        SendDraftMeta(player, *state);
 }
 
 void SendDraftOffer(Player* player, DraftState const& state)
 {
     if (state.offerType == DraftCardType::None || !state.offeredCards[0])
     {
-        SendDraftClosed(player);
+        SendDraftClosed(player, &state);
         return;
     }
 
@@ -706,28 +1217,30 @@ void SendDraftOffer(Player* player, DraftState const& state)
     }
 
     SendAddonPayload(player, ADVENTURER_DRAFT_PREFIX, payload.str());
+    SendDraftMeta(player, state);
 }
 
 void EnsureDraftOffer(Player* player, DraftState& state)
 {
+    ReloadDraftRuntimeData();
     DraftCardType nextType = NextPendingDraftType(state);
     if (nextType == DraftCardType::None)
     {
         ClearDraftOffer(state);
         PersistDraftState(player, state);
-        SendDraftClosed(player);
+        SendDraftClosed(player, &state);
         return;
     }
 
-    if (!ExistingOfferIsValid(state, nextType))
+    if (!ExistingOfferIsValid(player, state, nextType))
     {
-        GenerateDraftOffer(state, nextType);
+        GenerateDraftOffer(player, state, nextType, false);
         PersistDraftState(player, state);
     }
 
     if (state.offerType == DraftCardType::None || !state.offeredCards[0])
     {
-        SendDraftError(player, nextType == DraftCardType::Active ? "NO_ACTIVE_CARDS" : "NO_TALENT_CARDS");
+        SendDraftError(player, nextType == DraftCardType::Active ? "NO_ACTIVE_CARDS" : "NO_TALENT_CARDS", &state);
         return;
     }
 
@@ -840,6 +1353,8 @@ void ApplyDraftCard(Player* player, DraftState& state, DraftCard const& card)
             player->learnSpell(spellId);
 
     state.ownedRanks[card.id] = nextRank;
+    if (state.blessedCardId == card.id && nextRank >= card.rankGrants.size())
+        state.blessedCardId = 0;
 
     if (card.type == DraftCardType::Active && state.pendingActive > 0)
         --state.pendingActive;
@@ -850,10 +1365,6 @@ void ApplyDraftCard(Player* player, DraftState& state, DraftCard const& card)
     UpgradeDraftedActiveSpells(player, state);
     PersistDraftState(player, state);
     player->SaveToDB(false, false);
-
-    // Generate the next unresolved pick immediately. This is what makes the
-    // level-1 three-pick sequence feel like one draft session and also ensures
-    // level 10 active -> talent ordering sees newly unlocked passive cards.
     EnsureDraftOffer(player, state);
 }
 
@@ -863,14 +1374,14 @@ void HandleDraftPick(Player* player, uint32 cardId)
     DraftCard const* card = FindDraftCard(cardId);
     if (!card || !IsCardInCurrentOffer(state, cardId))
     {
-        SendDraftError(player, "INVALID_PICK");
+        SendDraftError(player, "INVALID_PICK", &state);
         EnsureDraftOffer(player, state);
         return;
     }
 
-    if (card->type != state.offerType || !IsCardEligible(state, *card, state.offerType))
+    if (card->type != state.offerType || !IsCardEligible(player, state, *card, state.offerType))
     {
-        SendDraftError(player, "INELIGIBLE_PICK");
+        SendDraftError(player, "INELIGIBLE_PICK", &state);
         ClearDraftOffer(state);
         EnsureDraftOffer(player, state);
         return;
@@ -879,8 +1390,108 @@ void HandleDraftPick(Player* player, uint32 cardId)
     ApplyDraftCard(player, state, *card);
 }
 
+void HandleDraftReroll(Player* player)
+{
+    DraftState& state = GetDraftState(player);
+    QueueDraftProgressionToLevel(state, player->GetLevel());
+    EnsureDraftOffer(player, state);
+    if (state.offerType == DraftCardType::None || !state.offeredCards[0])
+        return;
+    if (state.rerollCharges == 0)
+    {
+        SendDraftError(player, "NO_REROLLS", &state);
+        return;
+    }
+
+    --state.rerollCharges;
+    GenerateDraftOffer(player, state, state.offerType, true);
+    PersistDraftState(player, state);
+    if (!state.offeredCards[0])
+        SendDraftError(player, "NO_REROLL_CARDS", &state);
+    else
+        SendDraftOffer(player, state);
+}
+
+void HandleDraftBless(Player* player, uint32 cardId)
+{
+    DraftState& state = GetDraftState(player);
+    DraftRuntimeConfig const& config = GetDraftConfig();
+    if (config.blessMaxActive == 0 || config.blessWeightMultiplierPercent == 0)
+    {
+        SendDraftError(player, "BLESS_DISABLED", &state);
+        return;
+    }
+
+    DraftCard const* card = FindDraftCard(cardId);
+    if (!card || !IsCardInCurrentOffer(state, cardId) || !IsCardEligible(player, state, *card, state.offerType))
+    {
+        SendDraftError(player, "INVALID_BLESS", &state);
+        return;
+    }
+
+    state.blessedCardId = cardId;
+    PersistDraftState(player, state);
+    SendDraftMeta(player, state);
+}
+
+void ReplaceDestroyedOfferSlot(Player* player, DraftState& state, size_t slot)
+{
+    std::set<uint32> excluded;
+    for (uint32 cardId : state.offeredCards)
+        if (cardId)
+            excluded.insert(cardId);
+
+    std::vector<uint32> replacement = SelectWeightedCards(player, state, state.offerType, 1, excluded);
+    state.offeredCards[slot] = replacement.empty() ? 0 : replacement.front();
+}
+
+void HandleDraftDestroy(Player* player, uint32 cardId)
+{
+    DraftState& state = GetDraftState(player);
+    if (state.destroyCharges == 0)
+    {
+        SendDraftError(player, "NO_DESTROYS", &state);
+        return;
+    }
+
+    DraftCard const* card = FindDraftCard(cardId);
+    if (!card || !IsCardInCurrentOffer(state, cardId) || !IsCardEligible(player, state, *card, state.offerType))
+    {
+        SendDraftError(player, "INVALID_DESTROY", &state);
+        return;
+    }
+
+    size_t slot = 0;
+    while (slot < state.offeredCards.size() && state.offeredCards[slot] != cardId)
+        ++slot;
+    if (slot >= state.offeredCards.size())
+    {
+        SendDraftError(player, "INVALID_DESTROY", &state);
+        return;
+    }
+
+    DraftState previous = state;
+    --state.destroyCharges;
+    state.destroyedCards.insert(cardId);
+    if (state.blessedCardId == cardId)
+        state.blessedCardId = 0;
+    state.offeredCards[slot] = 0;
+    ReplaceDestroyedOfferSlot(player, state, slot);
+
+    if (OfferedCardCount(state) == 0)
+    {
+        state = previous;
+        SendDraftError(player, "CANNOT_DESTROY_LAST_CARD", &state);
+        return;
+    }
+
+    PersistDraftState(player, state);
+    SendDraftOffer(player, state);
+}
+
 void HandleDraftReady(Player* player)
 {
+    ReloadDraftRuntimeData();
     DraftState& state = GetDraftState(player);
     QueueDraftProgressionToLevel(state, player->GetLevel());
     PersistDraftState(player, state);
@@ -921,9 +1532,10 @@ public:
         {
             ApplyRuntimeCapabilities(player);
             player->SetFreeTalentPoints(0);
-            player->SetAcceptWhispers(true); // internal self-whisper draft protocol
+            player->SetAcceptWhispers(true);
             comboSyncStates.erase(player->GetGUID().GetRawValue());
 
+            ReloadDraftRuntimeData();
             DraftState& state = GetDraftState(player);
             QueueDraftProgressionToLevel(state, player->GetLevel());
             RestoreDraftedSpells(player, state);
@@ -957,6 +1569,7 @@ public:
         ApplyRuntimeCapabilities(player);
         player->SetFreeTalentPoints(0);
 
+        ReloadDraftRuntimeData();
         DraftState& state = GetDraftState(player);
         QueueDraftProgressionToLevel(state, player->GetLevel());
         UpgradeDraftedActiveSpells(player, state);
@@ -980,20 +1593,35 @@ public:
             HandleDraftReady(player);
             return false;
         }
-
-        if (msg.rfind(DRAFT_PICK_PREFIX, 0) == 0)
+        if (msg == DRAFT_REROLL_MESSAGE)
         {
+            HandleDraftReroll(player);
+            return false;
+        }
+
+        auto parseCardCommand = [&](char const* prefix, auto handler) -> bool
+        {
+            size_t length = std::char_traits<char>::length(prefix);
+            if (msg.rfind(prefix, 0) != 0)
+                return false;
             try
             {
-                uint32 cardId = static_cast<uint32>(std::stoul(msg.substr(sizeof(DRAFT_PICK_PREFIX) - 1)));
-                HandleDraftPick(player, cardId);
+                uint32 cardId = static_cast<uint32>(std::stoul(msg.substr(length)));
+                handler(player, cardId);
             }
             catch (...)
             {
                 SendDraftError(player, "BAD_PICK_FORMAT");
             }
+            return true;
+        };
+
+        if (parseCardCommand(DRAFT_PICK_PREFIX, HandleDraftPick))
             return false;
-        }
+        if (parseCardCommand(DRAFT_BLESS_PREFIX, HandleDraftBless))
+            return false;
+        if (parseCardCommand(DRAFT_DESTROY_PREFIX, HandleDraftDestroy))
+            return false;
 
         return true;
     }
@@ -1003,8 +1631,6 @@ public:
         if (!IsAdventurer(player))
             return;
 
-        // Preserve native-sized floors for the two auxiliary pools while still
-        // allowing talents/auras to increase them above the baseline.
         switch (power)
         {
             case POWER_RAGE:
@@ -1023,7 +1649,7 @@ public:
         if (!IsAdventurer(player))
             return false;
         if (player->getPowerType() == power)
-            return false; // Native Mana continues through AzerothCore's stock path.
+            return false;
 
         switch (power)
         {
