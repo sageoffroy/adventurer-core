@@ -31,6 +31,14 @@ AC_API_EXPORT std::size_t EnumUtils<Classes>::Count() { return 10; }
         case CLASS_DRUID: return 9;
 """
 
+DBC_STRUCTURE = """#define MAX_TALENT_RANK 5
+#define MAX_PET_TALENT_RANK 3
+#define MAX_TALENT_TABS 3
+"""
+
+DBC_STORES = """static uint32 sTalentTabPages[MAX_CLASSES][3];
+"""
+
 STAT = """    0.9830f,  // Warlock
     0.0f,     // ??
     0.9720f   // Druid
@@ -209,6 +217,8 @@ void AddCustomScripts()
 FILES = {
     "src/server/shared/SharedDefines.h": SHARED,
     "src/server/shared/enuminfo_SharedDefines.cpp": ENUMINFO,
+    "src/server/shared/DataStores/DBCStructure.h": DBC_STRUCTURE,
+    "src/server/game/DataStores/DBCStores.cpp": DBC_STORES,
     "src/server/game/Entities/Unit/StatSystem.cpp": STAT,
     "src/server/game/Entities/Player/PlayerStorage.cpp": ALLOWABLE,
     "src/server/game/Entities/Player/Player.cpp": PLAYER,
@@ -232,7 +242,13 @@ class CorePatchTests(unittest.TestCase):
             core = Path(td)
             payload = self.make_tree(core)
             first = plan(core, payload)
-            self.assertEqual(len(first), 7)
+            self.assertEqual(len(first), 9)
+
+            dbc_structure = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("DBCStructure.h"))
+            self.assertIn("#define MAX_TALENT_TABS 4", dbc_structure)
+            dbc_stores = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("DBCStores.cpp"))
+            self.assertIn("sTalentTabPages[MAX_CLASSES][MAX_TALENT_TABS]", dbc_stores)
+
             storage = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("PlayerStorage.cpp"))
             self.assertEqual(storage.count("getClass() != CLASS_ADVENTURER) ||"), 2)
             self.assertIn("getClass() != CLASS_ADVENTURER && proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD", storage)

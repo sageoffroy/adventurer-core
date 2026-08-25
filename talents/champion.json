@@ -4,8 +4,9 @@
   "point_total": 80,
   "tabs": [
     {"id": 5000, "key": "guardian", "source_tab_id": 383, "order": 0, "enUS": "Guardian", "esMX": "Guardián"},
-    {"id": 5001, "key": "champion", "source_tab_id": 161, "order": 1, "enUS": "Champion", "esMX": "Campeón"},
-    {"id": 5002, "key": "scholar", "source_tab_id": 382, "order": 2, "enUS": "Scholar", "esMX": "Erudito"}
+    {"id": 5001, "key": "champion", "source_tab_id": 161, "order": 1, "enUS": "Mercenary", "esMX": "Mercenario"},
+    {"id": 5002, "key": "scholar", "source_tab_id": 382, "order": 2, "enUS": "Scholar", "esMX": "Erudito"},
+    {"id": 5003, "key": "explorer", "source_tab_id": 362, "order": 3, "enUS": "Explorer", "esMX": "Explorador"}
   ],
   "spell_id_base": 300000,
   "talent_id_base": 6000,

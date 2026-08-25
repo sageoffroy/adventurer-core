@@ -101,6 +101,24 @@ def patch_enuminfo(text: str) -> str:
     )
 
 
+def patch_dbc_structure(text: str) -> str:
+    return replace_once(
+        text,
+        "#define MAX_TALENT_TABS 3",
+        "#define MAX_TALENT_TABS 4",
+        "DBCStructure talent tab capacity",
+    )
+
+
+def patch_dbc_stores(text: str) -> str:
+    return replace_once(
+        text,
+        "static uint32 sTalentTabPages[MAX_CLASSES][3];",
+        "static uint32 sTalentTabPages[MAX_CLASSES][MAX_TALENT_TABS];",
+        "DBCStores class talent tab pages",
+    )
+
+
 def patch_stat_system(text: str) -> str:
     text = replace_once(
         text,
@@ -493,6 +511,8 @@ def patch_player_cpp(text: str) -> str:
 TRANSFORMS = {
     "src/server/shared/SharedDefines.h": patch_shared_defines,
     "src/server/shared/enuminfo_SharedDefines.cpp": patch_enuminfo,
+    "src/server/shared/DataStores/DBCStructure.h": patch_dbc_structure,
+    "src/server/game/DataStores/DBCStores.cpp": patch_dbc_stores,
     "src/server/game/Entities/Unit/StatSystem.cpp": patch_stat_system,
     "src/server/game/Entities/Player/PlayerStorage.cpp": patch_player_storage,
     "src/server/game/Entities/Player/Player.cpp": patch_player_cpp,

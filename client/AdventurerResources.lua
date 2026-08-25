@@ -5,6 +5,8 @@
 -- the same dimensions/anchors as the supplied classless reference layout.
 
 local ADVENTURER_CLASS_ID = 10
+local ADVENTURER_TALENT_TAB_COUNT = 4
+local ADVENTURER_GLYPH_TAB_ID = 5
 local POWER_RAGE = 1
 local POWER_ENERGY = 3
 local COMBO_PREFIX = "AdventurerCP"
@@ -87,6 +89,68 @@ local function IsAdventurer()
     return className == "Adventurer"
         or className == "Aventurero"
         or className == "Aventurera"
+end
+
+-- Stock 3.3.5a exposes three talent-tree buttons and uses button 4 for Glyphs.
+-- Adventurer owns four trees, so only for class 10 we raise the Lua capacity to
+-- four, repurpose stock button 4 as the fourth talent tab, and move Glyphs to a
+-- newly-created button 5. The underlying TalentTab.dbc remains the authority for
+-- names, backgrounds and the actual number of trees.
+local adventurerTalentTabsConfigured = false
+
+local function ConfigureAdventurerTalentTabs()
+    if adventurerTalentTabsConfigured or not IsAdventurer() then
+        return
+    end
+    if not PlayerTalentFrame or not PlayerTalentFrameTab4 or not PlayerTalentTab_OnClick then
+        return
+    end
+
+    MAX_TALENT_TABS = ADVENTURER_TALENT_TAB_COUNT
+
+    local fourthTab = PlayerTalentFrameTab4
+    fourthTab:SetID(4)
+    fourthTab:SetScript("OnClick", PlayerTalentTab_OnClick)
+    fourthTab:SetScript("OnEvent", PlayerTalentTab_OnEvent)
+    fourthTab:SetScript("OnEnter", PlayerTalentFrameTab_OnEnter)
+    fourthTab:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    local glyphTab = PlayerTalentFrameTab5
+    if not glyphTab then
+        glyphTab = CreateFrame("Button", "PlayerTalentFrameTab5", PlayerTalentFrame, "PlayerGlyphTabTemplate")
+    end
+    glyphTab:SetID(ADVENTURER_GLYPH_TAB_ID)
+    glyphTab:SetText(GLYPHS)
+    glyphTab:ClearAllPoints()
+    glyphTab:SetPoint("LEFT", fourthTab, "RIGHT", -15, 0)
+    glyphTab:SetScript("OnClick", PlayerGlyphTab_OnClick)
+    glyphTab:SetScript("OnEvent", PlayerGlyphTab_OnEvent)
+    glyphTab:SetScript("OnEnter", PlayerTalentFrameTab_OnEnter)
+    glyphTab:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    glyphTab:RegisterEvent("PLAYER_LEVEL_UP")
+    glyphTab.textWidth = glyphTab:GetTextWidth()
+
+    GLYPH_TALENT_TAB = ADVENTURER_GLYPH_TAB_ID
+    PanelTemplates_SetNumTabs(PlayerTalentFrame, ADVENTURER_GLYPH_TAB_ID)
+    adventurerTalentTabsConfigured = true
+end
+
+local function EnableAdventurerTalentTabCapacity()
+    if not IsAdventurer() then
+        return
+    end
+
+    -- TalentFrameBase.lua defines this global as 3. Raise it before the
+    -- load-on-demand Blizzard_TalentUI is instantiated.
+    MAX_TALENT_TABS = ADVENTURER_TALENT_TAB_COUNT
+
+    if IsAddOnLoaded and IsAddOnLoaded("Blizzard_TalentUI") then
+        ConfigureAdventurerTalentTabs()
+    end
 end
 
 local function PlayerIsUsingVehicleUI()
@@ -318,6 +382,7 @@ end
 
 local AdventurerResourceFrame = CreateFrame("Frame", "AdventurerResourceFrame", UIParent)
 AdventurerResourceFrame.elapsed = 0
+AdventurerResourceFrame:RegisterEvent("ADDON_LOADED")
 AdventurerResourceFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 AdventurerResourceFrame:RegisterEvent("PLAYER_ALIVE")
 AdventurerResourceFrame:RegisterEvent("UNIT_DISPLAYPOWER")
@@ -327,6 +392,14 @@ AdventurerResourceFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 AdventurerResourceFrame:RegisterEvent("CHAT_MSG_ADDON")
 
 AdventurerResourceFrame:SetScript("OnEvent", function(self, event, ...)
+    if event == "ADDON_LOADED" then
+        local addonName = ...
+        if addonName == "Blizzard_TalentUI" then
+            ConfigureAdventurerTalentTabs()
+        end
+        return
+    end
+
     if event == "CHAT_MSG_ADDON" then
         local prefix, message = ...
         if IsAdventurer() and prefix == COMBO_PREFIX then
@@ -336,6 +409,7 @@ AdventurerResourceFrame:SetScript("OnEvent", function(self, event, ...)
     end
 
     if event == "PLAYER_ENTERING_WORLD" then
+        EnableAdventurerTalentTabCapacity()
         if RegisterAddonMessagePrefix then
             RegisterAddonMessagePrefix(COMBO_PREFIX)
         end
