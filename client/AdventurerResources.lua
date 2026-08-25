@@ -381,3 +381,343 @@ AdventurerResourceFrame:SetScript("OnUpdate", function(self, elapsed)
         PlayerFrameRageBar:Show()
     end
 end)
+
+-- ---------------------------------------------------------------------------
+-- Adventurer Draft v1: minimal three-card chooser
+-- ---------------------------------------------------------------------------
+local DRAFT_PREFIX = "AdventurerDraft"
+local DRAFT_READY_MESSAGE = "ADRAFT_READY"
+local DRAFT_PICK_PREFIX = "ADRAFT_PICK:"
+local DRAFT_BUTTON_COUNT = 3
+
+local draftText
+if locale == "esES" or locale == "esMX" then
+    draftText = {
+        activeTitle = "Elige una habilidad",
+        talentTitle = "Elige un talento",
+        activePending = "Habilidades pendientes: %d",
+        talentPending = "Talentos pendientes: %d",
+        rank = "Rango %d/%d",
+        bundle = "Incluye %d habilidades",
+        choose = "Elegir",
+        waiting = "Aprendiendo...",
+        error = "El servidor rechazó la elección (%s).",
+        rarity = { "Común", "Poco común", "Rara", "Épica", "Legendaria" },
+    }
+else
+    draftText = {
+        activeTitle = "Choose an ability",
+        talentTitle = "Choose a talent",
+        activePending = "Pending abilities: %d",
+        talentPending = "Pending talents: %d",
+        rank = "Rank %d/%d",
+        bundle = "Includes %d abilities",
+        choose = "Choose",
+        waiting = "Learning...",
+        error = "The server rejected the choice (%s).",
+        rarity = { "Common", "Uncommon", "Rare", "Epic", "Legendary" },
+    }
+end
+
+local rarityColors = {
+    { 1.00, 1.00, 1.00 },
+    { 0.12, 1.00, 0.00 },
+    { 0.00, 0.44, 0.87 },
+    { 0.64, 0.21, 0.93 },
+    { 1.00, 0.50, 0.00 },
+}
+
+local function SplitText(value, separator)
+    local parts = {}
+    if not value or value == "" then
+        return parts
+    end
+
+    local start = 1
+    while true do
+        local first, last = string.find(value, separator, start, true)
+        if not first then
+            table.insert(parts, string.sub(value, start))
+            break
+        end
+        table.insert(parts, string.sub(value, start, first - 1))
+        start = last + 1
+    end
+    return parts
+end
+
+local DraftFrame = CreateFrame("Frame", "AdventurerDraftFrame", UIParent)
+DraftFrame:SetWidth(650)
+DraftFrame:SetHeight(300)
+DraftFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
+DraftFrame:SetFrameStrata("FULLSCREEN_DIALOG")
+DraftFrame:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true,
+    tileSize = 32,
+    edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+})
+DraftFrame:SetBackdropColor(0.05, 0.05, 0.08, 0.98)
+DraftFrame:EnableMouse(true)
+DraftFrame:SetMovable(true)
+DraftFrame:RegisterForDrag("LeftButton")
+DraftFrame:SetScript("OnDragStart", function(self) self:StartMoving() end)
+DraftFrame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+DraftFrame:Hide()
+
+DraftFrame.title = DraftFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+DraftFrame.title:SetPoint("TOP", DraftFrame, "TOP", 0, -22)
+DraftFrame.title:SetText("Adventurer Draft")
+
+DraftFrame.status = DraftFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+DraftFrame.status:SetPoint("TOP", DraftFrame.title, "BOTTOM", 0, -6)
+DraftFrame.status:SetText("")
+
+DraftFrame.hint = DraftFrame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+DraftFrame.hint:SetPoint("BOTTOM", DraftFrame, "BOTTOM", 0, 14)
+DraftFrame.hint:SetText("Mouseover: detalles de la habilidad")
+if locale ~= "esES" and locale ~= "esMX" then
+    DraftFrame.hint:SetText("Mouseover: ability details")
+end
+
+local draftButtons = {}
+
+local function SetDraftButtonsEnabled(enabled)
+    for _, button in ipairs(draftButtons) do
+        if enabled then
+            button:Enable()
+            button:SetAlpha(1)
+            button.choose:SetText(draftText.choose)
+        else
+            button:Disable()
+            button:SetAlpha(0.55)
+            button.choose:SetText(draftText.waiting)
+        end
+    end
+end
+
+local function SendDraftCommand(message)
+    local target = UnitName("player")
+    if target and target ~= "" then
+        SendChatMessage(message, "WHISPER", nil, target)
+    end
+end
+
+for index = 1, DRAFT_BUTTON_COUNT do
+    local button = CreateFrame("Button", "AdventurerDraftCard" .. index, DraftFrame)
+    button:SetWidth(190)
+    button:SetHeight(205)
+    button:SetPoint("TOPLEFT", DraftFrame, "TOPLEFT", 28 + (index - 1) * 202, -68)
+    button:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true,
+        tileSize = 16,
+        edgeSize = 14,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    button:SetBackdropColor(0.03, 0.04, 0.07, 0.96)
+    button:SetBackdropBorderColor(0.55, 0.55, 0.60, 1)
+
+    button.icon = button:CreateTexture(nil, "ARTWORK")
+    button.icon:SetWidth(56)
+    button.icon:SetHeight(56)
+    button.icon:SetPoint("TOP", button, "TOP", 0, -15)
+    button.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+
+    button.name = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    button.name:SetWidth(170)
+    button.name:SetPoint("TOP", button.icon, "BOTTOM", 0, -8)
+    button.name:SetJustifyH("CENTER")
+    button.name:SetText("-")
+
+    button.rarity = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    button.rarity:SetPoint("TOP", button.name, "BOTTOM", 0, -5)
+    button.rarity:SetText("")
+
+    button.meta = button:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    button.meta:SetWidth(170)
+    button.meta:SetPoint("TOP", button.rarity, "BOTTOM", 0, -4)
+    button.meta:SetJustifyH("CENTER")
+    button.meta:SetText("")
+
+    button.choose = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    button.choose:SetPoint("BOTTOM", button, "BOTTOM", 0, 12)
+    button.choose:SetText(draftText.choose)
+
+    button:SetScript("OnEnter", function(self)
+        if not self.spellId then
+            return
+        end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink("spell:" .. self.spellId)
+        GameTooltip:Show()
+        if self:IsEnabled() then
+            self:SetBackdropColor(0.10, 0.12, 0.18, 0.98)
+        end
+    end)
+    button:SetScript("OnLeave", function(self)
+        GameTooltip:Hide()
+        self:SetBackdropColor(0.03, 0.04, 0.07, 0.96)
+    end)
+    button:SetScript("OnClick", function(self)
+        if not self.cardId then
+            return
+        end
+        SetDraftButtonsEnabled(false)
+        SendDraftCommand(DRAFT_PICK_PREFIX .. self.cardId)
+    end)
+
+    table.insert(draftButtons, button)
+end
+
+local function HideDraftFrame()
+    DraftFrame:Hide()
+    for _, button in ipairs(draftButtons) do
+        button.cardId = nil
+        button.spellId = nil
+        button:Hide()
+    end
+end
+
+local function ParseDraftCard(record)
+    local fields = SplitText(record, ":")
+    if #fields < 7 then
+        return nil
+    end
+
+    local card = {
+        cardId = tonumber(fields[1]),
+        spellId = tonumber(fields[2]),
+        rarity = tonumber(fields[3]) or 0,
+        weight = tonumber(fields[4]) or 100,
+        grantCount = tonumber(fields[5]) or 1,
+        rank = tonumber(fields[6]) or 1,
+        maxRank = tonumber(fields[7]) or 1,
+    }
+    if not card.cardId or not card.spellId then
+        return nil
+    end
+    return card
+end
+
+local function ShowDraftOffer(payload)
+    local sections = SplitText(payload, "|")
+    if #sections < 5 or sections[1] ~= "O" then
+        return
+    end
+
+    local draftKind = sections[2]
+    local pendingActive = tonumber(sections[3]) or 0
+    local pendingTalent = tonumber(sections[4]) or 0
+    local records = SplitText(sections[5], ";")
+
+    if draftKind == "T" then
+        DraftFrame.title:SetText(draftText.talentTitle)
+    else
+        DraftFrame.title:SetText(draftText.activeTitle)
+    end
+    DraftFrame.status:SetText(
+        string.format(draftText.activePending, pendingActive)
+        .. "   •   "
+        .. string.format(draftText.talentPending, pendingTalent)
+    )
+
+    for index = 1, DRAFT_BUTTON_COUNT do
+        local button = draftButtons[index]
+        local card = records[index] and ParseDraftCard(records[index]) or nil
+        if card then
+            button.cardId = card.cardId
+            button.spellId = card.spellId
+            button.weight = card.weight
+
+            local name, subName, icon = GetSpellInfo(card.spellId)
+            button.name:SetText(name or ("Spell #" .. card.spellId))
+            button.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+
+            local rarityIndex = math.max(0, math.min(4, card.rarity)) + 1
+            local rarityName = draftText.rarity[rarityIndex] or ""
+            local color = rarityColors[rarityIndex] or rarityColors[1]
+            button.rarity:SetText(rarityName)
+            button.rarity:SetTextColor(color[1], color[2], color[3])
+            button:SetBackdropBorderColor(color[1], color[2], color[3], 0.9)
+
+            local meta = {}
+            if card.maxRank > 1 then
+                table.insert(meta, string.format(draftText.rank, card.rank, card.maxRank))
+            end
+            if card.grantCount > 1 then
+                table.insert(meta, string.format(draftText.bundle, card.grantCount))
+            end
+            button.meta:SetText(table.concat(meta, "\n"))
+            button.choose:SetText(draftText.choose)
+            button:Enable()
+            button:SetAlpha(1)
+            button:Show()
+        else
+            button.cardId = nil
+            button.spellId = nil
+            button:Hide()
+        end
+    end
+
+    DraftFrame:Show()
+end
+
+local function HandleDraftServerMessage(message)
+    if not message or message == "" then
+        return
+    end
+
+    if string.sub(message, 1, 2) == "O|" then
+        ShowDraftOffer(message)
+    elseif message == "C" then
+        HideDraftFrame()
+    elseif string.sub(message, 1, 2) == "E|" then
+        SetDraftButtonsEnabled(true)
+        local errorCode = string.sub(message, 3)
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff5555[Adventurer Draft]|r " .. string.format(draftText.error, errorCode))
+    end
+end
+
+local function DraftWhisperFilter(_, _, message, sender)
+    if not IsAdventurer() or sender ~= UnitName("player") then
+        return false
+    end
+    if message == DRAFT_READY_MESSAGE or string.sub(message, 1, string.len(DRAFT_PICK_PREFIX)) == DRAFT_PICK_PREFIX then
+        return true
+    end
+    return false
+end
+
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", DraftWhisperFilter)
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", DraftWhisperFilter)
+
+local AdventurerDraftEventFrame = CreateFrame("Frame", "AdventurerDraftEventFrame", UIParent)
+AdventurerDraftEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+AdventurerDraftEventFrame:RegisterEvent("CHAT_MSG_ADDON")
+AdventurerDraftEventFrame:SetScript("OnEvent", function(self, event, ...)
+    if event == "PLAYER_ENTERING_WORLD" then
+        if not IsAdventurer() then
+            HideDraftFrame()
+            return
+        end
+        if RegisterAddonMessagePrefix then
+            RegisterAddonMessagePrefix(DRAFT_PREFIX)
+        end
+        -- Ask the server to resend any persisted offer. A short delay is not
+        -- required: if the server-side login hook already sent the offer this
+        -- command is idempotent; otherwise it establishes the first one.
+        SendDraftCommand(DRAFT_READY_MESSAGE)
+        return
+    end
+
+    if event == "CHAT_MSG_ADDON" then
+        local prefix, message = ...
+        if IsAdventurer() and prefix == DRAFT_PREFIX then
+            HandleDraftServerMessage(message)
+        end
+    end
+end)
