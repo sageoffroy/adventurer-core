@@ -169,6 +169,10 @@ class TalentGeneratorTests(unittest.TestCase):
             (503, "Spell_deathknight_bloodboil"),
             (504, "ability_warstomp"),
             (505, "ability_backstab"),
+            (506, "spell_nature_abolishmagic"),
+            (507, "inv_gauntlets_19"),
+            (508, "spell_shadow_lifedrain"),
+            (509, "spell_misc_emotionangry"),
         ):
             path = f"Interface\\Icons\\{name}".encode() + b"\0"
             offset = len(icon_strings)
@@ -219,6 +223,14 @@ class TalentGeneratorTests(unittest.TestCase):
         patch_talent_directory(self.dbc_dir)
         talents = DBC.read(self.dbc_dir / "Talent.dbc")
         spells = DBC.read(self.dbc_dir / "Spell.dbc")
+
+        _index, _definition, vitality = self.generated_talent(talents, self.spec, "vitality")
+        for spell_id, size, health in zip(self.rank_ids(vitality), (3, 6, 9, 12, 15), (2, 4, 6, 8, 10)):
+            spell = next(r for r in spells.records if u32(r, 0) == spell_id)
+            self.assertEqual(u32(spell, SPELL_EFFECT_FIELDS[0]), 6)
+            self.assertEqual(u32(spell, SPELL_EFFECT_APPLY_AURA_FIELDS[0]), 61)
+            self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), size - 1)
+            self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[1]), health - 1)
 
         index, definition, talent = self.generated_talent(talents, self.spec, "steady_footing")
         self.assertEqual(definition["icon"], "ability_warstomp")
