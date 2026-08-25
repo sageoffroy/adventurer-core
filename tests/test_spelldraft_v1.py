@@ -148,11 +148,28 @@ class SpellDraftV1Tests(unittest.TestCase):
         ):
             self.assertIn(token, self.meta_client)
 
+    def test_destroyed_cards_stay_blocked_in_current_offer_without_free_replacement(self) -> None:
+        self.assertIn("SelectableOfferCount", self.runtime)
+        self.assertIn("state.destroyedCards.insert(cardId)", self.runtime)
+        self.assertIn("state.destroyedCards.count(cardId)", self.runtime)
+        self.assertIn("state.destroyedCards.count(card->id) ? 1 : 0", self.runtime)
+        self.assertNotIn("ReplaceDestroyedOfferSlot", self.runtime)
+        self.assertNotIn("state.offeredCards[slot] = 0", self.runtime)
+        self.assertIn('SendDraftError(player, "CANNOT_DESTROY_LAST_CARD"', self.runtime)
+        self.assertIn('state.destroyed[cardId] = tonumber(fields[8]) == 1', self.meta_client)
+        self.assertIn('button:SetAlpha(0.30)', self.meta_client)
+        self.assertIn('button.choose:SetText(text.blocked)', self.meta_client)
+
     def test_destroyed_cards_are_removed_and_bless_does_not_bypass_requirements(self) -> None:
         self.assertIn("state.destroyedCards.count(card.id)", self.runtime)
         self.assertIn("state.destroyedCards.insert(cardId)", self.runtime)
         self.assertIn("return MeetsRequirements(state, card)", self.runtime)
         self.assertIn("state.blessedCardId = cardId", self.runtime)
+
+    def test_meta_ui_compacts_card_actions_and_reports_unlimited_blessing(self) -> None:
+        self.assertIn('button.choose:SetPoint("TOP", button.meta, "BOTTOM", 0, -10)', self.meta_client)
+        self.assertIn('blessings = "Bendiciones: %s"', self.meta_client)
+        self.assertIn('local blessingCount = state.blessMultiplierPercent > 0 and "∞" or "0"', self.meta_client)
 
     def test_normal_talent_points_are_disabled_for_spell_draft_adventurer(self) -> None:
         self.assertIn("PLAYERHOOK_ON_CALCULATE_TALENTS_POINTS", self.runtime)
