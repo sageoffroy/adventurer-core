@@ -101,7 +101,10 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    args = parser().parse_args()
+    # apply.sh/update.sh/rollback.sh forward their full Adventurer argument set.
+    # Runtime data only needs core/data paths, so ignore unrelated client/DBC
+    # switches instead of forcing the shell wrappers to maintain two arg lists.
+    args, _ = parser().parse_known_args()
     try:
         if args.command == "install":
             install(args.core_dir, args.server_data_dir)
