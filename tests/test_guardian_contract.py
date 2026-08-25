@@ -15,14 +15,18 @@ class GuardianContractTests(unittest.TestCase):
         self.spec = load_spec()
         self.definitions = {definition["key"]: definition for definition in self.spec["talents"]}
 
-    def test_guardian_uses_build_depth_design_instead_of_eighty_point_padding(self) -> None:
-        self.assertEqual(len(self.definitions), 26)
+    def test_guardian_final_builder_has_two_ultimate_eighty_rank_shape(self) -> None:
+        self.assertEqual(len(self.definitions), 32)
         self.assertEqual(
             sum(len(talent_source_spell_ids(definition)) for definition in self.spec["talents"]),
-            73,
+            80,
         )
-        self.assertEqual(self.spec["point_total"], 73)
+        self.assertEqual(self.spec["point_total"], 80)
         self.assertNotIn("guardian_points", self.spec)
+        self.assertEqual(
+            {key for key, definition in self.definitions.items() if int(definition["row"]) == 10},
+            {"throw_shield", "shockwave"},
+        )
 
     def test_guardian_first_rows_are_generic_foundations(self) -> None:
         vitality = self.definitions["vitality"]
@@ -30,7 +34,8 @@ class GuardianContractTests(unittest.TestCase):
         self.assertEqual(vitality["disable_effects"], [0])
 
         strength = self.definitions["overwhelming_strength"]
-        self.assertEqual(strength["effect_values"]["0"], [3, 6, 9, 12, 15])
+        self.assertEqual(strength["effect_values"]["0"], [15])
+        self.assertEqual(len(talent_source_spell_ids(strength)), 1)
 
         cicatrization = self.definitions["cicatrization"]
         self.assertEqual(cicatrization["effect_values"]["1"], [3, 6])
@@ -67,13 +72,30 @@ class GuardianContractTests(unittest.TestCase):
             "acclimation": [49200, 50151, 50152],
             "bulwark": [20127, 20130, 20135],
             "damage_shield": [58872, 58874],
-            "focused_rage": [29787, 29790, 29792],
+            "focused_rage": [29787, 29790],
             "nerves_of_steel": [31130, 31131],
         }
         for key, spell_ids in expected.items():
             definition = self.definitions[key]
             self.assertTrue(definition["reuse_native_spells"], key)
             self.assertEqual(definition["spell_source_ids"], spell_ids, key)
+
+    def test_deep_native_tools_reuse_wotlk_mechanics(self) -> None:
+        expected = {
+            "concussion_blow": [12809],
+            "titans_grip": [46917],
+            "vigilance": [50720],
+            "shockwave": [46968],
+        }
+        for key, spell_ids in expected.items():
+            definition = self.definitions[key]
+            self.assertTrue(definition["reuse_native_spells"], key)
+            self.assertEqual(definition["spell_source_ids"], spell_ids, key)
+
+        self.assertTrue(self.definitions["concussion_blow"]["add_to_spellbook"])
+        self.assertTrue(self.definitions["vigilance"]["add_to_spellbook"])
+        self.assertTrue(self.definitions["shockwave"]["add_to_spellbook"])
+        self.assertFalse(self.definitions["titans_grip"].get("add_to_spellbook", False))
 
     def test_survivor_is_renamed_without_touching_paladin_spell_rows(self) -> None:
         definition = self.definitions["survivor"]
@@ -96,8 +118,55 @@ class GuardianContractTests(unittest.TestCase):
         self.assertEqual(indomitable["spell_source_ids"], [33853, 33855, 33856])
         self.assertEqual(indomitable["disable_effects"], [2])  # no Bear-only armor rider
 
+    def test_armored_to_the_teeth_is_buffed_and_runtime_owned(self) -> None:
+        definition = self.definitions["armored_to_the_teeth"]
+        self.assertEqual(definition["spell_source_ids"], [61216, 61221, 61222])
+        self.assertEqual(definition["effect_values"]["0"], [2, 4, 6])
+        self.assertEqual(definition["spell_u32_values"]["95"], 4)  # dummy marker
+        self.assertIn("150", definition["description_esMX"])
+
+        index = next(i for i, item in enumerate(self.spec["talents"]) if item["key"] == "armored_to_the_teeth")
+        self.assertEqual(index, 26)
+        self.assertEqual(
+            [custom_spell_id(self.spec, index, rank) for rank in range(3)],
+            [290260, 290261, 290262],
+        )
+
+        runtime = (ROOT / "payload/core/src/server/scripts/Custom/adventurer_core.cpp").read_text()
+        self.assertIn("ARMORED_TO_THE_TEETH_RANK_1 = 290260", runtime)
+        self.assertIn("float(player->GetArmor()) * float(rank * 2) / 150.0f", runtime)
+        self.assertIn("PLAYERHOOK_ON_AFTER_UPDATE_ATTACK_POWER_AND_DAMAGE", runtime)
+
+    def test_blood_gorged_is_classless_and_health_gated(self) -> None:
+        definition = self.definitions["blood_gorged"]
+        self.assertEqual(definition["effect_values"]["0"], [2, 4, 6, 8, 10])
+        self.assertEqual(definition["effect_values"]["1"], [2, 4, 6, 8, 10])
+        self.assertEqual(definition["spell_u32_values"]["95"], 79)
+        self.assertEqual(definition["spell_u32_values"]["96"], 280)
+        self.assertEqual(definition["effect_misc_values"]["0"], 127)
+        for field in ("208", "209", "210", "211"):
+            self.assertEqual(definition["spell_u32_values"][field], 0)
+
+        index = next(i for i, item in enumerate(self.spec["talents"]) if item["key"] == "blood_gorged")
+        self.assertEqual(index, 29)
+        self.assertEqual(custom_spell_id(self.spec, index, 0), 290290)
+        self.assertEqual(custom_spell_id(self.spec, index, 4), 290294)
+
+        runtime = (ROOT / "payload/core/src/server/scripts/Custom/adventurer_core.cpp").read_text()
+        self.assertIn("BLOOD_GORGED_RANK_1 = 290290", runtime)
+        self.assertIn("player->GetHealthPct() > 75.0f", runtime)
+        self.assertIn("damageEffect->ChangeAmount(desiredAmount)", runtime)
+
     def test_guardian_active_tools_are_only_the_selected_classless_actives(self) -> None:
-        expected = {"riposte", "last_stand", "sweeping_strikes", "throw_shield"}
+        expected = {
+            "riposte",
+            "last_stand",
+            "sweeping_strikes",
+            "throw_shield",
+            "concussion_blow",
+            "vigilance",
+            "shockwave",
+        }
         actual = {
             definition["key"]
             for definition in self.spec["talents"]
@@ -117,6 +186,7 @@ class GuardianContractTests(unittest.TestCase):
         throw_index = next(i for i, item in enumerate(self.spec["talents"]) if item["key"] == "throw_shield")
         self.assertEqual(throw_index, 24)
         self.assertEqual(custom_spell_id(self.spec, throw_index, 0), 290240)
+        self.assertEqual(self.definitions["throw_shield"]["icon"], "inv_jewelry_trinketpvp_02")
 
     def test_guardian_prerequisites_are_short_and_mechanical(self) -> None:
         expected = {
@@ -125,6 +195,8 @@ class GuardianContractTests(unittest.TestCase):
             "sweeping_strikes": "one_handed_weapon_specialization",
             "damage_shield": "bulwark",
             "throw_shield": "damage_shield",
+            "vigilance": "concussion_blow",
+            "shockwave": "titans_grip",
         }
         actual = {
             key: definition.get("requires")
