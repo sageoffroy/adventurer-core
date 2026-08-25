@@ -121,6 +121,13 @@ class TalentGeneratorTests(unittest.TestCase):
                 set_u32(spell, 104, 3); set_u32(spell, 204, 26)
                 set_u32(spell, 208, 10); set_u32(spell, 209, 0x1234); set_u32(spell, 225, 2)
                 set_f32(spell, 77, 1.0); set_f32(spell, 229, 0.07)
+            if spell_id in {61216, 61221, 61222}:
+                set_u32(spell, 71, 6); set_u32(spell, 72, 6)
+                set_u32(spell, 95, 285); set_u32(spell, 96, 4)
+            if spell_id == 50096:
+                set_u32(spell, 71, 6); set_u32(spell, 95, 79)
+                set_i32(spell, 110, 127)
+                set_u32(spell, 208, 15); set_u32(spell, 209, 0xFFFF)
 
             # Champion structural fixtures for the custom/sanitized mechanics.
             if spell_id in {30812, 16513, 16266, 20117}:
@@ -163,13 +170,18 @@ class TalentGeneratorTests(unittest.TestCase):
 
         icon_strings = bytearray(b"\0")
         icon_rows = []
-        for icon_id, name in (
-            (501, "ability_warrior_intensifyrage"),
-            (502, "ability_warrior_secondwind"),
-            (503, "Spell_deathknight_bloodboil"),
-            (504, "ability_warstomp"),
-            (505, "ability_backstab"),
-        ):
+        for icon_id, name in enumerate((
+            "spell_nature_abolishmagic",
+            "inv_gauntlets_19",
+            "spell_shadow_lifedrain",
+            "ability_backstab",
+            "ability_warstomp",
+            "spell_misc_emotionangry",
+            "ability_warrior_intensifyrage",
+            "inv_jewelry_trinketpvp_02",
+            "inv_shoulder_22",
+            "spell_nature_reincarnation",
+        ), start=501):
             path = f"Interface\\Icons\\{name}".encode() + b"\0"
             offset = len(icon_strings)
             icon_strings.extend(path)
@@ -206,7 +218,7 @@ class TalentGeneratorTests(unittest.TestCase):
         talents = DBC.read(self.dbc_dir / "Talent.dbc")
         guardian = [r for r in talents.records if 5000 <= u32(r, 0) < 6000]
         champion = [r for r in talents.records if 6000 <= u32(r, 0) < 7000]
-        self.assertEqual(len(guardian), 26)
+        self.assertEqual(len(guardian), 32)
         self.assertEqual(len(champion), 28)
         self.assertFalse(any(u32(r, 0) in {5999, 6999} for r in talents.records))
 
@@ -249,8 +261,9 @@ class TalentGeneratorTests(unittest.TestCase):
             self.assertEqual(u32(spell, SPELL_EFFECT_FIELDS[0]), 0)
             self.assertNotEqual(u32(spell, SPELL_EFFECT_TRIGGER_SPELL_FIELDS[1]), 0)
 
-        index, _definition, throw = self.generated_talent(talents, self.spec, "throw_shield")
+        index, throw_definition, throw = self.generated_talent(talents, self.spec, "throw_shield")
         self.assertEqual(index, 24)
+        self.assertEqual(throw_definition["icon"], "inv_jewelry_trinketpvp_02")
         spell = next(r for r in spells.records if u32(r, 0) == custom_spell_id(self.spec, index, 0))
         self.assertEqual(u32(spell, 0), 290240)
         self.assertEqual(u32(spell, SPELL_SCHOOL_MASK_FIELD), 1)
@@ -263,6 +276,45 @@ class TalentGeneratorTests(unittest.TestCase):
             spell = next(r for r in spells.records if u32(r, 0) == spell_id)
             self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), value - 1)
             self.assertEqual(i32(spell, SPELL_EFFECT_MISC_VALUE_FIELDS[0]), 1)
+
+        armored_index, _definition, armored = self.generated_talent(talents, self.spec, "armored_to_the_teeth")
+        self.assertEqual(armored_index, 26)
+        for spell_id, value in zip(self.rank_ids(armored), (2, 4, 6)):
+            spell = next(r for r in spells.records if u32(r, 0) == spell_id)
+            self.assertEqual(u32(spell, SPELL_EFFECT_APPLY_AURA_FIELDS[0]), 4)
+            self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), value - 1)
+            self.assertEqual(u32(spell, SPELL_EFFECT_FIELDS[1]), 0)
+
+        blood_index, _definition, blood = self.generated_talent(talents, self.spec, "blood_gorged")
+        self.assertEqual(blood_index, 29)
+        for spell_id, value in zip(self.rank_ids(blood), (2, 4, 6, 8, 10)):
+            spell = next(r for r in spells.records if u32(r, 0) == spell_id)
+            self.assertEqual(u32(spell, SPELL_EFFECT_APPLY_AURA_FIELDS[0]), 79)
+            self.assertEqual(u32(spell, SPELL_EFFECT_APPLY_AURA_FIELDS[1]), 280)
+            self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[0]), value - 1)
+            self.assertEqual(i32(spell, SPELL_EFFECT_BASEPOINT_FIELDS[1]), value - 1)
+            self.assertEqual(i32(spell, SPELL_EFFECT_MISC_VALUE_FIELDS[0]), 127)
+            for field in (208, 209, 210, 211):
+                self.assertEqual(u32(spell, field), 0)
+
+    def test_guardian_deep_native_tools_and_prerequisites_are_emitted(self) -> None:
+        patch_talent_directory(self.dbc_dir)
+        talents = DBC.read(self.dbc_dir / "Talent.dbc")
+
+        for key, source_id in (
+            ("concussion_blow", 12809),
+            ("titans_grip", 46917),
+            ("vigilance", 50720),
+            ("shockwave", 46968),
+        ):
+            _index, definition, talent = self.generated_talent(talents, self.spec, key)
+            self.assertTrue(definition["reuse_native_spells"])
+            self.assertEqual(self.rank_ids(talent), [source_id])
+
+        for child, parent in (("vigilance", "concussion_blow"), ("shockwave", "titans_grip")):
+            _index, _definition, talent = self.generated_talent(talents, self.spec, child)
+            parent_index, _ = self.definition(self.spec, parent)
+            self.assertEqual(u32(talent, TALENT_PREREQ_TALENT_FIELDS[0]), custom_talent_id(self.spec, parent_index))
 
     def test_champion_heart_strike_uses_rage_and_has_no_dk_resource(self) -> None:
         patch_talent_directory(self.dbc_dir)
