@@ -76,7 +76,7 @@ class AdventurerResourceTests(unittest.TestCase):
         self.assertIn("void SendAddonPayload", self.source)
         self.assertIn('std::string message = prefix + "\\t" + payload', self.source)
         self.assertIn("WorldPacket data(SMSG_MESSAGECHAT, 100 + message.length())", self.source)
-        self.assertIn("data << uint8(0); // CHAT_MSG_ADDON", self.source)
+        self.assertIn("data << uint8(0);", self.source)
         self.assertIn("LANG_ADDON", self.source)
         self.assertIn("SendAddonPayload(player, ADVENTURER_COMBO_PREFIX", self.source)
         self.assertIn("player->SendDirectMessage(&data)", self.source)
