@@ -28,6 +28,12 @@ python3 "$ROOT/tools/database.py" prepare "$@"
 status=0
 python3 "$ROOT/tools/adventurer.py" apply "$@" || status=$?
 
+# SpellDraft balance/catalog data is intentionally outside the compiled C++.
+# Install editable live copies only after the core/client transaction succeeded.
+if (( status == 0 )); then
+    python3 "$ROOT/tools/spelldraft_runtime.py" install "$@" || status=$?
+fi
+
 # Versioned maintenance migrations are part of the official clean install.
 # Existing development installations can run tools/world.py directly, but a
 # fresh apply never depends on remembering that extra step.
