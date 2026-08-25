@@ -32,16 +32,22 @@ class TalentLayoutTests(unittest.TestCase):
             "steady_footing": (4, 0),
             "survivor": (4, 1),
             "unfair_advantage": (4, 2),
-            "indomitable": (5, 0),
-            "acclimation": (5, 1),
+            "armored_to_the_teeth": (5, 0),
+            "acclimation": (5, 2),
             "sweeping_strikes": (5, 3),
-            "nerves_of_steel": (6, 0),
-            "prayer": (6, 1),
-            "focused_rage": (6, 3),
+            "prayer": (6, 0),
+            "focused_rage": (6, 1),
+            "nerves_of_steel": (6, 2),
             "bulwark": (7, 0),
+            "indomitable": (7, 1),
+            "concussion_blow": (7, 3),
             "damage_shield": (8, 0),
-            "demolition_machine": (9, 2),
+            "demolition_machine": (8, 1),
+            "titans_grip": (8, 2),
+            "blood_gorged": (9, 1),
+            "vigilance": (9, 3),
             "throw_shield": (10, 0),
+            "shockwave": (10, 2),
         }
 
         self.assertEqual(set(definitions), set(expected))
@@ -49,22 +55,22 @@ class TalentLayoutTests(unittest.TestCase):
             definition = definitions[key]
             self.assertEqual((int(definition["row"]), int(definition["col"])), position, key)
 
-    def test_guardian_is_26_talents_73_available_ranks_and_eleven_rows(self) -> None:
+    def test_guardian_is_32_talents_80_available_ranks_and_eleven_rows(self) -> None:
         spec = load_spec()
         definitions = spec["talents"]
-        self.assertEqual(len(definitions), 26)
+        self.assertEqual(len(definitions), 32)
         self.assertEqual(
             sum(len(talent_source_spell_ids(definition)) for definition in definitions),
-            73,
+            80,
         )
-        self.assertEqual(int(spec["point_total"]), 73)
+        self.assertEqual(int(spec["point_total"]), 80)
 
         positions = [(int(d["row"]), int(d["col"])) for d in definitions]
         self.assertEqual(len(positions), len(set(positions)))
         self.assertEqual(min(row for row, _col in positions), 0)
         self.assertEqual(max(row for row, _col in positions), 10)
 
-    def test_first_six_rows_hold_the_build_complete_core(self) -> None:
+    def test_first_six_rows_hold_the_level_sixty_build_core(self) -> None:
         definitions = {definition["key"]: definition for definition in load_spec()["talents"]}
         first_six = {key for key, definition in definitions.items() if int(definition["row"]) <= 5}
         self.assertEqual(
@@ -86,21 +92,30 @@ class TalentLayoutTests(unittest.TestCase):
                 "steady_footing",
                 "survivor",
                 "unfair_advantage",
-                "indomitable",
+                "armored_to_the_teeth",
                 "acclimation",
                 "sweeping_strikes",
             },
         )
         self.assertEqual(
             sum(len(talent_source_spell_ids(definitions[key])) for key in first_six),
-            57,
+            53,
         )
 
-    def test_paso_firme_uses_stock_spell_icon(self) -> None:
+    def test_approved_custom_icons_are_locked(self) -> None:
         definitions = {definition["key"]: definition for definition in load_spec()["talents"]}
-        self.assertEqual(definitions["steady_footing"]["esMX"], "Paso firme")
-        self.assertEqual(definitions["steady_footing"]["icon"], "ability_warstomp")
-        self.assertEqual(len(talent_source_spell_ids(definitions["steady_footing"])), 2)
+        expected = {
+            "vitality": "spell_nature_abolishmagic",
+            "overwhelming_strength": "inv_gauntlets_19",
+            "cicatrization": "spell_shadow_lifedrain",
+            "steady_footing": "ability_warstomp",
+            "survivor": "spell_misc_emotionangry",
+            "indomitable": "ability_warrior_intensifyrage",
+            "throw_shield": "inv_jewelry_trinketpvp_02",
+        }
+        for key, icon in expected.items():
+            self.assertEqual(definitions[key].get("icon"), icon, key)
+
         self.assertFalse(any(definition.get("provisional_drive_blank") for definition in definitions.values()))
 
     def test_guardian_prerequisites_match_approved_arrows(self) -> None:
@@ -111,6 +126,8 @@ class TalentLayoutTests(unittest.TestCase):
             "sweeping_strikes": "one_handed_weapon_specialization",
             "damage_shield": "bulwark",
             "throw_shield": "damage_shield",
+            "vigilance": "concussion_blow",
+            "shockwave": "titans_grip",
         }
         actual = {
             key: definition.get("requires")
@@ -118,6 +135,17 @@ class TalentLayoutTests(unittest.TestCase):
             if definition.get("requires")
         }
         self.assertEqual(actual, expected)
+
+    def test_guardian_has_two_row_eleven_ultimates(self) -> None:
+        definitions = {definition["key"]: definition for definition in load_spec()["talents"]}
+        row_eleven = {
+            key
+            for key, definition in definitions.items()
+            if int(definition["row"]) == 10
+        }
+        self.assertEqual(row_eleven, {"throw_shield", "shockwave"})
+        self.assertTrue(definitions["throw_shield"].get("add_to_spellbook"))
+        self.assertTrue(definitions["shockwave"].get("add_to_spellbook"))
 
     def test_prerequisite_lanes_are_clear(self) -> None:
         spec = load_spec()
