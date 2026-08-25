@@ -1,5 +1,5 @@
 id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unlocks;replaces_previous;name
-1;battle_stance;active;1;common;100;2457;;;11,106;0;Actitud de batalla
+1;battle_stance;active;1;common;100;2457+100;;;24,25,26,27;0;Actitud de batalla
 2;fireball;active;1;common;100;133;;;104;0;Bola de Fuego
 3;frostbolt;active;4;common;100;116;;;105;0;Descarga de Escarcha
 4;shadow_bolt;active;1;common;100;686;;;;0;Descarga de las Sombras
@@ -8,11 +8,87 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 7;wrath;active;1;common;100;5176;;;;0;Cólera
 8;heroic_strike;active;1;common;110;78;;;107;0;Golpe heroico
 9;rejuvenation;active;4;common;100;774;;;;0;Rejuvenecimiento
-10;stealth_kit;active;1;uncommon;120;1784+921;;;;0;Sigilo + Robar
-11;charge;active;4;common;500;100;1:1;;;0;Cargar
+10;stealth;active;1;uncommon;120;1784+921+6770;;;;0;Sigilo
 12;arcane_intellect;active;1;common;90;1459;;;;0;Intelecto Arcano
 13;healing_wave;active;1;common;100;331;;;;0;Ola de sanación
-14;sinister_strike;active;1;common;100;1752;;;;0;Golpe siniestro
+14;sinister_strike;active;1;common;100;1752;;;50,55;0;Golpe siniestro
+15;defensive_stance;active;10;common;100;71+355;;;24,25;0;Actitud defensiva
+16;healing_touch;active;1;common;100;5185;;;;0;Toque de sanación
+17;mark_of_the_wild;active;1;uncommon;100;1126;;;;0;Marca de lo salvaje
+18;moonfire;active;4;uncommon;100;8921;;;;0;Fuego lunar
+19;thorns;active;6;common;100;467;;;;0;Espinas
+20;entangling_roots;active;8;uncommon;100;339;;;;0;Raíces enredadoras
+21;bear_form;active;10;rare;100;5487+6807+6795+99;;;;0;Forma de oso
+22;teleport_moonglade;active;10;common;80;18960;;;;0;Teletransporte: Claro de la Luna
+23;battle_shout;active;1;common;100;6673;;;;0;Grito de batalla
+24;rend;active;4;common;100;772;;1:1|15:1;;0;Desgarrar
+25;thunder_clap;active;6;common;100;6343;;1:1|15:1;;0;Atronar
+26;victory_rush;active;6;common;100;34428;1:1;;;0;Ataque de la victoria
+27;hamstring;active;8;common;100;1715;1:1;;;0;Seccionar
+28;bloodrage;active;10;common;100;2687;;;;0;Ira sangrienta
+29;sunder_armor;active;10;common;100;7386;;;;0;Hender armadura
+30;holy_light;active;1;common;100;635;;;;0;Luz Sagrada
+31;seal_of_righteousness;active;1;common;100;21084;;;34;0;Sello de rectitud
+32;devotion_aura;active;1;common;100;465;;;;0;Aura de devoción
+33;blessing_of_might;active;4;common;100;19740;;;;0;Bendición de poderío
+34;judgement_of_light;active;4;common;100;20271;31:1;;;0;Sentencia de Luz
+35;divine_protection;active;6;common;100;498;;;;0;Protección divina
+36;hammer_of_justice;active;8;common;100;853;;;;0;Martillo de Justicia
+37;purify;active;8;common;100;1152;;;;0;Purificar
+38;hand_of_protection;active;10;common;100;1022;;;;0;Mano de protección
+39;lay_on_hands;active;10;common;100;633;;;;0;Imposición de manos
+40;raptor_strike;active;1;common;100;2973;;;;0;Golpe de raptor
+41;track_beasts;active;1;common;90;1494;;;;0;Rastrear bestias
+42;aspect_of_the_monkey;active;4;common;100;13163;;;;0;Aspecto del mono
+43;serpent_sting;active;4;common;100;1978;;;;0;Picadura de serpiente
+44;arcane_shot;active;6;common;100;3044;;;;0;Disparo Arcano
+45;hunters_mark;active;6;common;90;1130;;;;0;Marca del cazador
+46;concussive_shot;active;8;common;100;5116;;;;0;Disparo de conmoción
+47;aspect_of_the_hawk;active;10;common;100;13165;;;;0;Aspecto del halcón
+48;track_humanoids;active;10;common;90;19883;;;;0;Rastrear humanoides
+49;tame_beast;active;10;epic;100;1515+883+2641+6991+982;;;;0;Domesticar bestia
+50;eviscerate;active;1;common;100;2098;;14:1|51:1|53:1;;0;Eviscerar
+51;backstab;active;4;common;100;53;;;50,55;0;Puñalada
+53;gouge;active;6;common;100;1776;;;50,55;0;Gubia
+54;evasion;active;8;common;100;5277;;;;0;Evasión
+55;slice_and_dice;active;10;common;100;5171;;14:1|51:1|53:1;;0;Hacer picadillo
+56;sprint;active;10;common;100;2983;;;;0;Sprint
+57;lesser_heal;active;1;common;100;2050;;;;0;Sanación inferior
+58;power_word_fortitude;active;1;common;100;1243;;;;0;Palabra de poder: entereza
+59;shadow_word_pain;active;4;common;100;589;;;;0;Palabra de las Sombras: dolor
+60;power_word_shield;active;6;common;100;17;;;;0;Palabra de poder: escudo
+61;fade;active;8;common;90;586;;;;0;Desvanecerse
+62;renew;active;8;common;100;139;;;;0;Renovar
+63;mind_blast;active;10;common;100;8092;;;;0;Explosión mental
+64;resurrection;active;10;common;80;2006;;;;0;Resurrección
+65;rockbiter_weapon;active;1;common;100;8017;;;;0;Arma Muerdepiedras
+66;earth_shock;active;4;common;100;8042;;;;0;Choque de tierra
+67;stoneskin_totem;active;4;common;100;8071;;;;0;Tótem Piel de piedra
+68;earthbind_totem;active;6;common;100;2484;;;;0;Tótem Nexo terrestre
+69;lightning_shield;active;8;common;100;324;;;;0;Escudo de relámpagos
+70;stoneclaw_totem;active;8;common;100;5730;;;;0;Tótem Garra de piedra
+71;flame_shock;active;10;common;100;8050;;;;0;Choque de llamas
+72;flametongue_weapon;active;10;common;100;8024;;;;0;Arma Lengua de Fuego
+73;searing_totem;active;10;common;100;3599;;;;0;Tótem abrasador
+74;strength_of_earth_totem;active;10;common;100;8075;;;;0;Tótem Fuerza de la tierra
+75;frost_armor;active;1;common;100;168;;;;0;Armadura de Escarcha
+76;conjure_water;active;4;common;80;5504;;;;0;Crear agua
+77;conjure_food;active;6;common;80;587;;;;0;Crear comida
+78;fire_blast;active;6;common;100;2136;;;;0;Explosión de Fuego
+79;arcane_missiles;active;8;common;100;5143;;;;0;Misiles Arcanos
+80;polymorph;active;8;common;100;118;;;;0;Polimorfia
+81;frost_nova;active;10;common;100;122;;;;0;Nova de Escarcha
+82;demon_skin;active;1;common;100;687;;;;0;Piel de demonio
+83;immolate;active;1;common;100;348;;;;0;Inmolar
+84;summon_imp;active;1;common;100;688;;;;0;Invocar diablillo
+85;corruption;active;4;common;100;172;;;;0;Corrupción
+86;curse_of_weakness;active;4;common;100;702;;;;0;Maldición de debilidad
+87;life_tap;active;6;common;100;1454;;;;0;Transfusión de vida
+88;curse_of_agony;active;8;common;100;980;;;;0;Maldición de agonía
+89;fear;active;8;common;100;5782;;;;0;Miedo
+90;drain_soul;active;10;common;100;1120;;;91,92;0;Drenar alma
+91;create_healthstone;active;10;common;90;6201;90:1;;;0;Crear piedra de salud
+92;summon_voidwalker;active;10;common;100;697;90:1;;;0;Invocar abisario
 101;cruelty;talent;10;common;120;12320/12852/12853/12855/12856;;;;1;Crueldad
 102;deflection;talent;10;common;100;16462/16463/16464/16465/16466;;;;1;Desvío
 103;anticipation;talent;10;common;90;12297/12750/12751/12752/12753;;;;1;Anticipación
