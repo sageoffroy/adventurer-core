@@ -805,7 +805,7 @@ void RestoreDraftedSpells(Player* player, DraftState const& state)
             for (uint8 rank = 1; rank < ownedRank; ++rank)
                 for (uint32 spellId : card->rankGrants[rank - 1])
                     if (player->HasSpell(spellId))
-                        player->removeSpell(spellId);
+                        player->removeSpell(spellId, SPEC_MASK_ALL, false);
         }
 
         for (uint32 spellId : card->rankGrants[ownedRank - 1])
@@ -832,7 +832,7 @@ void ApplyDraftCard(Player* player, DraftState& state, DraftCard const& card)
     {
         for (uint32 spellId : card.rankGrants[currentRank - 1])
             if (player->HasSpell(spellId))
-                player->removeSpell(spellId);
+                player->removeSpell(spellId, SPEC_MASK_ALL, false);
     }
 
     for (uint32 spellId : card.rankGrants[nextRank - 1])
