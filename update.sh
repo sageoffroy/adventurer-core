@@ -27,9 +27,13 @@ fi
 # to the pre-Adventurer server rather than merely to the previous package build.
 python3 "$ROOT/tools/upgrade.py" "$@"
 
+# Install editable SpellDraft runtime data beside DataDir. Existing live files
+# are deliberately preserved; fresh package defaults are refreshed as *.dist.
+python3 "$ROOT/tools/spelldraft_runtime.py" install "$@"
+
 # Maintenance migrations are versioned and copied into AzerothCore's normal
 # pending world-update directory. Worldserver applies only those not already
 # recorded by its database updater.
 python3 "$ROOT/tools/world.py" install --core-dir "$core_dir"
 
-printf '%s\n' "Adventurer Core update staged successfully. Rebuild worldserver and restart it to activate the new core/database state."
+printf '%s\n' "Adventurer Core update staged successfully. Rebuild worldserver and restart it to activate new core code; later SpellDraft config/card edits are runtime data and do not require recompilation."
