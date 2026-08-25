@@ -39,17 +39,42 @@ class SpellDraftV1Tests(unittest.TestCase):
         ):
             self.assertIn(token, self.runtime)
 
-        self.assertEqual(self.cards[10]["rank_grants"], "1784+921")
+        self.assertEqual(self.cards[10]["rank_grants"], "1784+921+6770")
         self.assertIn("ParseRankGrants", self.runtime)
         self.assertIn("ParseRequirements", self.runtime)
 
-    def test_battle_stance_unlocks_charge_without_granting_it_for_free(self) -> None:
-        battle_stance = self.cards[1]
-        charge = self.cards[11]
-        self.assertIn("11", battle_stance["unlocks"].split(","))
-        self.assertEqual(charge["requires_all"], "1:1")
-        self.assertEqual(charge["weight"], "500")
-        self.assertNotIn("GrantKitSpells", self.runtime)
+    def test_requested_level_ten_bundle_cards_are_exact(self) -> None:
+        self.assertEqual(self.cards[1]["rank_grants"], "2457+100")
+        self.assertEqual(self.cards[1]["rarity"], "common")
+        self.assertEqual(self.cards[15]["rank_grants"], "71+355")
+        self.assertEqual(self.cards[15]["rarity"], "common")
+        self.assertEqual(self.cards[10]["rank_grants"], "1784+921+6770")
+        self.assertEqual(self.cards[10]["rarity"], "uncommon")
+        self.assertEqual(self.cards[21]["rank_grants"], "5487+6807+6795+99")
+        self.assertEqual(self.cards[21]["rarity"], "rare")
+        self.assertEqual(self.cards[49]["rank_grants"], "1515+883+2641+6991+982")
+        self.assertEqual(self.cards[49]["rarity"], "epic")
+
+    def test_bundle_children_are_not_duplicate_standalone_cards(self) -> None:
+        active_primary_spells = {
+            int(row["rank_grants"].split("/")[0].split("+")[0])
+            for row in self.cards.values()
+            if row["type"] == "active"
+        }
+        for bundled_child in (100, 355, 921, 6770, 6807, 6795, 99, 883, 2641, 6991, 982):
+            self.assertNotIn(bundled_child, active_primary_spells)
+
+    def test_level_ten_active_catalog_is_populated_and_excludes_auto_shot(self) -> None:
+        active_rows = [row for row in self.cards.values() if row["type"] == "active"]
+        self.assertGreaterEqual(len(active_rows), 80)
+        self.assertTrue(all(int(row["source_level"]) <= 10 for row in active_rows))
+        primary_spells = {
+            int(row["rank_grants"].split("/")[0].split("+")[0])
+            for row in active_rows
+        }
+        self.assertNotIn(75, primary_spells)
+        for spell_id in (5185, 2457, 71, 21084, 1515, 1784, 585, 403, 133, 686):
+            self.assertIn(spell_id, primary_spells)
 
     def test_rarity_weight_and_blessing_are_independent_inputs_to_selection(self) -> None:
         self.assertIn("RarityWeightMultiplier", self.runtime)
@@ -64,7 +89,7 @@ class SpellDraftV1Tests(unittest.TestCase):
     def test_progression_matches_configured_level_one_five_and_ten_contract(self) -> None:
         for token in (
             "InitialActivePicks = 3",
-            "InitialActiveSourceLevelCap = 8",
+            "InitialActiveSourceLevelCap = 10",
             "ActiveDraftFirstLevel = 5",
             "ActiveDraftEveryLevels = 5",
             "TalentDraftFirstLevel = 10",
@@ -88,6 +113,13 @@ class SpellDraftV1Tests(unittest.TestCase):
         self.assertIn("uint8 nextRank = currentRank + 1", self.runtime)
         self.assertIn("state.ownedRanks[card.id] = nextRank", self.runtime)
         self.assertIn("replacesPreviousRank", self.runtime)
+
+    def test_talent_pool_keeps_a_small_verified_prototype_set(self) -> None:
+        talent_rows = [row for row in self.cards.values() if row["type"] == "talent"]
+        self.assertGreaterEqual(len(talent_rows), 7)
+        for card_id in (101, 102, 103, 104, 105, 106, 107):
+            self.assertIn(card_id, self.cards)
+            self.assertEqual(self.cards[card_id]["type"], "talent")
 
     def test_active_spell_families_upgrade_automatically(self) -> None:
         self.assertIn("UpgradeActiveSpellFamily", self.runtime)
@@ -156,7 +188,7 @@ class SpellDraftV1Tests(unittest.TestCase):
         self.assertNotIn("ReplaceDestroyedOfferSlot", self.runtime)
         self.assertNotIn("state.offeredCards[slot] = 0", self.runtime)
         self.assertIn('SendDraftError(player, "CANNOT_DESTROY_LAST_CARD"', self.runtime)
-        self.assertIn('state.destroyed[cardId] = tonumber(fields[8]) == 1', self.meta_client)
+        self.assertIn('state.destroyed[cardId] = destroyed', self.meta_client)
         self.assertIn('button:SetAlpha(0.30)', self.meta_client)
         self.assertIn('button.choose:SetText(text.blocked)', self.meta_client)
 
@@ -166,10 +198,23 @@ class SpellDraftV1Tests(unittest.TestCase):
         self.assertIn("return MeetsRequirements(state, card)", self.runtime)
         self.assertIn("state.blessedCardId = cardId", self.runtime)
 
-    def test_meta_ui_compacts_card_actions_and_reports_unlimited_blessing(self) -> None:
-        self.assertIn('button.choose:SetPoint("TOP", button.meta, "BOTTOM", 0, -10)', self.meta_client)
+    def test_bundle_ui_uses_extra_spell_icons_without_repeating_primary(self) -> None:
+        self.assertIn("extraSpellsByPrimary", self.meta_client)
+        self.assertIn("[1784] = {921, 6770}", self.meta_client)
+        self.assertIn("[5487] = {6807, 6795, 99}", self.meta_client)
+        self.assertIn("[1515] = {883, 2641, 6991, 982}", self.meta_client)
+        self.assertIn('GameTooltip:SetHyperlink("spell:" .. self.spellId)', self.meta_client)
+        self.assertIn('button.meta:SetText("")', self.meta_client)
+        self.assertNotIn("Incluye %d habilidades", self.meta_client)
+
+    def test_meta_ui_reports_unlimited_blessing_and_has_debug_pool_viewer(self) -> None:
         self.assertIn('blessings = "Bendiciones: %s"', self.meta_client)
         self.assertIn('local blessingCount = state.blessMultiplierPercent > 0 and "∞" or "0"', self.meta_client)
+        self.assertIn("AdventurerDraftPoolDebugButton", self.meta_client)
+        self.assertIn("AdventurerDraftPoolDebugFrame", self.meta_client)
+        self.assertIn('SLASH_ADVENTURERDRAFTPOOL1 = "/adraftpool"', self.meta_client)
+        self.assertIn('BuildDebugList("active")', self.meta_client)
+        self.assertIn('BuildDebugList("talent")', self.meta_client)
 
     def test_normal_talent_points_are_disabled_for_spell_draft_adventurer(self) -> None:
         self.assertIn("PLAYERHOOK_ON_CALCULATE_TALENTS_POINTS", self.runtime)
