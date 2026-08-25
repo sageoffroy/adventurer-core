@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -8,8 +9,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from adventurer import sha256_file  # noqa: E402
-from upgrade import verify_owned_source_state  # noqa: E402
+from adventurer import sha256_bytes, sha256_file  # noqa: E402
+from core_patch import PlannedFile  # noqa: E402
+from upgrade import (  # noqa: E402
+    UpgradeError,
+    prepare_new_source_ownership,
+    validate_new_owned_sources,
+    verify_owned_source_state,
+)
 
 
 class UpgradeStateTests(unittest.TestCase):
@@ -68,6 +75,57 @@ class UpgradeStateTests(unittest.TestCase):
 
             self.assertEqual(len(problems), 1)
             self.assertIn("modified: src/owned.cpp", problems[0])
+
+    def make_git_core(self, root: Path) -> Path:
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.email", "tests@example.invalid"], check=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.name", "Adventurer Tests"], check=True)
+        source = root / "src" / "newly-owned.cpp"
+        source.parent.mkdir(parents=True)
+        source.write_text("stock\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "src/newly-owned.cpp"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-qm", "baseline"], check=True)
+        return source
+
+    def test_pristine_tracked_file_can_be_adopted_by_new_package_revision(self):
+        with tempfile.TemporaryDirectory() as td:
+            core = Path(td)
+            source = self.make_git_core(core)
+            original = source.read_bytes()
+            planned = [
+                PlannedFile(
+                    "src/newly-owned.cpp",
+                    original,
+                    b"patched\n",
+                )
+            ]
+            state = {"files": []}
+
+            adopted = validate_new_owned_sources(core, state, planned)
+            self.assertEqual([item.relative_path for item in adopted], ["src/newly-owned.cpp"])
+
+            created = prepare_new_source_ownership(core, state, planned)
+            self.assertEqual(len(created), 1)
+            self.assertEqual(created[0].read_bytes(), original)
+            self.assertEqual(state["files"][0]["before_sha256"], sha256_bytes(original))
+            self.assertEqual(state["files"][0]["after_sha256"], sha256_bytes(b"patched\n"))
+            self.assertTrue(state["files"][0]["existed_before"])
+
+    def test_locally_modified_new_source_file_is_never_adopted(self):
+        with tempfile.TemporaryDirectory() as td:
+            core = Path(td)
+            source = self.make_git_core(core)
+            source.write_text("manual edit\n", encoding="utf-8")
+            planned = [
+                PlannedFile(
+                    "src/newly-owned.cpp",
+                    source.read_bytes(),
+                    b"patched\n",
+                )
+            ]
+
+            with self.assertRaisesRegex(UpgradeError, "local changes"):
+                validate_new_owned_sources(core, {"files": []}, planned)
 
 
 if __name__ == "__main__":
