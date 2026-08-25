@@ -42,8 +42,12 @@ jobs:
           planned = plan(core, payload)
           runtime_rel = "src/server/scripts/Custom/adventurer_core.cpp"
           runtime = next(item for item in planned if item.relative_path == runtime_rel)
+          dbc_structure = next(item for item in planned if item.relative_path.endswith("DBCStructure.h"))
+          dbc_stores = next(item for item in planned if item.relative_path.endswith("DBCStores.cpp"))
 
-          assert len(planned) == 7
+          assert len(planned) == 9
+          assert b"#define MAX_TALENT_TABS 4" in dbc_structure.patched
+          assert b"sTalentTabPages[MAX_CLASSES][MAX_TALENT_TABS]" in dbc_stores.patched
           assert runtime.original is None
           assert runtime.patched == (payload / runtime_rel).read_bytes()
           text = runtime.patched.decode("utf-8")
@@ -61,5 +65,5 @@ jobs:
               "PLAYERHOOK_ON_PLAYER_IS_CLASS",
           ):
               assert token not in text, token
-          print("Supported clean-core no-DK source patch smoke test OK")
+          print("Supported clean-core four-tree source patch smoke test OK")
           PY
