@@ -25,7 +25,7 @@ class SpellDraftExternalConfigTests(unittest.TestCase):
     def test_runtime_balance_knobs_are_external(self) -> None:
         self.assertEqual(self.config.getint("Draft", "OfferSize"), 3)
         self.assertEqual(self.config.getint("Draft", "InitialActivePicks"), 3)
-        self.assertEqual(self.config.getint("Draft", "InitialActiveSourceLevelCap"), 8)
+        self.assertEqual(self.config.getint("Draft", "InitialActiveSourceLevelCap"), 10)
 
         for section in ("Reroll", "Bless", "Destroy"):
             self.assertIn(section, self.config)
@@ -74,7 +74,11 @@ class SpellDraftExternalConfigTests(unittest.TestCase):
 
     def test_rank_grants_support_bundles_and_progressive_ranks(self) -> None:
         by_key = {row["key"]: row for row in self.cards}
-        self.assertEqual(by_key["stealth_kit"]["rank_grants"], "1784+921")
+        self.assertEqual(by_key["battle_stance"]["rank_grants"], "2457+100")
+        self.assertEqual(by_key["defensive_stance"]["rank_grants"], "71+355")
+        self.assertEqual(by_key["stealth"]["rank_grants"], "1784+921+6770")
+        self.assertEqual(by_key["bear_form"]["rank_grants"], "5487+6807+6795+99")
+        self.assertEqual(by_key["tame_beast"]["rank_grants"], "1515+883+2641+6991+982")
         self.assertEqual(
             by_key["cruelty"]["rank_grants"],
             "12320/12852/12853/12855/12856",
@@ -102,10 +106,15 @@ class SpellDraftExternalConfigTests(unittest.TestCase):
                     self.assertIn(int(card_id), card_ids, row)
                     self.assertGreater(int(rank), 0, row)
 
-    def test_current_prototype_relationships_survive_externalization(self) -> None:
+    def test_level_ten_relationships_survive_externalization(self) -> None:
         by_key = {row["key"]: row for row in self.cards}
-        self.assertEqual(by_key["charge"]["requires_all"], "1:1")
-        self.assertEqual(int(by_key["charge"]["weight"]), 500)
+        self.assertEqual(by_key["rend"]["requires_any"], "1:1|15:1")
+        self.assertEqual(by_key["thunder_clap"]["requires_any"], "1:1|15:1")
+        self.assertEqual(by_key["judgement_of_light"]["requires_all"], "31:1")
+        self.assertEqual(by_key["eviscerate"]["requires_any"], "14:1|51:1|53:1")
+        self.assertEqual(by_key["slice_and_dice"]["requires_any"], "14:1|51:1|53:1")
+        self.assertEqual(by_key["create_healthstone"]["requires_all"], "90:1")
+        self.assertEqual(by_key["summon_voidwalker"]["requires_all"], "90:1")
         self.assertEqual(by_key["improved_fireball"]["requires_all"], "2:1")
         self.assertEqual(by_key["improved_frostbolt"]["requires_all"], "3:1")
 
