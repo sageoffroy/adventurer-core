@@ -1,0 +1,22 @@
+id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unlocks;replaces_previous;name
+1;battle_stance;active;1;common;100;2457;;;11,106;0;Actitud de batalla
+2;fireball;active;1;common;100;133;;;104;0;Bola de Fuego
+3;frostbolt;active;4;common;100;116;;;105;0;Descarga de Escarcha
+4;shadow_bolt;active;1;common;100;686;;;;0;Descarga de las Sombras
+5;smite;active;1;common;100;585;;;;0;Punición
+6;lightning_bolt;active;1;common;100;403;;;;0;Descarga de relámpagos
+7;wrath;active;1;common;100;5176;;;;0;Cólera
+8;heroic_strike;active;1;common;110;78;;;107;0;Golpe heroico
+9;rejuvenation;active;4;common;100;774;;;;0;Rejuvenecimiento
+10;stealth_kit;active;1;uncommon;120;1784+921;;;;0;Sigilo + Robar
+11;charge;active;4;common;500;100;1:1;;;0;Cargar
+12;arcane_intellect;active;1;common;90;1459;;;;0;Intelecto Arcano
+13;healing_wave;active;1;common;100;331;;;;0;Ola de sanación
+14;sinister_strike;active;1;common;100;1752;;;;0;Golpe siniestro
+101;cruelty;talent;10;common;120;12320/12852/12853/12855/12856;;;;1;Crueldad
+102;deflection;talent;10;common;100;16462/16463/16464/16465/16466;;;;1;Desvío
+103;anticipation;talent;10;common;90;12297/12750/12751/12752/12753;;;;1;Anticipación
+104;improved_fireball;talent;10;uncommon;180;11069/12338/12339/12340/12341;2:1;;;1;Bola de Fuego mejorada
+105;improved_frostbolt;talent;10;uncommon;180;11070/12473/16763/16765/16766;3:1;;;1;Descarga de Escarcha mejorada
+106;tactical_mastery;talent;10;uncommon;250;12295/12676/12677;1:1;;;1;Maestría táctica
+107;improved_heroic_strike;talent;10;uncommon;180;12282/12663/12664;8:1;;;1;Golpe heroico mejorado
