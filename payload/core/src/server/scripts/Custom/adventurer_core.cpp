@@ -1099,6 +1099,20 @@ uint32 OfferedCardCount(DraftState const& state)
     return count;
 }
 
+uint32 SelectableOfferCount(Player* player, DraftState const& state)
+{
+    uint32 count = 0;
+    for (uint32 cardId : state.offeredCards)
+    {
+        if (!cardId || state.destroyedCards.count(cardId))
+            continue;
+        DraftCard const* card = FindDraftCard(cardId);
+        if (card && IsCardEligible(player, state, *card, state.offerType))
+            ++count;
+    }
+    return count;
+}
+
 bool ExistingOfferIsValid(Player* player, DraftState const& state, DraftCardType expectedType)
 {
     if (state.offerType != expectedType || state.offeredCards[0] == 0)
@@ -1106,15 +1120,24 @@ bool ExistingOfferIsValid(Player* player, DraftState const& state, DraftCardType
     if (OfferedCardCount(state) != GetDraftConfig().offerSize)
         return false;
 
+    bool hasSelectableCard = false;
     for (uint32 cardId : state.offeredCards)
     {
         if (!cardId)
             continue;
+
         DraftCard const* card = FindDraftCard(cardId);
-        if (!card || !IsCardEligible(player, state, *card, expectedType))
+        if (!card)
             return false;
+
+        if (state.destroyedCards.count(cardId))
+            continue;
+
+        if (!IsCardEligible(player, state, *card, expectedType))
+            return false;
+        hasSelectableCard = true;
     }
-    return true;
+    return hasSelectableCard;
 }
 
 void GenerateDraftOffer(Player* player, DraftState& state, DraftCardType type, bool avoidCurrent)
@@ -1213,7 +1236,8 @@ void SendDraftOffer(Player* player, DraftState const& state)
                 << ':' << card->weight
                 << ':' << grants.size()
                 << ':' << uint32(nextRank)
-                << ':' << card->rankGrants.size();
+                << ':' << card->rankGrants.size()
+                << ':' << (state.destroyedCards.count(card->id) ? 1 : 0);
     }
 
     SendAddonPayload(player, ADVENTURER_DRAFT_PREFIX, payload.str());
@@ -1434,17 +1458,6 @@ void HandleDraftBless(Player* player, uint32 cardId)
     SendDraftMeta(player, state);
 }
 
-void ReplaceDestroyedOfferSlot(Player* player, DraftState& state, size_t slot)
-{
-    std::set<uint32> excluded;
-    for (uint32 cardId : state.offeredCards)
-        if (cardId)
-            excluded.insert(cardId);
-
-    std::vector<uint32> replacement = SelectWeightedCards(player, state, state.offerType, 1, excluded);
-    state.offeredCards[slot] = replacement.empty() ? 0 : replacement.front();
-}
-
 void HandleDraftDestroy(Player* player, uint32 cardId)
 {
     DraftState& state = GetDraftState(player);
@@ -1461,29 +1474,16 @@ void HandleDraftDestroy(Player* player, uint32 cardId)
         return;
     }
 
-    size_t slot = 0;
-    while (slot < state.offeredCards.size() && state.offeredCards[slot] != cardId)
-        ++slot;
-    if (slot >= state.offeredCards.size())
+    if (SelectableOfferCount(player, state) <= 1)
     {
-        SendDraftError(player, "INVALID_DESTROY", &state);
+        SendDraftError(player, "CANNOT_DESTROY_LAST_CARD", &state);
         return;
     }
 
-    DraftState previous = state;
     --state.destroyCharges;
     state.destroyedCards.insert(cardId);
     if (state.blessedCardId == cardId)
         state.blessedCardId = 0;
-    state.offeredCards[slot] = 0;
-    ReplaceDestroyedOfferSlot(player, state, slot);
-
-    if (OfferedCardCount(state) == 0)
-    {
-        state = previous;
-        SendDraftError(player, "CANNOT_DESTROY_LAST_CARD", &state);
-        return;
-    }
 
     PersistDraftState(player, state);
     SendDraftOffer(player, state);
