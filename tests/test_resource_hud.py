@@ -9,9 +9,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from client import (  # noqa: E402
+    ADVENTURER_DRAFT_META_INTERNAL,
     ADVENTURER_FRAME_INTERNAL,
     ADVENTURER_PLAYER_FRAME_INTERNAL,
     DBC_NAMES,
+    build_adventurer_draft_meta_lua,
     build_adventurer_frame_art,
     build_adventurer_player_frame_xml,
     build_adventurer_resources_lua,
@@ -21,14 +23,15 @@ from client import (  # noqa: E402
 
 
 class AdventurerResourceHudTests(unittest.TestCase):
-    def test_frame_xml_loads_adventurer_layout_directly_after_player_frame(self) -> None:
+    def test_frame_xml_loads_adventurer_layout_and_draft_meta_after_player_frame(self) -> None:
         toc = build_frame_xml_toc().decode("utf-8")
         self.assertIn(
-            "PlayerFrame.xml\nAdventurerPlayerFrame.xml\nAdventurerResources.lua\nPartyFrame.xml",
+            "PlayerFrame.xml\nAdventurerPlayerFrame.xml\nAdventurerResources.lua\nAdventurerDraftMeta.lua\nPartyFrame.xml",
             toc,
         )
         self.assertEqual(toc.count("AdventurerPlayerFrame.xml"), 1)
         self.assertEqual(toc.count("AdventurerResources.lua"), 1)
+        self.assertEqual(toc.count("AdventurerDraftMeta.lua"), 1)
 
     def test_xml_uses_reference_energy_and_rage_geometry(self) -> None:
         xml = build_adventurer_player_frame_xml().decode("utf-8")
@@ -197,7 +200,7 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertEqual(int.from_bytes(art[12:16], "little"), 256)
         self.assertEqual(int.from_bytes(art[16:20], "little"), 128)
 
-    def test_root_mpq_contains_player_frame_xml_hud_and_frame_art(self) -> None:
+    def test_root_mpq_contains_player_frame_xml_hud_draft_meta_and_frame_art(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             work = Path(tmp_name)
             for index, name in enumerate(DBC_NAMES):
@@ -207,13 +210,19 @@ class AdventurerResourceHudTests(unittest.TestCase):
             self.assertIn("Interface\\FrameXML\\FrameXML.toc", root_files)
             self.assertIn(ADVENTURER_PLAYER_FRAME_INTERNAL, root_files)
             self.assertIn("Interface\\FrameXML\\AdventurerResources.lua", root_files)
+            self.assertIn(ADVENTURER_DRAFT_META_INTERNAL, root_files)
             self.assertIn(ADVENTURER_FRAME_INTERNAL, root_files)
             self.assertEqual(
                 root_files[ADVENTURER_PLAYER_FRAME_INTERNAL],
                 build_adventurer_player_frame_xml(),
             )
+            self.assertEqual(
+                root_files[ADVENTURER_DRAFT_META_INTERNAL],
+                build_adventurer_draft_meta_lua(),
+            )
             self.assertEqual(root_files[ADVENTURER_FRAME_INTERNAL], build_adventurer_frame_art())
             self.assertNotIn(ADVENTURER_PLAYER_FRAME_INTERNAL, locale_files)
+            self.assertNotIn(ADVENTURER_DRAFT_META_INTERNAL, locale_files)
             self.assertNotIn(ADVENTURER_FRAME_INTERNAL, locale_files)
 
 
