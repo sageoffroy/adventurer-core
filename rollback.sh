@@ -38,6 +38,10 @@ python3 "$ROOT/tools/database.py" restore "$@"
 python3 "$ROOT/tools/world.py" cleanup-db --core-dir "$core_dir"
 python3 "$ROOT/tools/world.py" remove --core-dir "$core_dir"
 
+# Remove unedited SpellDraft runtime defaults. User-edited live files are kept
+# with a warning instead of being destroyed during rollback.
+python3 "$ROOT/tools/spelldraft_runtime.py" remove "$@"
+
 # Restore original source, DBCs and client patches. This understands both the
 # original .adventurer-backup DBC suffix and the current package state.
 python3 "$ROOT/tools/package_rollback.py" "$@"
