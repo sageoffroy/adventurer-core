@@ -2,10 +2,11 @@
 """Transactional in-place upgrades for an already-installed Adventurer Core.
 
 Unlike the clean installer, this command deliberately allows existing class-10
-characters. It only upgrades files already owned by Adventurer Core, preserves
-the original pre-install rollback backups, stages every generated client/DBC
-artifact before mutation, and restores the immediately previous installed state
-if any upgrade step fails.
+characters. It upgrades Adventurer-owned files and may adopt newly-required core
+files only when they are still pristine at the originally-installed AzerothCore
+HEAD. Original rollback backups are preserved/extended, every generated
+client/DBC artifact is staged before mutation, and the immediately previous
+installed state is restored if any upgrade step fails.
 """
 
 from __future__ import annotations
@@ -21,6 +22,8 @@ import tempfile
 from adventurer import (
     InstallError,
     PAYLOAD_ROOT,
+    STATE_DIR_NAME,
+    git,
     load_state,
     save_state,
     sha256_bytes,
@@ -91,17 +94,67 @@ def validate_installed_state(core: Path, state: dict) -> None:
         )
 
 
+def validate_new_owned_sources(core: Path, state: dict, planned) -> list:
+    """Return planned files newly adopted by this package revision.
+
+    A newly-adopted path that already exists must be a tracked file and must be
+    byte-for-byte/mode clean relative to the unchanged AzerothCore HEAD. This is
+    the safety boundary that lets a package revision expand its source ownership
+    without silently overwriting a user's unrelated local core edit.
+    """
+    owned = state_file_map(state)
+    newly_owned = [item for item in planned if item.relative_path not in owned]
+
+    for item in newly_owned:
+        if item.original is None:
+            # A package-created path is safe to adopt only because plan_core has
+            # already established that the destination does not exist.
+            continue
+
+        tracked = git(
+            core,
+            "ls-files",
+            "--error-unmatch",
+            "--",
+            item.relative_path,
+            check=False,
+        )
+        if tracked.returncode != 0:
+            raise UpgradeError(
+                "Upgrade wants to adopt an existing source file that is not tracked "
+                f"by the installed AzerothCore commit: {item.relative_path}"
+            )
+
+        clean = git(
+            core,
+            "diff",
+            "--quiet",
+            "HEAD",
+            "--",
+            item.relative_path,
+            check=False,
+        )
+        if clean.returncode == 1:
+            raise UpgradeError(
+                "Upgrade wants to adopt a newly-owned core file, but it has local "
+                f"changes and will not be overwritten: {item.relative_path}"
+            )
+        if clean.returncode != 0:
+            raise UpgradeError(
+                f"Could not verify pristine state for newly-owned core file: {item.relative_path}"
+            )
+
+    return newly_owned
+
+
 def plan_owned_upgrade(core: Path, state: dict):
     planned = plan_core(core, PAYLOAD_ROOT, allow_payload_replace=True)
     owned = state_file_map(state)
-    missing = [item.relative_path for item in planned if item.relative_path not in owned]
-    if missing:
-        raise UpgradeError(
-            "Upgrade wants to modify files that are not present in the original ownership manifest: "
-            + ", ".join(missing)
-        )
+    validate_new_owned_sources(core, state, planned)
 
     for item in planned:
+        if item.relative_path not in owned:
+            continue
         expected = owned[item.relative_path].get("after_sha256")
         actual = sha256_bytes(item.original) if item.original is not None else None
         if expected != actual:
@@ -112,7 +165,7 @@ def plan_owned_upgrade(core: Path, state: dict):
     return planned
 
 
-def snapshot_runtime(core: Path, state: dict, directory: Path) -> dict:
+def snapshot_runtime(core: Path, state: dict, directory: Path, planned=()) -> dict:
     snapshot: dict = {"source": {}, "dbc": {}, "client": {}}
 
     for entry in state.get("files", []):
@@ -122,6 +175,20 @@ def snapshot_runtime(core: Path, state: dict, directory: Path) -> dict:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, target)
             snapshot["source"][entry["path"]] = target
+
+    # Newly-owned source files are not in the previous manifest yet, but they
+    # still need to be restored if this upgrade fails after source mutation.
+    for item in planned:
+        if item.relative_path in snapshot["source"]:
+            continue
+        path = core / item.relative_path
+        if path.is_file():
+            target = directory / "source" / item.relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, target)
+            snapshot["source"][item.relative_path] = target
+        else:
+            snapshot["source"][item.relative_path] = None
 
     dbc_state = state.get("dbc")
     if dbc_state:
@@ -171,15 +238,72 @@ def restore_previous(snapshot: dict) -> None:
         target = Path(raw) if Path(raw).is_absolute() else None
         # Source snapshots are keyed by repository-relative path. They are
         # restored separately by restore_sources(), which knows the core root.
-        if target is not None:
+        if target is not None and saved is not None:
             shutil.copy2(saved, target)
 
 
 def restore_sources(core: Path, snapshot: dict) -> None:
     for relative, saved in snapshot.get("source", {}).items():
         target = core / relative
+        if saved is None:
+            if target.exists():
+                target.unlink()
+            continue
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(saved, target)
+
+
+def prepare_new_source_ownership(core: Path, state: dict, planned) -> list[Path]:
+    """Extend rollback ownership for newly-adopted source paths before mutation."""
+    owned = state_file_map(state)
+    newly_owned = [item for item in planned if item.relative_path not in owned]
+    backup_root = core / STATE_DIR_NAME / "backups"
+
+    # Check every destination before writing any persistent backup.
+    for item in newly_owned:
+        if item.original is None:
+            continue
+        backup = backup_root / item.relative_path
+        if backup.exists():
+            raise UpgradeError(
+                "Unexpected rollback backup already exists for newly-owned source file: "
+                f"{backup}"
+            )
+
+    created_backups: list[Path] = []
+    for item in newly_owned:
+        if item.original is not None:
+            backup = backup_root / item.relative_path
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            backup.write_bytes(item.original)
+            created_backups.append(backup)
+
+        state.setdefault("files", []).append(
+            {
+                "path": item.relative_path,
+                "existed_before": item.original is not None,
+                "before_sha256": (
+                    sha256_bytes(item.original) if item.original is not None else None
+                ),
+                "after_sha256": sha256_bytes(item.patched),
+            }
+        )
+
+    return created_backups
+
+
+def cleanup_new_backups(core: Path, created_backups: list[Path]) -> None:
+    backup_root = core / STATE_DIR_NAME / "backups"
+    for backup in reversed(created_backups):
+        if backup.exists():
+            backup.unlink()
+        parent = backup.parent
+        while parent != backup_root and parent.is_dir():
+            try:
+                parent.rmdir()
+            except OSError:
+                break
+            parent = parent.parent
 
 
 def update_source_manifest(state: dict, planned) -> None:
@@ -211,13 +335,17 @@ def apply_upgrade(args) -> None:
         # installed source tree.
         build_patch(dbc_source, staged, args.locale)
         previous_state = copy.deepcopy(state)
-        snapshot = snapshot_runtime(core, state, temp / "previous")
+        snapshot = snapshot_runtime(core, state, temp / "previous", planned)
+        created_backups: list[Path] = []
 
         try:
+            created_backups = prepare_new_source_ownership(core, state, planned)
+
             for item in planned:
                 if item.original == item.patched:
                     continue
                 target = core / item.relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(item.patched)
 
             dbc_hashes = install_server_dbcs(staged, server_dbc)
@@ -251,16 +379,19 @@ def apply_upgrade(args) -> None:
                 target = Path(raw)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(saved, target)
+            cleanup_new_backups(core, created_backups)
             save_state(core, previous_state)
             raise
 
     changed = sum(1 for item in planned if item.original != item.patched)
+    adopted = len([item for item in planned if item.relative_path not in state_file_map(previous_state)])
     print("Adventurer Core upgraded and verified.")
     print(f"  core:             {core}")
     print(f"  owned source:     {changed} changed")
+    print(f"  newly adopted:    {adopted} pristine core files")
     print(f"  server DBC:       {len(DBC_NAMES)} refreshed")
     print(f"  client locale:    {args.locale}")
-    print("  rollback baseline: preserved from the original clean installation")
+    print("  rollback baseline: preserved and extended from the original clean installation")
     print("  NEXT: install pending world updates, rebuild worldserver, restart.")
 
 
