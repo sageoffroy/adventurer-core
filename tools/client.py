@@ -19,8 +19,10 @@ CHARACTER_CREATE_BASELINE = ROOT / "client" / "baseline" / "CharacterCreate.lua"
 FRAME_XML_BASELINE = ROOT / "client" / "baseline" / "FrameXML.toc"
 ADVENTURER_PLAYER_FRAME = ROOT / "client" / "AdventurerPlayerFrame.xml"
 ADVENTURER_RESOURCES = ROOT / "client" / "AdventurerResources.lua"
+ADVENTURER_DRAFT_META = ROOT / "client" / "AdventurerDraftMeta.lua"
 ADVENTURER_FRAME_ART = ROOT / "client" / "art" / "UI-AdventurerFrame.blp"
 ADVENTURER_PLAYER_FRAME_INTERNAL = "Interface\\FrameXML\\AdventurerPlayerFrame.xml"
+ADVENTURER_DRAFT_META_INTERNAL = "Interface\\FrameXML\\AdventurerDraftMeta.lua"
 ADVENTURER_FRAME_INTERNAL = "Interface\\Adventurer\\UI-AdventurerFrame.blp"
 DEFAULT_LOCALE = "esMX"
 PROJECT_SUFFIX = "Z"
@@ -179,7 +181,7 @@ def build_frame_xml_toc() -> bytes:
 
     text = FRAME_XML_BASELINE.read_text(encoding="utf-8")
     marker = "PlayerFrame.xml\nPartyFrame.xml"
-    replacement = "PlayerFrame.xml\nAdventurerPlayerFrame.xml\nAdventurerResources.lua\nPartyFrame.xml"
+    replacement = "PlayerFrame.xml\nAdventurerPlayerFrame.xml\nAdventurerResources.lua\nAdventurerDraftMeta.lua\nPartyFrame.xml"
 
     if replacement in text:
         raise ClientError("FrameXML baseline must remain pristine")
@@ -216,7 +218,6 @@ def build_adventurer_player_frame_xml() -> bytes:
             + ", ".join(missing)
         )
 
-    # Do not copy Ascension-client-only widgets into a stock 3.3.5a FrameXML.
     forbidden = (
         b"TotalAbsorbBarTemplate",
         b"HealAbsorbBarTemplate",
@@ -265,9 +266,6 @@ def build_adventurer_resources_lua() -> bytes:
             + ", ".join(missing)
         )
 
-    # The Adventurer no longer inherits Death Knight resources or client state,
-    # and its auxiliary bars must come from FrameXML rather than ad-hoc UIParent
-    # StatusBars.
     forbidden = (
         b"POWER_RUNIC_POWER",
         b"AdventurerRunicPowerBar",
@@ -288,16 +286,36 @@ def build_adventurer_resources_lua() -> bytes:
             + ", ".join(present)
         )
 
-    # 3.3.5a suppresses the client-side combo-point query for class 10. Keep
-    # Blizzard's TargetFrame/ComboFrame renderer, but permit exactly one narrow
-    # wrapper around GetComboPoints that substitutes only player -> target data
-    # delivered by the AdventurerCP server sync. All other calls must delegate
-    # to Blizzard's original API.
     if payload.count(b"GetComboPoints = function(unit, target)") != 1:
         raise ClientError("Adventurer resource HUD must contain exactly one combo-point shim")
     if b"SpellDraft" in payload:
         raise ClientError("Adventurer resource HUD must not depend on SpellDraft")
 
+    return payload
+
+
+def build_adventurer_draft_meta_lua() -> bytes:
+    if not ADVENTURER_DRAFT_META.is_file():
+        raise ClientError(f"Missing Adventurer Draft meta UI: {ADVENTURER_DRAFT_META}")
+
+    payload = ADVENTURER_DRAFT_META.read_bytes()
+    required = (
+        b'ADRAFT_REROLL',
+        b'ADRAFT_BLESS:',
+        b'ADRAFT_DESTROY:',
+        b'AdventurerDraftRerollButton',
+        b'AdventurerDraftBlessButton',
+        b'AdventurerDraftDestroyButton',
+        b'adventurerOriginalDraftClick',
+        b'blessedCardId',
+        b'CHAT_MSG_ADDON',
+    )
+    missing = [token.decode("ascii") for token in required if token not in payload]
+    if missing:
+        raise ClientError(
+            "Adventurer Draft meta UI is missing required contract markers: "
+            + ", ".join(missing)
+        )
     return payload
 
 
@@ -336,6 +354,7 @@ def build_archive_files(work: Path) -> tuple[dict[str, bytes], dict[str, bytes]]
         "Interface\\FrameXML\\FrameXML.toc": build_frame_xml_toc(),
         ADVENTURER_PLAYER_FRAME_INTERNAL: build_adventurer_player_frame_xml(),
         "Interface\\FrameXML\\AdventurerResources.lua": build_adventurer_resources_lua(),
+        ADVENTURER_DRAFT_META_INTERNAL: build_adventurer_draft_meta_lua(),
         ADVENTURER_FRAME_INTERNAL: build_adventurer_frame_art(),
         **{
             f"DBFilesClient\\{name}": (work / name).read_bytes()
@@ -399,6 +418,7 @@ def build_patch(dbc_source: Path, output: Path, locale: str = DEFAULT_LOCALE) ->
         "frame_xml_toc_sha256": hashlib.sha256(build_frame_xml_toc()).hexdigest(),
         "player_frame_xml_sha256": hashlib.sha256(build_adventurer_player_frame_xml()).hexdigest(),
         "resource_hud_sha256": hashlib.sha256(build_adventurer_resources_lua()).hexdigest(),
+        "draft_meta_sha256": hashlib.sha256(build_adventurer_draft_meta_lua()).hexdigest(),
         "adventurer_frame_sha256": hashlib.sha256(build_adventurer_frame_art()).hexdigest(),
     }
     (output / "manifest.json").write_text(
