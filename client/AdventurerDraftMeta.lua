@@ -17,7 +17,9 @@ if locale == "esES" or locale == "esMX" then
         bless = "Bendecir",
         destroy = "Destruir",
         cancel = "Cancelar",
+        blocked = "Bloqueada",
         rerolls = "Relanzamientos: %d",
+        blessings = "Bendiciones: %s",
         destroys = "Destrucciones: %d",
         blessed = "Bendecida x%.1f",
         blessHint = "Selecciona una carta para bendecirla",
@@ -29,7 +31,9 @@ else
         bless = "Bless",
         destroy = "Destroy",
         cancel = "Cancel",
+        blocked = "Blocked",
         rerolls = "Rerolls: %d",
+        blessings = "Blessings: %s",
         destroys = "Destroys: %d",
         blessed = "Blessed x%.1f",
         blessHint = "Select a card to bless it",
@@ -75,12 +79,9 @@ if not DraftFrame then
     return
 end
 
--- The original chooser is 300px high and the card buttons end near its bottom.
--- Give meta-actions their own footer instead of overlaying the card content.
-DraftFrame:SetHeight(365)
+DraftFrame:SetHeight(350)
 if DraftFrame.hint then
-    DraftFrame.hint:ClearAllPoints()
-    DraftFrame.hint:SetPoint("BOTTOM", DraftFrame, "BOTTOM", 0, 76)
+    DraftFrame.hint:SetPoint("BOTTOM", DraftFrame, "BOTTOM", 0, 48)
 end
 
 local state = {
@@ -90,17 +91,18 @@ local state = {
     blessMultiplierPercent = 0,
     mode = nil,
     offered = {},
+    destroyed = {},
 }
 
 DraftFrame.metaStatus = DraftFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-DraftFrame.metaStatus:SetPoint("BOTTOM", DraftFrame, "BOTTOM", 0, 56)
+DraftFrame.metaStatus:SetPoint("BOTTOM", DraftFrame, "BOTTOM", 0, 52)
 DraftFrame.metaStatus:SetText("")
 
 local function CreateActionButton(name, x)
     local button = CreateFrame("Button", name, DraftFrame, "UIPanelButtonTemplate")
     button:SetWidth(112)
     button:SetHeight(24)
-    button:SetPoint("BOTTOM", DraftFrame, "BOTTOM", x, 22)
+    button:SetPoint("BOTTOM", DraftFrame, "BOTTOM", x, 18)
     return button
 end
 
@@ -120,6 +122,19 @@ for i = 1, 3 do
         button.adventurerMetaBadge = button:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         button.adventurerMetaBadge:SetPoint("TOPRIGHT", button, "TOPRIGHT", -8, -7)
         button.adventurerMetaBadge:SetText("")
+
+        -- The base chooser anchored "Elegir" to the bottom of a 205px card,
+        -- leaving a large empty hole after the rarity on cards without rank or
+        -- bundle metadata. Keep the button directly below the real card text.
+        if button.choose then
+            button.choose:ClearAllPoints()
+            if button.meta then
+                button.choose:SetPoint("TOP", button.meta, "BOTTOM", 0, -10)
+            else
+                button.choose:SetPoint("TOP", button.rarity, "BOTTOM", 0, -10)
+            end
+        end
+
         table.insert(cardButtons, button)
     end
 end
@@ -139,7 +154,10 @@ end
 
 local function RefreshMetaUI()
     local blessMultiplier = (state.blessMultiplierPercent or 0) / 100
+    local blessingCount = state.blessMultiplierPercent > 0 and "∞" or "0"
     local status = string.format(text.rerolls, state.rerolls)
+        .. "   •   "
+        .. string.format(text.blessings, blessingCount)
         .. "   •   "
         .. string.format(text.destroys, state.destroys)
     if state.blessedCardId and state.blessedCardId > 0 and blessMultiplier > 0 then
@@ -166,18 +184,43 @@ local function RefreshMetaUI()
     end
 
     for _, button in ipairs(cardButtons) do
-        if button.cardId and button.cardId == state.blessedCardId then
-            button.adventurerMetaBadge:SetText("★")
-            button.adventurerMetaBadge:SetTextColor(1, 0.82, 0)
+        local cardId = button.cardId
+        local isDestroyed = cardId and state.destroyed[cardId]
+
+        if isDestroyed then
+            button:Disable()
+            button:SetAlpha(0.30)
+            if button.choose then
+                button.choose:SetText(text.blocked)
+            end
+            button.adventurerMetaBadge:SetText("X")
+            button.adventurerMetaBadge:SetTextColor(0.55, 0.55, 0.55)
         else
-            button.adventurerMetaBadge:SetText("")
+            if cardId and DraftFrame:IsShown() then
+                button:Enable()
+                button:SetAlpha(1)
+            end
+            if button.choose then
+                if locale == "esES" or locale == "esMX" then
+                    button.choose:SetText("Elegir")
+                else
+                    button.choose:SetText("Choose")
+                end
+            end
+
+            if cardId and cardId == state.blessedCardId then
+                button.adventurerMetaBadge:SetText("★")
+                button.adventurerMetaBadge:SetTextColor(1, 0.82, 0)
+            else
+                button.adventurerMetaBadge:SetText("")
+            end
         end
     end
 end
 
 for _, button in ipairs(cardButtons) do
     button:SetScript("OnClick", function(self, mouseButton)
-        if not self.cardId then
+        if not self.cardId or state.destroyed[self.cardId] then
             return
         end
 
@@ -243,13 +286,16 @@ local function ParseOffer(message)
     if #sections < 5 or sections[1] ~= "O" then
         return
     end
+
     state.offered = {}
+    state.destroyed = {}
     local records = SplitText(sections[5], ";")
     for _, record in ipairs(records) do
         local fields = SplitText(record, ":")
         local cardId = tonumber(fields[1])
         if cardId then
             table.insert(state.offered, cardId)
+            state.destroyed[cardId] = tonumber(fields[8]) == 1
         end
     end
 end
@@ -307,6 +353,7 @@ MetaEventFrame:SetScript("OnEvent", function(self, event, ...)
     elseif string.sub(message, 1, 2) == "M|" then
         ParseMeta(message)
     elseif message == "C" then
+        state.destroyed = {}
         ResetMode()
         RefreshMetaUI()
     elseif string.sub(message, 1, 2) == "E|" then
