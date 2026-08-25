@@ -26,10 +26,16 @@ class GuardianContractTests(unittest.TestCase):
 
     def test_guardian_first_rows_are_generic_foundations(self) -> None:
         vitality = self.definitions["vitality"]
+        self.assertEqual(vitality["effect_values"]["0"], [3, 6, 9, 12, 15])
         self.assertEqual(vitality["effect_values"]["1"], [2, 4, 6, 8, 10])
-        self.assertEqual(vitality["disable_effects"], [0])
+        self.assertNotIn("disable_effects", vitality)
+        self.assertEqual(vitality["spell_u32_values"]["71"], 6)  # SPELL_EFFECT_APPLY_AURA
+        self.assertEqual(vitality["spell_u32_values"]["89"], 1)  # caster target
+        self.assertEqual(vitality["spell_u32_values"]["95"], 61)  # SPELL_AURA_MOD_SCALE
+        self.assertIn("tamaño", vitality["description_esMX"])
 
         strength = self.definitions["overwhelming_strength"]
+        self.assertEqual(strength["spell_source_ids"], [20262, 20263, 20264, 20265, 20266])
         self.assertEqual(strength["effect_values"]["0"], [3, 6, 9, 12, 15])
 
         cicatrization = self.definitions["cicatrization"]
@@ -52,6 +58,10 @@ class GuardianContractTests(unittest.TestCase):
         self.assertEqual(index, 6)
         self.assertEqual(custom_spell_id(self.spec, index, 0), 290060)
         self.assertEqual(custom_spell_id(self.spec, index, 4), 290064)
+
+        core = (ROOT / "payload/core/src/server/scripts/Custom/adventurer_core.cpp").read_text(encoding="utf-8")
+        self.assertIn("player->HasSpell(spellId) || player->HasAura(spellId)", core)
+        self.assertIn("RefreshConsistencyArmor(player, diff);", core)
 
     def test_painful_impacts_is_physical_threat_and_uses_backstab_icon(self) -> None:
         definition = self.definitions["painful_impacts"]

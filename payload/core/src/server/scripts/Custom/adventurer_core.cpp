@@ -102,8 +102,11 @@ uint8 GetConsistencyRank(Player const* player)
         return 0;
 
     for (uint8 rank = CONSISTENCY_RANKS; rank > 0; --rank)
-        if (player->HasAura(CONSISTENCY_RANK_1 + rank - 1))
+    {
+        uint32 spellId = CONSISTENCY_RANK_1 + rank - 1;
+        if (player->HasSpell(spellId) || player->HasAura(spellId))
             return rank;
+    }
 
     return 0;
 }

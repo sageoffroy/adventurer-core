@@ -38,10 +38,10 @@
       "esMX": "Vitalidad",
       "icon": "spell_nature_abolishmagic",
       "spell_source_ids": [19584,19584,19584,19584,19584],
-      "effect_values": {"1": [2,4,6,8,10]},
-      "disable_effects": [0],
-      "description_enUS": "Increases your maximum health by $s2%.",
-      "description_esMX": "Aumenta tu salud máxima un $s2%."
+      "effect_values": {"0": [3,6,9,12,15], "1": [2,4,6,8,10]},
+      "spell_u32_values": {"71": 6, "89": 1, "95": 61, "116": 0},
+      "description_enUS": "Increases your maximum health by $s2% and your size by $s1%.",
+      "description_esMX": "Aumenta tu salud máxima un $s2% y tu tamaño un $s1%."
     },
     {
       "key": "overwhelming_strength",
@@ -50,7 +50,7 @@
       "enUS": "Overwhelming Strength",
       "esMX": "Fuerza descomunal",
       "icon": "inv_gauntlets_19",
-      "spell_source_ids": [20266,20266,20266,20266,20266],
+      "spell_source_ids": [20262,20263,20264,20265,20266],
       "effect_values": {"0": [3,6,9,12,15]},
       "description_enUS": "Increases your total Strength by $s1%.",
       "description_esMX": "Aumenta tu fuerza total un $s1%."
