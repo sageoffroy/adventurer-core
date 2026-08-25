@@ -17,13 +17,15 @@ The source package owns two seed files:
 - `config/spelldraft/spelldraft.conf`
 - `config/spelldraft/cards.csv`
 
-The installer/runtime loader will seed them into the server data tree. Once seeded, the installed copies are operator-owned and must not be overwritten by later package upgrades.
+`apply.sh` and `update.sh` install editable runtime copies beside AzerothCore's normal data directory and refresh packaged defaults as `.dist` files. Existing editable copies are never overwritten by a later package update.
 
-The intended installed location is:
+Installed location:
 
 ```text
-<DataDir>/adventurer/spelldraft.conf
-<DataDir>/adventurer/cards.csv
+<DataDir>/spelldraft/spelldraft.conf
+<DataDir>/spelldraft/cards.csv
+<DataDir>/spelldraft/spelldraft.conf.dist
+<DataDir>/spelldraft/cards.csv.dist
 ```
 
 `DataDir` is the normal AzerothCore worldserver data directory.
@@ -51,7 +53,7 @@ Requirement token syntax is `cardId:minRank`.
 - `requires_any`: at least one listed requirement must be satisfied.
 - Empty requirement fields mean no gate.
 
-This is required for relationships such as Rogue finishers, where Eviscerate may be unlocked by any valid combo-point generator rather than by all of them.
+This supports relationships such as Rogue finishers, where Eviscerate may be unlocked by any valid combo-point generator rather than by all of them.
 
 ## Source level cap
 
@@ -63,7 +65,7 @@ For the initial prototype:
 InitialActiveSourceLevelCap = 8
 ```
 
-This lets the three initial active drafts draw from the audited level 1-8 catalog while still respecting dependency gates.
+This lets the three initial active drafts draw from the audited level 1-8 catalog while still respecting dependency gates. After the player passes the configured cap, the current player level becomes the active-card source cap.
 
 ## Reroll
 
@@ -74,7 +76,7 @@ Rules:
 1. It does not consume the pending active/talent pick.
 2. It does not grant any card.
 3. When the eligible pool is large enough, the server excludes the current three cards from that redraw so the reroll produces a genuinely new offer.
-4. If fewer than three alternative cards exist, already displayed cards may reappear only as necessary to fill the offer.
+4. If fewer than three alternatives exist, displayed cards may reappear only as necessary to fill the offer.
 5. Charges persist through relog/restart.
 6. Starting charges, gain interval, gain amount, and optional cap are configuration values.
 
@@ -88,11 +90,11 @@ GainAmount = 1
 MaxCharges = 0
 ```
 
-`MaxCharges = 0` means no cap.
+`MaxCharges = 0` means no cap. These numbers are prototype balance values, not final game-design values.
 
 ## Bless
 
-Bless marks a card as favored for the current character. It never grants the card and never bypasses requirements.
+Bless marks a currently offered card as favored for the current character. It does not consume the draft pick: the player may bless one displayed card and then choose another card from the offer, making the blessed card more likely to return later.
 
 Rules:
 
@@ -101,9 +103,9 @@ Rules:
 3. Requirements still apply normally.
 4. Destroyed cards can never be blessed into the pool.
 5. A card already fully owned is not made eligible again merely because it is blessed.
-6. `MaxActive` controls how many card blessings a character may maintain at once.
-7. With `MaxActive = 1`, blessing a new card replaces the previous blessing.
-8. Blessing persists through relog/restart.
+6. The v2 implementation supports one active blessing; blessing another card replaces it.
+7. Blessing persists through relog/restart.
+8. If the blessed card reaches its final rank after being selected, the blessing is cleared.
 
 Configuration:
 
@@ -113,18 +115,18 @@ MaxActive = 1
 WeightMultiplierPercent = 300
 ```
 
-For example, a card whose post-rarity effective weight is 55 becomes 165 while blessed at 300%.
+For v2, `MaxActive = 0` disables blessing and any non-zero value enables the single blessing slot. For example, a card whose post-rarity effective weight is 55 becomes 165 while blessed at 300%.
 
 ## Destroy
 
-Destroy permanently bans the selected card from that character's future pool.
+Destroy permanently bans a currently offered card from that character's future pool.
 
 Rules:
 
-1. Destroy never grants the card.
+1. Destroy never grants the card and does not consume the pending draft pick.
 2. The card is excluded before weighted selection.
 3. Destroyed state persists through relog/restart.
-4. Destroying a currently offered card immediately regenerates the unresolved offer.
+4. Destroying an offered card attempts to replace that slot immediately.
 5. Owned cards cannot be destroyed retroactively; destruction applies to cards that are still candidates.
 6. A destroyed prerequisite may make dependent cards unreachable naturally; the server does not auto-fix the build graph.
 7. Charges are independently configurable.
@@ -139,18 +141,21 @@ GainAmount = 1
 MaxCharges = 0
 ```
 
+These numbers are prototype balance values.
+
 ## Per-character state v2
 
-The existing `character_settings` source remains `adventurer_draft_v1` so deployed test characters can be migrated in place.
+The existing `character_settings` source remains `adventurer_draft_v1` so deployed test characters can migrate in place.
 
-The serialized state must gain:
+Serialized v2 state includes:
 
 - reroll charges
 - destroy charges
-- blessed card IDs
+- blessed card ID
 - destroyed card IDs
+- existing owned ranks and unresolved offer
 
-Schema v1 data must be accepted and migrated to v2 defaults rather than discarded.
+Schema v1 data is accepted and migrated to v2 defaults rather than discarded.
 
 ## Protocol additions
 
@@ -162,30 +167,36 @@ ADRAFT_BLESS:<cardId>
 ADRAFT_DESTROY:<cardId>
 ```
 
-Server to client offer payload must additionally expose current reroll/destroy charges and blessing state so the UI never guesses authority.
+Server to client meta payload:
 
-The server validates every action against the persisted current offer and current configuration.
+```text
+M|rerollCharges|destroyCharges|blessedCardId|blessMultiplierPercent
+```
+
+The server validates every action against the current offer, eligibility graph and server-owned state.
 
 ## UI contract
 
-The three-card chooser gains:
+The existing three-card chooser gains a footer with:
 
-- one `Relanzar` button for the whole offer
-- one `Bendecir` action on each displayed card
-- one `Destruir` action on each displayed card
+- `Relanzar`
+- `Bendecir`
+- `Destruir`
 - visible reroll/destroy charge counts
-- a visible blessed marker on a blessed card
+- a star marker when one of the displayed cards is the blessed card
 
-The first implementation should favor correctness over decorative art.
+`Bendecir` and `Destruir` enter a temporary selection mode; the next displayed card clicked is the target. Normal card selection is unchanged outside those modes.
 
-## Reload
+## Runtime reload behavior
 
-The desired operational endpoint is a GM-only reload command:
+The server reads `<DataDir>/spelldraft/spelldraft.conf` and `cards.csv` at runtime. It refreshes runtime data before resolving/sending draft offers and on login/level transitions. Therefore normal catalog, weight, source-level and balance edits do not require recompiling `worldserver`.
+
+If a later `cards.csv` read is invalid, the last valid in-memory catalog remains active instead of replacing it with partial data. A compiled prototype catalog exists only as a first-start safety fallback.
+
+A dedicated GM convenience command such as:
 
 ```text
 .spelldraft reload
 ```
 
-It reloads `spelldraft.conf` and `cards.csv` atomically. Invalid configuration must leave the previously loaded catalog active and report the validation error rather than partially replacing runtime state.
-
-Reloading configuration does not mutate already learned spells or existing character ownership. It only changes future pool construction and meta-mechanic parameters.
+can still be added later, but it is not required for the v2 runtime-data workflow.
