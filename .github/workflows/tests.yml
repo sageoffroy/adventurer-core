@@ -50,6 +50,10 @@ jobs:
           assert "ADVENTURER_MAX_RAGE = 1000" in text
           assert "ADVENTURER_MAX_ENERGY = 100" in text
           assert 'ADVENTURER_COMBO_PREFIX[] = "AdventurerCP"' in text
+          assert 'ADVENTURER_DRAFT_PREFIX[] = "AdventurerDraft"' in text
+          assert "SelectWeightedCards" in text
+          assert "GetNextSpellInChain" in text
+          assert "character_settings" in text
           for token in (
               "CLASS_DEATH_KNIGHT",
               "POWER_RUNIC_POWER",
@@ -61,5 +65,20 @@ jobs:
               "PLAYERHOOK_ON_PLAYER_IS_CLASS",
           ):
               assert token not in text, token
-          print("Supported clean-core no-DK source patch smoke test OK")
+
+          player_h = (core / "src/server/game/Entities/Player/Player.h").read_text(encoding="utf-8")
+          spell_mgr_h = (core / "src/server/game/Spells/SpellMgr.h").read_text(encoding="utf-8")
+          player_script_h = (core / "src/server/game/Scripting/ScriptDefines/PlayerScript.h").read_text(encoding="utf-8")
+          settings_h = (core / "src/server/game/Entities/Player/PlayerSettings.h").read_text(encoding="utf-8")
+
+          assert "void SetAcceptWhispers(bool on)" in player_h
+          assert "void SetFreeTalentPoints(uint32 points);" in player_h
+          assert "void removeSpell(uint32 spellId, uint8 removeSpecMask, bool onlyTemporary);" in player_h
+          assert "uint32 GetFirstSpellInChain(uint32 spell_id) const;" in spell_mgr_h
+          assert "uint32 GetNextSpellInChain(uint32 spell_id) const;" in spell_mgr_h
+          assert "PLAYERHOOK_CAN_PLAYER_USE_PRIVATE_CHAT" in player_script_h
+          assert "std::string& /*msg*/, Player* /*receiver*/" in player_script_h
+          assert 'existing "source" row from character_settings' in settings_h
+
+          print("Supported clean-core no-DK + SpellDraft API smoke test OK")
           PY
