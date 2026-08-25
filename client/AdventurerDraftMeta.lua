@@ -75,9 +75,12 @@ if not DraftFrame then
     return
 end
 
-DraftFrame:SetHeight(350)
+-- The original chooser is 300px high and the card buttons end near its bottom.
+-- Give meta-actions their own footer instead of overlaying the card content.
+DraftFrame:SetHeight(365)
 if DraftFrame.hint then
-    DraftFrame.hint:SetPoint("BOTTOM", DraftFrame, "BOTTOM", 0, 48)
+    DraftFrame.hint:ClearAllPoints()
+    DraftFrame.hint:SetPoint("BOTTOM", DraftFrame, "BOTTOM", 0, 76)
 end
 
 local state = {
@@ -90,14 +93,14 @@ local state = {
 }
 
 DraftFrame.metaStatus = DraftFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-DraftFrame.metaStatus:SetPoint("BOTTOM", DraftFrame, "BOTTOM", 0, 52)
+DraftFrame.metaStatus:SetPoint("BOTTOM", DraftFrame, "BOTTOM", 0, 56)
 DraftFrame.metaStatus:SetText("")
 
 local function CreateActionButton(name, x)
     local button = CreateFrame("Button", name, DraftFrame, "UIPanelButtonTemplate")
     button:SetWidth(112)
     button:SetHeight(24)
-    button:SetPoint("BOTTOM", DraftFrame, "BOTTOM", x, 18)
+    button:SetPoint("BOTTOM", DraftFrame, "BOTTOM", x, 22)
     return button
 end
 
