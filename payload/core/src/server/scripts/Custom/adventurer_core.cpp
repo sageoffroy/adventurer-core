@@ -94,6 +94,7 @@ struct DraftRuntimeConfig
     uint8 offerSize = 3;
     uint16 initialActivePicks = 3;
     uint8 initialActiveSourceLevelCap = 10;
+    uint8 activeSourceLevelLookahead = 3;
     uint8 activeDraftFirstLevel = 5;
     uint8 activeDraftEveryLevels = 5;
     uint8 talentDraftFirstLevel = 10;
@@ -467,6 +468,7 @@ bool LoadDraftConfig(std::string const& path, DraftRuntimeConfig& config, std::s
         std::max<uint32>(1, ReadOption(values, "Draft.OfferSize", parsed.offerSize))));
     parsed.initialActivePicks = static_cast<uint16>(ReadOption(values, "Draft.InitialActivePicks", parsed.initialActivePicks));
     parsed.initialActiveSourceLevelCap = static_cast<uint8>(ReadOption(values, "Draft.InitialActiveSourceLevelCap", parsed.initialActiveSourceLevelCap));
+    parsed.activeSourceLevelLookahead = static_cast<uint8>(ReadOption(values, "Draft.ActiveSourceLevelLookahead", parsed.activeSourceLevelLookahead));
     parsed.activeDraftFirstLevel = static_cast<uint8>(ReadOption(values, "Draft.ActiveDraftFirstLevel", parsed.activeDraftFirstLevel));
     parsed.activeDraftEveryLevels = static_cast<uint8>(ReadOption(values, "Draft.ActiveDraftEveryLevels", parsed.activeDraftEveryLevels));
     parsed.talentDraftFirstLevel = static_cast<uint8>(ReadOption(values, "Draft.TalentDraftFirstLevel", parsed.talentDraftFirstLevel));
@@ -818,7 +820,12 @@ bool IsCardEligible(Player const* player, DraftState const& state, DraftCard con
     uint32 playerLevel = player ? player->GetLevel() : 1;
     uint32 sourceCap = playerLevel;
     if (type == DraftCardType::Active)
-        sourceCap = std::max<uint32>(sourceCap, GetDraftConfig().initialActiveSourceLevelCap);
+    {
+        DraftRuntimeConfig const& config = GetDraftConfig();
+        sourceCap = playerLevel <= config.initialActiveSourceLevelCap
+            ? config.initialActiveSourceLevelCap
+            : playerLevel + config.activeSourceLevelLookahead;
+    }
     if (card.sourceLevel > sourceCap)
         return false;
 
