@@ -381,3 +381,76 @@ AdventurerResourceFrame:SetScript("OnUpdate", function(self, elapsed)
         PlayerFrameRageBar:Show()
     end
 end)
+
+-- ---------------------------------------------------------------------------
+-- Talent window cleanup
+-- ---------------------------------------------------------------------------
+-- Some 3.3.5a interface stacks add a permanent helper label to the talent
+-- window telling the player to "mouseover" / "mouse over" a talent. Adventurer
+-- has no use for that instruction. Remove only matching FontStrings that belong
+-- to PlayerTalentFrame; do not alter global localized strings or other tooltips.
+local function IsMouseoverInstruction(text)
+    if type(text) ~= "string" then
+        return false
+    end
+
+    local lowered = string.lower(text)
+    return string.find(lowered, "mouseover", 1, true) ~= nil
+        or string.find(lowered, "mouse over", 1, true) ~= nil
+end
+
+local function HideMouseoverInstructionInFrame(frame)
+    if not frame then
+        return
+    end
+
+    local regions = { frame:GetRegions() }
+    for _, region in ipairs(regions) do
+        if region and region.GetText then
+            local text = region:GetText()
+            if IsMouseoverInstruction(text) then
+                region:SetText("")
+                region:Hide()
+            end
+        end
+    end
+
+    local children = { frame:GetChildren() }
+    for _, child in ipairs(children) do
+        HideMouseoverInstructionInFrame(child)
+    end
+end
+
+local talentCleanupInstalled = false
+local function CleanupAdventurerTalentWindow()
+    if IsAdventurer() and PlayerTalentFrame then
+        HideMouseoverInstructionInFrame(PlayerTalentFrame)
+    end
+end
+
+local function InstallAdventurerTalentWindowCleanup()
+    if talentCleanupInstalled or not PlayerTalentFrame then
+        return
+    end
+
+    talentCleanupInstalled = true
+    PlayerTalentFrame:HookScript("OnShow", CleanupAdventurerTalentWindow)
+
+    if hooksecurefunc and PlayerTalentFrame_Refresh then
+        hooksecurefunc("PlayerTalentFrame_Refresh", CleanupAdventurerTalentWindow)
+    end
+
+    CleanupAdventurerTalentWindow()
+end
+
+local AdventurerTalentUICleanupFrame = CreateFrame("Frame")
+AdventurerTalentUICleanupFrame:RegisterEvent("ADDON_LOADED")
+AdventurerTalentUICleanupFrame:SetScript("OnEvent", function(self, event, addonName)
+    if addonName == "Blizzard_TalentUI" then
+        InstallAdventurerTalentWindowCleanup()
+        self:UnregisterEvent("ADDON_LOADED")
+    end
+end)
+
+-- Covers clients where Blizzard_TalentUI is already loaded before this file.
+InstallAdventurerTalentWindowCleanup()
