@@ -28,6 +28,13 @@ python3 "$ROOT/tools/database.py" prepare "$@"
 status=0
 python3 "$ROOT/tools/adventurer.py" apply "$@" || status=$?
 
+# Adventurer is native class 10 in our core but not in Playerbots. Patch the
+# external module transactionally so randombot generation never creates class
+# 10 and old class-10 bot rows cannot enter the zero-weight talent-spec path.
+if (( status == 0 )); then
+    python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir" || status=$?
+fi
+
 # SpellDraft balance/catalog data is intentionally outside the compiled C++.
 # Install editable live copies only after the core/client transaction succeeded.
 if (( status == 0 )); then
