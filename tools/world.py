@@ -14,6 +14,8 @@ from database import _run_mysql, query_scalar, read_database_info
 ROOT = Path(__file__).resolve().parent.parent
 PENDING_WORLD_RELATIVE = Path("data/sql/updates/pending_db_world")
 DEFAULT_CONF_RELATIVE = Path("env/dist/etc/worldserver.conf")
+GUARDIAN_SPELL_MIN = 290000
+GUARDIAN_SPELL_MAX = 299999
 
 
 @dataclass(frozen=True)
@@ -34,6 +36,10 @@ WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
         "rev_1787446800000000001.sql",
+    ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "004_guardian_script_bindings.sql",
+        "rev_1787779800000000000.sql",
     ),
 )
 
@@ -121,12 +127,12 @@ def remove(core: Path) -> list[tuple[Path, bool]]:
 
 
 def cleanup_database(core: Path, conf: Path | None = None) -> None:
-    """Remove only DB rows uniquely owned by maintenance updates 002+.
+    """Remove DB rows uniquely owned by Adventurer maintenance updates 002+.
 
     The main database rollback snapshot already restores every class-10 stat
-    range touched by 001/003. This cleanup covers the extra Last Bastion script
-    binding and the AzerothCore update markers, which older snapshots could not
-    have known about when they were created.
+    range touched by 001/003. This cleanup covers the Adventurer-owned Guardian
+    SpellScript reservation and AzerothCore update markers, which older
+    snapshots could not have known about when they were created.
     """
     core = validate_core(core)
     conf = (
@@ -138,8 +144,8 @@ def cleanup_database(core: Path, conf: Path | None = None) -> None:
     names = ", ".join("'" + update.name.replace("'", "''") + "'" for update in WORLD_UPDATES)
     sql = f"""
 DELETE FROM `spell_script_names`
-WHERE `spell_id` = 290050
-  AND `ScriptName` = 'spell_warr_last_stand';
+WHERE (`spell_id` BETWEEN {GUARDIAN_SPELL_MIN} AND {GUARDIAN_SPELL_MAX})
+   OR (`spell_id` BETWEEN {-GUARDIAN_SPELL_MAX} AND {-GUARDIAN_SPELL_MIN});
 
 DELETE FROM `updates`
 WHERE `name` IN ({names});
@@ -149,7 +155,8 @@ WHERE `name` IN ({names});
     binding_count = int(query_scalar(
         db,
         "SELECT COUNT(*) FROM `spell_script_names` "
-        "WHERE `spell_id`=290050 AND `ScriptName`='spell_warr_last_stand'",
+        f"WHERE (`spell_id` BETWEEN {GUARDIAN_SPELL_MIN} AND {GUARDIAN_SPELL_MAX}) "
+        f"OR (`spell_id` BETWEEN {-GUARDIAN_SPELL_MAX} AND {-GUARDIAN_SPELL_MIN})",
     ))
     marker_count = int(query_scalar(
         db,
@@ -158,7 +165,7 @@ WHERE `name` IN ({names});
     if binding_count or marker_count:
         raise WorldUpdateError(
             "Maintenance DB cleanup did not converge: "
-            f"binding={binding_count}, update_markers={marker_count}"
+            f"bindings={binding_count}, update_markers={marker_count}"
         )
 
 
