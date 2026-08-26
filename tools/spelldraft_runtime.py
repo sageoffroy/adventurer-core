@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Install editable SpellDraft runtime data beside AzerothCore's server data.
 
-The package keeps a managed copy of each runtime file. Package updates refresh a
-live file automatically only while that live file still matches the last managed
-version. Real local edits are preserved. Historical packaged versions from the
-pre-marker installer are migrated once so old installs do not stay stuck forever.
+cards.csv remains file-managed: package updates advance it while unedited and
+preserve it wholesale after a real local edit.
+
+spelldraft.conf is merged option-by-option against the previous packaged .dist.
+That lets package updates add/reorder options and advance untouched defaults while
+preserving values the server owner deliberately changed for runtime testing.
 """
 
 from __future__ import annotations
@@ -63,6 +65,76 @@ def write_marker(path: Path, digest: str) -> None:
     path.write_text(digest + "\n", encoding="utf-8")
 
 
+def parse_config_values(text: str) -> dict[tuple[str, str], str]:
+    values: dict[tuple[str, str], str] = {}
+    section = ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith(";"):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1].strip()
+            continue
+        if "=" not in raw or not section:
+            continue
+        key, value = raw.split("=", 1)
+        key = key.strip()
+        if key:
+            values[(section, key)] = value.strip()
+    return values
+
+
+def merge_config_text(source_text: str, live_text: str, previous_text: str | None) -> str | None:
+    """Render the new package template while preserving genuine local values.
+
+    previous_text is the package baseline from the prior update. If a live value
+    still equals that baseline, it was not locally changed and may advance to the
+    new package value. If it differs, the local override wins. Missing live keys
+    always adopt the new package value.
+
+    A pre-marker/stale install can already have the current .dist beside an older
+    live file. The same rule still works: existing differing values are treated as
+    intentional overrides while newly introduced options are added from source.
+    """
+    source_values = parse_config_values(source_text)
+    live_values = parse_config_values(live_text)
+    if not source_values or not live_values:
+        return None
+
+    previous_values = parse_config_values(previous_text) if previous_text is not None else {}
+    output: list[str] = []
+    section = ""
+
+    for raw in source_text.splitlines(keepends=True):
+        stripped = raw.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            section = stripped[1:-1].strip()
+            output.append(raw)
+            continue
+        if "=" not in raw or not section or stripped.startswith("#") or stripped.startswith(";"):
+            output.append(raw)
+            continue
+
+        left, source_value_raw = raw.split("=", 1)
+        key = left.strip()
+        option = (section, key)
+        if not key or option not in source_values:
+            output.append(raw)
+            continue
+
+        chosen = source_values[option]
+        if option in live_values:
+            live_value = live_values[option]
+            previous_value = previous_values.get(option)
+            if previous_value is None or live_value != previous_value:
+                chosen = live_value
+
+        newline = "\n" if raw.endswith("\n") else ""
+        output.append(f"{left}= {chosen}{newline}")
+
+    return "".join(output)
+
+
 def install(core: Path, server_data_dir: Path | None) -> None:
     data_dir = resolve_data_dir(core, server_data_dir)
     if not data_dir.is_dir():
@@ -74,6 +146,7 @@ def install(core: Path, server_data_dir: Path | None) -> None:
     created: list[str] = []
     updated: list[str] = []
     migrated: list[str] = []
+    merged: list[str] = []
     preserved: list[str] = []
 
     for name in FILES:
@@ -104,16 +177,11 @@ def install(core: Path, server_data_dir: Path | None) -> None:
             if managed_hash is not None:
                 package_managed = live_hash == managed_hash
             elif live_hash == source_hash:
-                # Existing install already happens to be current. Adopt it as a
-                # managed file so future package updates can advance it safely.
                 package_managed = True
             elif previous_dist_hash is not None and live_hash == previous_dist_hash:
-                # Old installer state where live still matched the previous .dist.
                 package_managed = True
                 legacy_migration = True
             elif live_hash in LEGACY_PACKAGED_SHA256.get(name, set()):
-                # The broken updater may already have replaced .dist with the new
-                # package while leaving live on an older exact packaged version.
                 package_managed = True
                 legacy_migration = True
 
@@ -125,6 +193,18 @@ def install(core: Path, server_data_dir: Path | None) -> None:
                     else:
                         updated.append(name)
                 write_marker(marker, source_hash)
+            elif name == "spelldraft.conf":
+                source_text = source.read_text(encoding="utf-8")
+                live_text = live.read_text(encoding="utf-8")
+                previous_text = dist.read_text(encoding="utf-8") if dist.is_file() else None
+                merged_text = merge_config_text(source_text, live_text, previous_text)
+                if merged_text is None:
+                    preserved.append(name)
+                else:
+                    if merged_text != live_text:
+                        live.write_text(merged_text, encoding="utf-8")
+                        merged.append(name)
+                    write_marker(marker, source_hash)
             else:
                 preserved.append(name)
 
@@ -139,6 +219,8 @@ def install(core: Path, server_data_dir: Path | None) -> None:
         print("  updated managed:  " + ", ".join(updated))
     if migrated:
         print("  migrated stale:   " + ", ".join(migrated))
+    if merged:
+        print("  merged config:    " + ", ".join(merged))
     if preserved:
         print("  preserved edits:  " + ", ".join(preserved))
     print("  packaged defaults: spelldraft.conf.dist, cards.csv.dist")
@@ -191,9 +273,6 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    # apply.sh/update.sh/rollback.sh forward their full Adventurer argument set.
-    # Runtime data only needs core/data paths, so ignore unrelated client/DBC
-    # switches instead of forcing the shell wrappers to maintain two arg lists.
     args, _ = parser().parse_known_args()
     try:
         if args.command == "install":
