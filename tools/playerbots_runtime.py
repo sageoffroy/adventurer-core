@@ -11,7 +11,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PROFILE = ROOT / "config" / "playerbots" / "managed.conf"
-TARGET_RELATIVE = Path("env/dist/etc/playerbots.conf")
+# AzerothCore installs module configs under etc/modules. Older/local layouts may
+# place them directly under etc, so target_path() deliberately supports both and
+# finally discovers one unambiguous playerbots.conf below the install etc dir.
+TARGET_RELATIVE = Path("env/dist/etc/modules/playerbots.conf")
+TARGET_CANDIDATES = (
+    TARGET_RELATIVE,
+    Path("env/dist/etc/playerbots.conf"),
+)
 BACKUP_SUFFIX = ".adventurer-core.before"
 
 
@@ -48,10 +55,29 @@ def read_profile(path: Path = PROFILE) -> dict[str, str]:
 
 def target_path(core: Path) -> Path:
     core = core.expanduser().resolve()
-    target = core / TARGET_RELATIVE
-    if not target.is_file():
-        raise PlayerbotsConfigError(f"Playerbots runtime config not found: {target}")
-    return target
+
+    # Prefer known AzerothCore layouts deterministically.
+    for relative in TARGET_CANDIDATES:
+        target = core / relative
+        if target.is_file():
+            return target
+
+    # Be tolerant of a custom install layout, but never guess when ambiguous.
+    etc_dir = core / "env" / "dist" / "etc"
+    discovered = sorted(path for path in etc_dir.rglob("playerbots.conf") if path.is_file()) \
+        if etc_dir.is_dir() else []
+    if len(discovered) == 1:
+        return discovered[0]
+    if len(discovered) > 1:
+        rendered = "\n  ".join(str(path) for path in discovered)
+        raise PlayerbotsConfigError(
+            "Multiple Playerbots runtime configs found; refusing to guess:\n  " + rendered
+        )
+
+    searched = "\n  ".join(str(core / relative) for relative in TARGET_CANDIDATES)
+    raise PlayerbotsConfigError(
+        "Playerbots runtime config not found. Searched:\n  " + searched
+    )
 
 
 def backup_path(target: Path) -> Path:
@@ -161,7 +187,9 @@ def main() -> int:
     args = parser().parse_args()
     try:
         if args.command == "install":
+            target = target_path(args.core_dir)
             changed = install(args.core_dir)
+            print(f"Playerbots runtime config: {target}")
             if changed:
                 print(f"Playerbots managed profile applied: {len(changed)} value(s) changed.")
                 for key in changed:
@@ -169,7 +197,9 @@ def main() -> int:
             else:
                 print("Playerbots managed profile already current.")
         elif args.command == "verify":
+            target = target_path(args.core_dir)
             verify(args.core_dir)
+            print(f"Playerbots runtime config: {target}")
             print("Playerbots managed profile verifies cleanly.")
         else:
             restored = rollback(args.core_dir)
