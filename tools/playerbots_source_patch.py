@@ -7,10 +7,13 @@ accounts, and its talent/spec tables intentionally have no class-10 entries.
 Without this compatibility layer Playerbots creates Adventurer randombots and
 later calls urand(1, 0) while selecting their talent spec.
 
-The patches below do two things:
+The patches below do three things:
 * never generate CLASS_ADVENTURER as a random/add-account population class;
 * defensively skip native Playerbots talent-tree initialization if an old
-  class-10 bot still exists from an earlier run.
+  class-10 bot still exists from an earlier run;
+* avoid FLUSH TABLES in the one-shot randombot account cleanup path, because
+  the queues are already drained after explicit commits and FLUSH TABLES would
+  unnecessarily require MySQL RELOAD/FLUSH_TABLES privileges.
 
 All edits are exact-anchor, reversible, and preflighted before any file is
 written.
@@ -19,6 +22,7 @@ written.
 from __future__ import annotations
 
 import argparse
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -80,6 +84,20 @@ TALENT_FACTORY_PATCHED = """uint32 PlayerbotFactory::InitTalentsTree(bool increm
     std::map<uint8, uint32> tabs = AiFactory::GetPlayerSpecTabs(bot);
 """
 
+CLEANUP_FLUSH_CLEAN = """        // Flush tables to ensure all data in memory are written to disk
+        LoginDatabase.Execute("FLUSH TABLES");
+        CharacterDatabase.Execute("FLUSH TABLES");
+        PlayerbotsDatabase.Execute("FLUSH TABLES");
+
+"""
+
+CLEANUP_FLUSH_PATCHED = """        // Adventurer Core: the async queues were drained above after the
+        // explicit commits. FLUSH TABLES is unnecessary here and would require
+        // elevated MySQL RELOAD/FLUSH_TABLES privileges from the worldserver DB
+        // account, so keep the cleanup compatible with least-privilege users.
+
+"""
+
 
 PATCHES = (
     PatchSpec(
@@ -93,6 +111,12 @@ PATCHES = (
         TALENT_FACTORY_CLEAN,
         TALENT_FACTORY_PATCHED,
         "class-10 talent initialization guard",
+    ),
+    PatchSpec(
+        "modules/mod-playerbots/src/Bot/Factory/RandomPlayerbotFactory.cpp",
+        CLEANUP_FLUSH_CLEAN,
+        CLEANUP_FLUSH_PATCHED,
+        "randombot cleanup privileged FLUSH removal",
     ),
 )
 
@@ -119,22 +143,36 @@ def _classify(text: str, spec: PatchSpec) -> str:
     )
 
 
+def _group_specs() -> OrderedDict[str, list[PatchSpec]]:
+    grouped: OrderedDict[str, list[PatchSpec]] = OrderedDict()
+    for spec in PATCHES:
+        grouped.setdefault(spec.relative_path, []).append(spec)
+    return grouped
+
+
 def install(core_dir: Path) -> list[str]:
-    plans: list[tuple[Path, str, str, PatchSpec]] = []
+    plans: list[tuple[Path, str, str]] = []
     changed: list[str] = []
 
-    # Preflight every target first. Never leave a half-patched module.
-    for spec in PATCHES:
-        path = core_dir / spec.relative_path
-        text = _read(path)
-        state = _classify(text, spec)
-        if state == "clean":
-            plans.append((path, text, text.replace(spec.clean, spec.patched, 1), spec))
-            changed.append(spec.relative_path)
+    # Preflight and transform every target fully in memory first. Multiple
+    # Adventurer-owned patches may intentionally share one Playerbots file.
+    for relative_path, specs in _group_specs().items():
+        path = core_dir / relative_path
+        original = _read(path)
+        patched = original
+        file_changed = False
+        for spec in specs:
+            state = _classify(patched, spec)
+            if state == "clean":
+                patched = patched.replace(spec.clean, spec.patched, 1)
+                file_changed = True
+        if file_changed:
+            if original == patched:
+                raise PlayerbotsSourcePatchError(f"{relative_path}: patch produced no change")
+            plans.append((path, original, patched))
+            changed.append(relative_path)
 
-    for path, original, patched, spec in plans:
-        if original == patched:
-            raise PlayerbotsSourcePatchError(f"{spec.label}: patch produced no change")
+    for path, _original, patched in plans:
         path.write_text(patched, encoding="utf-8")
 
     verify(core_dir)
@@ -149,33 +187,42 @@ def install(core_dir: Path) -> list[str]:
 
 
 def verify(core_dir: Path) -> None:
+    cache: dict[str, str] = {}
     for spec in PATCHES:
-        path = core_dir / spec.relative_path
-        state = _classify(_read(path), spec)
+        text = cache.setdefault(spec.relative_path, _read(core_dir / spec.relative_path))
+        state = _classify(text, spec)
         if state != "patched":
             raise PlayerbotsSourcePatchError(f"{spec.label}: expected patched source")
 
 
 def rollback(core_dir: Path) -> list[str]:
-    plans: list[tuple[Path, str, str, PatchSpec]] = []
+    plans: list[tuple[Path, str, str]] = []
     changed: list[str] = []
 
-    for spec in PATCHES:
-        path = core_dir / spec.relative_path
-        text = _read(path)
-        state = _classify(text, spec)
-        if state == "patched":
-            plans.append((path, text, text.replace(spec.patched, spec.clean, 1), spec))
-            changed.append(spec.relative_path)
+    for relative_path, specs in _group_specs().items():
+        path = core_dir / relative_path
+        original = _read(path)
+        clean = original
+        file_changed = False
+        for spec in specs:
+            state = _classify(clean, spec)
+            if state == "patched":
+                clean = clean.replace(spec.patched, spec.clean, 1)
+                file_changed = True
+        if file_changed:
+            if original == clean:
+                raise PlayerbotsSourcePatchError(f"{relative_path}: rollback produced no change")
+            plans.append((path, original, clean))
+            changed.append(relative_path)
 
-    for path, original, clean, spec in plans:
-        if original == clean:
-            raise PlayerbotsSourcePatchError(f"{spec.label}: rollback produced no change")
+    for path, _original, clean in plans:
         path.write_text(clean, encoding="utf-8")
 
     # A successful rollback must leave every target in the exact clean state.
+    cache: dict[str, str] = {}
     for spec in PATCHES:
-        state = _classify(_read(core_dir / spec.relative_path), spec)
+        text = cache.setdefault(spec.relative_path, _read(core_dir / spec.relative_path))
+        state = _classify(text, spec)
         if state != "clean":
             raise PlayerbotsSourcePatchError(f"{spec.label}: rollback verification failed")
 
