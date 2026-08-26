@@ -78,6 +78,111 @@ class SpellDraftRuntimeInstallerTests(unittest.TestCase):
             self.assertEqual((target / "spelldraft.conf.dist").read_text(), "conf-v2\n")
             self.assertEqual((target / "cards.csv.dist").read_text(), "cards-v2\n")
 
+    def test_config_update_preserves_only_changed_values_and_adds_new_options(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source, data = self.make_layout(root)
+            v1 = """[Reroll]
+StartingCharges = 2
+GainEveryLevels = 5
+
+[Bless]
+WeightMultiplierPercent = 250
+"""
+            self.write_package(source, v1, "cards-v1\n")
+            self.install_with_source(source, data)
+
+            target = data / "spelldraft"
+            live = target / "spelldraft.conf"
+            live.write_text(
+                """[Reroll]
+StartingCharges = 10
+GainEveryLevels = 5
+
+[Bless]
+WeightMultiplierPercent = 250
+""",
+                encoding="utf-8",
+            )
+
+            v2 = """# current package template
+[Reroll]
+StartingCharges = 3
+GainEveryLevels = 10
+GainAmount = 1
+
+[Bless]
+StartingCharges = 1
+WeightMultiplierPercent = 300
+"""
+            self.write_package(source, v2, "cards-v2\n")
+            self.install_with_source(source, data)
+
+            merged = live.read_text(encoding="utf-8")
+            self.assertIn("# current package template", merged)
+            self.assertIn("StartingCharges = 10", merged)
+            self.assertIn("GainEveryLevels = 10", merged)
+            self.assertIn("GainAmount = 1", merged)
+            self.assertIn("[Bless]\nStartingCharges = 1", merged)
+            self.assertIn("WeightMultiplierPercent = 300", merged)
+
+    def test_stale_live_config_merges_missing_keys_even_when_dist_is_already_current(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source, data = self.make_layout(root)
+            current = """[Reroll]
+StartingCharges = 10
+GainEveryLevels = 5
+GainAmount = 1
+MaxCharges = 0
+
+[Bless]
+StartingCharges = 1
+GainEveryLevels = 10
+GainAmount = 1
+MaxCharges = 0
+MaxActive = 1
+WeightMultiplierPercent = 300
+
+[Destroy]
+StartingCharges = 1
+GainEveryLevels = 10
+GainAmount = 1
+MaxCharges = 0
+"""
+            self.write_package(source, current, "cards-current\n")
+            target = data / "spelldraft"
+            target.mkdir()
+            (target / "spelldraft.conf.dist").write_text(current, encoding="utf-8")
+            (target / "cards.csv.dist").write_text("cards-current\n", encoding="utf-8")
+            (target / "cards.csv").write_text("cards-current\n", encoding="utf-8")
+            (target / "spelldraft.conf").write_text(
+                """[Reroll]
+StartingCharges = 10
+GainEveryLevels = 0
+GainAmount = 0
+
+[Bless]
+MaxActive = 1
+WeightMultiplierPercent = 250
+
+[Destroy]
+StartingCharges = 5
+GainEveryLevels = 0
+""",
+                encoding="utf-8",
+            )
+
+            self.install_with_source(source, data)
+
+            merged = (target / "spelldraft.conf").read_text(encoding="utf-8")
+            self.assertIn("[Reroll]\nStartingCharges = 10\nGainEveryLevels = 0\nGainAmount = 0\nMaxCharges = 0", merged)
+            self.assertIn(
+                "[Bless]\nStartingCharges = 1\nGainEveryLevels = 10\nGainAmount = 1\nMaxCharges = 0\nMaxActive = 1\nWeightMultiplierPercent = 250",
+                merged,
+            )
+            self.assertIn("[Destroy]\nStartingCharges = 5\nGainEveryLevels = 0\nGainAmount = 1\nMaxCharges = 0", merged)
+
     def test_pre_marker_live_matching_previous_dist_is_migrated(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
