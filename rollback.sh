@@ -27,6 +27,7 @@ fi
 # file was edited outside Adventurer Core.
 python3 "$ROOT/tools/database.py" can-rollback "$@"
 python3 "$ROOT/tools/adventurer.py" verify "$@"
+python3 "$ROOT/tools/playerbots_source_patch.py" verify --core-dir "$core_dir"
 python3 "$ROOT/tools/playerbots_runtime.py" verify --core-dir "$core_dir"
 
 # Restore class-10 world rows first while the original snapshot is still
@@ -47,8 +48,11 @@ python3 "$ROOT/tools/spelldraft_runtime.py" remove "$@"
 # ownership of its small managed key set.
 python3 "$ROOT/tools/playerbots_runtime.py" rollback --core-dir "$core_dir"
 
+# Restore the two exact Playerbots source anchors owned by Adventurer Core.
+python3 "$ROOT/tools/playerbots_source_patch.py" rollback --core-dir "$core_dir"
+
 # Restore original source, DBCs and client patches. This understands both the
 # original .adventurer-backup DBC suffix and the current package state.
 python3 "$ROOT/tools/package_rollback.py" "$@"
 
-printf '%s\n' "Adventurer Core fully rolled back: source, DBC, client patch, Playerbots profile, world updates, and world DB restored."
+printf '%s\n' "Adventurer Core fully rolled back: source, DBC, client patch, Playerbots source/profile, world updates, and world DB restored."
