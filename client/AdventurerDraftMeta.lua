@@ -7,6 +7,7 @@ local DRAFT_PREFIX = "AdventurerDraft"
 local DRAFT_REROLL_MESSAGE = "ADRAFT_REROLL"
 local DRAFT_BLESS_PREFIX = "ADRAFT_BLESS:"
 local DRAFT_DESTROY_PREFIX = "ADRAFT_DESTROY:"
+local DRAFT_DEBUG_POOL_MESSAGE = "ADRAFT_POOL"
 local INITIAL_ACTIVE_SOURCE_LEVEL_CAP = 10
 local DEBUG_VISIBLE_ROWS = 15
 
@@ -65,6 +66,14 @@ local rarityLabels = {
     legendary = isSpanish and "Legendaria" or "Legendary",
 }
 
+local rarityKeys = {
+    [0] = "common",
+    [1] = "uncommon",
+    [2] = "rare",
+    [3] = "epic",
+    [4] = "legendary",
+}
+
 local rarityColors = {
     common = {1.00, 1.00, 1.00},
     uncommon = {0.12, 1.00, 0.00},
@@ -83,113 +92,8 @@ local extraSpellsByPrimary = {
     [1515] = {883, 2641, 6991, 982},
 }
 
--- Client-side mirror used only by the debug window. Server cards.csv remains
--- authoritative for actual draws. Requirements use card IDs, matching cards.csv.
-local debugCatalog = {
-    { id=1, type="active", level=1, rarity="common", spell=2457, maxRank=1 },
-    { id=2, type="active", level=1, rarity="common", spell=133, maxRank=1 },
-    { id=3, type="active", level=4, rarity="common", spell=116, maxRank=1 },
-    { id=4, type="active", level=1, rarity="common", spell=686, maxRank=1 },
-    { id=5, type="active", level=1, rarity="common", spell=585, maxRank=1 },
-    { id=6, type="active", level=1, rarity="common", spell=403, maxRank=1 },
-    { id=7, type="active", level=1, rarity="common", spell=5176, maxRank=1 },
-    { id=8, type="active", level=1, rarity="common", spell=78, maxRank=1 },
-    { id=9, type="active", level=4, rarity="common", spell=774, maxRank=1 },
-    { id=10, type="active", level=1, rarity="uncommon", spell=1784, maxRank=1 },
-    { id=12, type="active", level=1, rarity="common", spell=1459, maxRank=1 },
-    { id=13, type="active", level=1, rarity="common", spell=331, maxRank=1 },
-    { id=14, type="active", level=1, rarity="common", spell=1752, maxRank=1 },
-    { id=15, type="active", level=10, rarity="common", spell=71, maxRank=1 },
-    { id=16, type="active", level=1, rarity="common", spell=5185, maxRank=1 },
-    { id=17, type="active", level=1, rarity="uncommon", spell=1126, maxRank=1 },
-    { id=18, type="active", level=4, rarity="uncommon", spell=8921, maxRank=1 },
-    { id=19, type="active", level=6, rarity="common", spell=467, maxRank=1 },
-    { id=20, type="active", level=8, rarity="uncommon", spell=339, maxRank=1 },
-    { id=21, type="active", level=10, rarity="rare", spell=5487, maxRank=1 },
-    { id=22, type="active", level=10, rarity="common", spell=18960, maxRank=1 },
-    { id=23, type="active", level=1, rarity="common", spell=6673, maxRank=1 },
-    { id=24, type="active", level=4, rarity="common", spell=772, maxRank=1, any={{1,1},{15,1}} },
-    { id=25, type="active", level=6, rarity="common", spell=6343, maxRank=1, any={{1,1},{15,1}} },
-    { id=26, type="active", level=6, rarity="common", spell=34428, maxRank=1, all={{1,1}} },
-    { id=27, type="active", level=8, rarity="common", spell=1715, maxRank=1, all={{1,1}} },
-    { id=28, type="active", level=10, rarity="common", spell=2687, maxRank=1 },
-    { id=29, type="active", level=10, rarity="common", spell=7386, maxRank=1 },
-    { id=30, type="active", level=1, rarity="common", spell=635, maxRank=1 },
-    { id=31, type="active", level=1, rarity="common", spell=21084, maxRank=1 },
-    { id=32, type="active", level=1, rarity="common", spell=465, maxRank=1 },
-    { id=33, type="active", level=4, rarity="common", spell=19740, maxRank=1 },
-    { id=34, type="active", level=4, rarity="common", spell=20271, maxRank=1, all={{31,1}} },
-    { id=35, type="active", level=6, rarity="common", spell=498, maxRank=1 },
-    { id=36, type="active", level=8, rarity="common", spell=853, maxRank=1 },
-    { id=37, type="active", level=8, rarity="common", spell=1152, maxRank=1 },
-    { id=38, type="active", level=10, rarity="common", spell=1022, maxRank=1 },
-    { id=39, type="active", level=10, rarity="common", spell=633, maxRank=1 },
-    { id=40, type="active", level=1, rarity="common", spell=2973, maxRank=1 },
-    { id=41, type="active", level=1, rarity="common", spell=1494, maxRank=1 },
-    { id=42, type="active", level=4, rarity="common", spell=13163, maxRank=1 },
-    { id=43, type="active", level=4, rarity="common", spell=1978, maxRank=1 },
-    { id=44, type="active", level=6, rarity="common", spell=3044, maxRank=1 },
-    { id=45, type="active", level=6, rarity="common", spell=1130, maxRank=1 },
-    { id=46, type="active", level=8, rarity="common", spell=5116, maxRank=1 },
-    { id=47, type="active", level=10, rarity="common", spell=13165, maxRank=1 },
-    { id=48, type="active", level=10, rarity="common", spell=19883, maxRank=1 },
-    { id=49, type="active", level=10, rarity="epic", spell=1515, maxRank=1 },
-    { id=50, type="active", level=1, rarity="common", spell=2098, maxRank=1, any={{14,1},{51,1},{53,1}} },
-    { id=51, type="active", level=4, rarity="common", spell=53, maxRank=1 },
-    { id=53, type="active", level=6, rarity="common", spell=1776, maxRank=1 },
-    { id=54, type="active", level=8, rarity="common", spell=5277, maxRank=1 },
-    { id=55, type="active", level=10, rarity="common", spell=5171, maxRank=1, any={{14,1},{51,1},{53,1}} },
-    { id=56, type="active", level=10, rarity="common", spell=2983, maxRank=1 },
-    { id=57, type="active", level=1, rarity="common", spell=2050, maxRank=1 },
-    { id=58, type="active", level=1, rarity="common", spell=1243, maxRank=1 },
-    { id=59, type="active", level=4, rarity="common", spell=589, maxRank=1 },
-    { id=60, type="active", level=6, rarity="common", spell=17, maxRank=1 },
-    { id=61, type="active", level=8, rarity="common", spell=586, maxRank=1 },
-    { id=62, type="active", level=8, rarity="common", spell=139, maxRank=1 },
-    { id=63, type="active", level=10, rarity="common", spell=8092, maxRank=1 },
-    { id=64, type="active", level=10, rarity="common", spell=2006, maxRank=1 },
-    { id=65, type="active", level=1, rarity="common", spell=8017, maxRank=1 },
-    { id=66, type="active", level=4, rarity="common", spell=8042, maxRank=1 },
-    { id=67, type="active", level=4, rarity="common", spell=8071, maxRank=1 },
-    { id=68, type="active", level=6, rarity="common", spell=2484, maxRank=1 },
-    { id=69, type="active", level=8, rarity="common", spell=324, maxRank=1 },
-    { id=70, type="active", level=8, rarity="common", spell=5730, maxRank=1 },
-    { id=71, type="active", level=10, rarity="common", spell=8050, maxRank=1 },
-    { id=72, type="active", level=10, rarity="common", spell=8024, maxRank=1 },
-    { id=73, type="active", level=10, rarity="common", spell=3599, maxRank=1 },
-    { id=74, type="active", level=10, rarity="common", spell=8075, maxRank=1 },
-    { id=75, type="active", level=1, rarity="common", spell=168, maxRank=1 },
-    { id=76, type="active", level=4, rarity="common", spell=5504, maxRank=1 },
-    { id=77, type="active", level=6, rarity="common", spell=587, maxRank=1 },
-    { id=78, type="active", level=6, rarity="common", spell=2136, maxRank=1 },
-    { id=79, type="active", level=8, rarity="common", spell=5143, maxRank=1 },
-    { id=80, type="active", level=8, rarity="common", spell=118, maxRank=1 },
-    { id=81, type="active", level=10, rarity="common", spell=122, maxRank=1 },
-    { id=82, type="active", level=1, rarity="common", spell=687, maxRank=1 },
-    { id=83, type="active", level=1, rarity="common", spell=348, maxRank=1 },
-    { id=84, type="active", level=1, rarity="common", spell=688, maxRank=1 },
-    { id=85, type="active", level=4, rarity="common", spell=172, maxRank=1 },
-    { id=86, type="active", level=4, rarity="common", spell=702, maxRank=1 },
-    { id=87, type="active", level=6, rarity="common", spell=1454, maxRank=1 },
-    { id=88, type="active", level=8, rarity="common", spell=980, maxRank=1 },
-    { id=89, type="active", level=8, rarity="common", spell=5782, maxRank=1 },
-    { id=90, type="active", level=10, rarity="common", spell=1120, maxRank=1 },
-    { id=91, type="active", level=10, rarity="common", spell=6201, maxRank=1, all={{90,1}} },
-    { id=92, type="active", level=10, rarity="common", spell=697, maxRank=1, all={{90,1}} },
-    { id=101, type="talent", level=10, rarity="common", spell=12320, maxRank=5, rankSpells={12320,12852,12853,12855,12856} },
-    { id=102, type="talent", level=10, rarity="common", spell=16462, maxRank=5, rankSpells={16462,16463,16464,16465,16466} },
-    { id=103, type="talent", level=10, rarity="common", spell=12297, maxRank=5, rankSpells={12297,12750,12751,12752,12753} },
-    { id=104, type="talent", level=10, rarity="uncommon", spell=11069, maxRank=5, all={{2,1}}, rankSpells={11069,12338,12339,12340,12341} },
-    { id=105, type="talent", level=10, rarity="uncommon", spell=11070, maxRank=5, all={{3,1}}, rankSpells={11070,12473,16763,16765,16766} },
-    { id=106, type="talent", level=10, rarity="uncommon", spell=12295, maxRank=3, all={{1,1}}, rankSpells={12295,12676,12677} },
-    { id=107, type="talent", level=10, rarity="uncommon", spell=12282, maxRank=3, all={{8,1}}, rankSpells={12282,12663,12664} },
-}
-
-local catalogById = {}
-for _, card in ipairs(debugCatalog) do
-    catalogById[card.id] = card
-end
-
+-- The pool debug catalog is streamed by the server from authoritative cards.csv.
+-- No card/talent relationships or rarities are hardcoded client-side.
 local function IsAdventurer()
     local className, classToken, classId = UnitClass("player")
     if classId == ADVENTURER_CLASS_ID or classToken == "ADVENTURER" then
@@ -259,6 +163,8 @@ local state = {
     serverDestroyStart = 0,
     serverSourceCap = 0,
     serverCatalogSize = 0,
+    debugCatalog = {},
+    debugCatalogLoading = false,
 }
 
 DraftFrame.metaStatus = DraftFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -368,62 +274,6 @@ local function RefreshExtraIcons(button, card)
     end
 end
 
-local function GetOwnedRank(card)
-    local owned = state.sessionRanks[card.id] or 0
-    if card.rankSpells then
-        for rank, spellId in ipairs(card.rankSpells) do
-            if IsKnownSpell(spellId) and rank > owned then
-                owned = rank
-            end
-        end
-    elseif IsKnownSpell(card.spell) then
-        owned = math.max(owned, 1)
-    end
-    return owned
-end
-
-local function RequirementMet(requirement)
-    local card = catalogById[requirement[1]]
-    if not card then return false end
-    return GetOwnedRank(card) >= (requirement[2] or 1)
-end
-
-local function MeetsDebugRequirements(card)
-    if card.all then
-        for _, requirement in ipairs(card.all) do
-            if not RequirementMet(requirement) then
-                return false
-            end
-        end
-    end
-    if card.any and #card.any > 0 then
-        local any = false
-        for _, requirement in ipairs(card.any) do
-            if RequirementMet(requirement) then
-                any = true
-                break
-            end
-        end
-        if not any then return false end
-    end
-    return true
-end
-
-local function IsDebugEligible(card)
-    if state.destroyedAll[card.id] then
-        return false
-    end
-    local level = UnitLevel("player") or 1
-    local sourceCap = math.max(level, INITIAL_ACTIVE_SOURCE_LEVEL_CAP)
-    if card.level > sourceCap then
-        return false
-    end
-    if GetOwnedRank(card) >= (card.maxRank or 1) then
-        return false
-    end
-    return MeetsDebugRequirements(card)
-end
-
 local debugFrame = CreateFrame("Frame", "AdventurerDraftPoolDebugFrame", UIParent)
 debugFrame:SetWidth(760)
 debugFrame:SetHeight(475)
@@ -516,8 +366,8 @@ local talentColumn = CreatePoolColumn(382)
 
 local function BuildDebugList(kind)
     local items = {}
-    for _, card in ipairs(debugCatalog) do
-        if card.type == kind and IsDebugEligible(card) then
+    for _, card in ipairs(state.debugCatalog) do
+        if card.type == kind then
             local name = GetSpellInfo(card.spell) or ("Spell #" .. card.spell)
             card.debugName = name
             table.insert(items, card)
@@ -543,9 +393,10 @@ local function ConfigureColumnRefresh(column)
                 row.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
                 row.name:SetText(card.debugName or ("Spell #" .. card.spell))
                 row.name:SetTextColor(color[1], color[2], color[3])
-                local rank = GetOwnedRank(card)
+                local rank = card.currentRank or 0
                 if card.maxRank and card.maxRank > 1 then
-                    row.meta:SetText(string.format("Lv%d  %d/%d", card.level, rank + 1, card.maxRank))
+                    local nextRank = math.min(rank + 1, card.maxRank)
+                    row.meta:SetText(string.format("Lv%d  %d/%d", card.level, nextRank, card.maxRank))
                 else
                     row.meta:SetText("Lv" .. card.level)
                 end
@@ -574,12 +425,19 @@ local function RefreshDebugPool()
     talentColumn:refreshRows()
 end
 
+local function RequestDebugPool()
+    state.debugCatalog = {}
+    state.debugCatalogLoading = true
+    RefreshDebugPool()
+    SendDraftCommand(DRAFT_DEBUG_POOL_MESSAGE)
+end
+
 local function ToggleDebugPool()
     if debugFrame:IsShown() then
         debugFrame:Hide()
     else
-        RefreshDebugPool()
         debugFrame:Show()
+        RequestDebugPool()
     end
 end
 
@@ -734,6 +592,47 @@ local function ParseOffer(message)
     end
 end
 
+local function ParseDebugPool(message)
+    local fields = SplitText(message, "|")
+    if #fields < 2 or fields[1] ~= "D" then return end
+
+    if fields[2] == "B" then
+        state.debugCatalog = {}
+        state.debugCatalogLoading = true
+        if tonumber(fields[3]) then
+            state.serverCatalogSize = tonumber(fields[3])
+        end
+        return
+    end
+
+    if fields[2] == "C" and #fields >= 9 then
+        local kind = fields[3] == "A" and "active" or (fields[3] == "T" and "talent" or nil)
+        local cardId = tonumber(fields[4])
+        local spellId = tonumber(fields[5])
+        local rarity = rarityKeys[tonumber(fields[6]) or 0] or "common"
+        local level = tonumber(fields[7]) or 1
+        local currentRank = tonumber(fields[8]) or 0
+        local maxRank = tonumber(fields[9]) or 1
+        if kind and cardId and spellId then
+            table.insert(state.debugCatalog, {
+                id = cardId,
+                type = kind,
+                spell = spellId,
+                rarity = rarity,
+                level = level,
+                currentRank = currentRank,
+                maxRank = maxRank,
+            })
+        end
+        return
+    end
+
+    if fields[2] == "E" then
+        state.debugCatalogLoading = false
+        if debugFrame:IsShown() then RefreshDebugPool() end
+    end
+end
+
 local function ParseMeta(message)
     local fields = SplitText(message, "|")
     if #fields < 5 or fields[1] ~= "M" then return end
@@ -753,6 +652,7 @@ end
 
 local function MetaWhisperFilter(_, _, message, sender)
     if not IsAdventurer() or sender ~= UnitName("player") then return false end
+    if message == DRAFT_DEBUG_POOL_MESSAGE then return true end
     if message == DRAFT_REROLL_MESSAGE then return true end
     if string.sub(message, 1, string.len(DRAFT_BLESS_PREFIX)) == DRAFT_BLESS_PREFIX then return true end
     if string.sub(message, 1, string.len(DRAFT_DESTROY_PREFIX)) == DRAFT_DESTROY_PREFIX then return true end
@@ -780,6 +680,9 @@ MetaEventFrame:SetScript("OnEvent", function(self, event, ...)
         ParseOffer(message)
         ResetMode()
         RefreshMetaUI()
+        if debugFrame:IsShown() then RequestDebugPool() end
+    elseif string.sub(message, 1, 2) == "D|" then
+        ParseDebugPool(message)
     elseif string.sub(message, 1, 2) == "M|" then
         ParseMeta(message)
     elseif message == "C" then
@@ -788,6 +691,7 @@ MetaEventFrame:SetScript("OnEvent", function(self, event, ...)
         for _, button in ipairs(cardButtons) do HideExtraIcons(button) end
         ResetMode()
         RefreshMetaUI()
+        if debugFrame:IsShown() then RequestDebugPool() end
     elseif string.sub(message, 1, 2) == "E|" then
         state.pendingPickedCardId = nil
         ResetMode()

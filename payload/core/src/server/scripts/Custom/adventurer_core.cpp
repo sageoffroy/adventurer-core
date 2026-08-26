@@ -50,6 +50,7 @@ constexpr char DRAFT_PICK_PREFIX[] = "ADRAFT_PICK:";
 constexpr char DRAFT_REROLL_MESSAGE[] = "ADRAFT_REROLL";
 constexpr char DRAFT_BLESS_PREFIX[] = "ADRAFT_BLESS:";
 constexpr char DRAFT_DESTROY_PREFIX[] = "ADRAFT_DESTROY:";
+constexpr char DRAFT_DEBUG_POOL_MESSAGE[] = "ADRAFT_POOL";
 
 enum class DraftCardType : uint8
 {
@@ -832,6 +833,39 @@ bool IsCardEligible(Player const* player, DraftState const& state, DraftCard con
     return MeetsRequirements(state, card);
 }
 
+bool IsCardDebugEligible(Player const* player, DraftState const& state, DraftCard const& card)
+{
+    if (card.rankGrants.empty() || state.destroyedCards.count(card.id))
+        return false;
+
+    uint8 currentRank = GetOwnedRank(state, card.id);
+    if (currentRank >= card.rankGrants.size())
+        return false;
+
+    uint32 playerLevel = player ? player->GetLevel() : 1;
+    DraftRuntimeConfig const& config = GetDraftConfig();
+    uint32 sourceCap = playerLevel;
+    if (card.type == DraftCardType::Active)
+    {
+        sourceCap = playerLevel <= config.initialActiveSourceLevelCap
+            ? config.initialActiveSourceLevelCap
+            : playerLevel + config.activeSourceLevelLookahead;
+    }
+    else if (card.type == DraftCardType::Talent)
+    {
+        // The debug window previews the talent pool from the first talent-draft
+        // level onward. Actual talent offers remain level-gated by IsCardEligible.
+        sourceCap = std::max<uint32>(playerLevel, config.talentDraftFirstLevel);
+    }
+    else
+        return false;
+
+    if (card.sourceLevel > sourceCap)
+        return false;
+
+    return MeetsRequirements(state, card);
+}
+
 uint32 RarityWeightMultiplier(DraftRarity rarity)
 {
     size_t index = static_cast<size_t>(rarity);
@@ -1203,6 +1237,48 @@ void GenerateDraftOffer(Player* player, DraftState& state, DraftCardType type, b
         state.offeredCards[i] = selected[i];
 }
 
+void SendDraftDebugPool(Player* player, DraftState const& state)
+{
+    uint32 activeCount = 0;
+    uint32 talentCount = 0;
+
+    SendAddonPayload(player, ADVENTURER_DRAFT_PREFIX,
+        std::string("D|B|") + std::to_string(GetDraftCards().size()));
+
+    for (DraftCard const& card : GetDraftCards())
+    {
+        if (!IsCardDebugEligible(player, state, card))
+            continue;
+
+        uint8 currentRank = GetOwnedRank(state, card.id);
+        uint8 nextRank = currentRank + 1;
+        if (nextRank == 0 || nextRank > card.rankGrants.size())
+            continue;
+        std::vector<uint32> const& grants = card.rankGrants[nextRank - 1];
+        if (grants.empty())
+            continue;
+
+        if (card.type == DraftCardType::Active)
+            ++activeCount;
+        else if (card.type == DraftCardType::Talent)
+            ++talentCount;
+
+        std::ostringstream payload;
+        payload << "D|C|" << (card.type == DraftCardType::Active ? 'A' : 'T')
+                << '|' << card.id
+                << '|' << grants.front()
+                << '|' << uint32(card.rarity)
+                << '|' << uint32(card.sourceLevel)
+                << '|' << uint32(currentRank)
+                << '|' << card.rankGrants.size();
+        SendAddonPayload(player, ADVENTURER_DRAFT_PREFIX, payload.str());
+    }
+
+    std::ostringstream end;
+    end << "D|E|" << activeCount << '|' << talentCount;
+    SendAddonPayload(player, ADVENTURER_DRAFT_PREFIX, end.str());
+}
+
 void SendDraftMeta(Player* player, DraftState const& state)
 {
     DraftRuntimeConfig const& config = GetDraftConfig();
@@ -1537,6 +1613,15 @@ void HandleDraftDestroy(Player* player, uint32 cardId)
     SendDraftOffer(player, state);
 }
 
+void HandleDraftDebugPool(Player* player)
+{
+    ReloadDraftRuntimeData();
+    DraftState& state = GetDraftState(player);
+    QueueDraftProgressionToLevel(state, player->GetLevel());
+    PersistDraftState(player, state);
+    SendDraftDebugPool(player, state);
+}
+
 void HandleDraftReady(Player* player)
 {
     ReloadDraftRuntimeData();
@@ -1639,6 +1724,11 @@ public:
         if (msg == DRAFT_READY_MESSAGE)
         {
             HandleDraftReady(player);
+            return false;
+        }
+        if (msg == DRAFT_DEBUG_POOL_MESSAGE)
+        {
+            HandleDraftDebugPool(player);
             return false;
         }
         if (msg == DRAFT_REROLL_MESSAGE)
