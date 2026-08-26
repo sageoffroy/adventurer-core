@@ -25,7 +25,9 @@ class PlayerbotsRuntimeTests(unittest.TestCase):
         self.assertEqual(profile["AiPlayerbot.MinRandomBots"], "20")
         self.assertEqual(profile["AiPlayerbot.MaxRandomBots"], "30")
         self.assertEqual(profile["AiPlayerbot.DisabledWithoutRealPlayer"], "1")
-        self.assertEqual(profile["AiPlayerbot.SyncLevelWithPlayers"], "1")
+        # Current Playerbots level-sync path underflows at real-player level 1
+        # (playersLevel - 3 => 4294967294) and can lead to invalid urand ranges.
+        self.assertEqual(profile["AiPlayerbot.SyncLevelWithPlayers"], "0")
         self.assertEqual(profile["AiPlayerbot.AddClassAccountPoolSize"], "5")
         self.assertEqual(profile["AiPlayerbot.IterationsPerTick"], "5")
         self.assertEqual(profile["AiPlayerbot.DeleteRandomBotAccounts"], "0")
