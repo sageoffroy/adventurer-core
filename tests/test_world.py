@@ -22,13 +22,15 @@ class WorldUpdateTests(unittest.TestCase):
             core = self.make_core(Path(td) / "core")
             results = world.install(core)
 
-            self.assertEqual(len(results), 2)
+            self.assertEqual(len(results), 3)
             self.assertTrue(all(changed for _target, changed in results))
 
             bastion = core / world.WORLD_UPDATES[0].relative
             chassis = core / world.WORLD_UPDATES[1].relative
+            bindings = core / world.WORLD_UPDATES[2].relative
             self.assertTrue(bastion.is_file())
             self.assertTrue(chassis.is_file())
+            self.assertTrue(bindings.is_file())
 
             bastion_sql = bastion.read_text(encoding="utf-8")
             self.assertIn("290050", bastion_sql)
@@ -42,18 +44,35 @@ class WorldUpdateTests(unittest.TestCase):
             self.assertIn("gtoctclasscombatratingscalar_dbc", chassis_sql)
             self.assertIn("gtregenmpperspt_dbc", chassis_sql)
 
+            bindings_sql = bindings.read_text(encoding="utf-8")
+            self.assertIn("BETWEEN 290000 AND 299999", bindings_sql)
+            self.assertIn("BETWEEN -299999 AND -290000", bindings_sql)
+            self.assertIn("VALUES (290050, 'spell_warr_last_stand')", bindings_sql)
+            for stale_id in (290090, 290150, 290151, 290152, 290180):
+                self.assertNotIn(f"VALUES ({stale_id},", bindings_sql)
+
             results_again = world.install(core)
-            self.assertEqual(len(results_again), 2)
+            self.assertEqual(len(results_again), 3)
             self.assertTrue(all(not changed for _target, changed in results_again))
 
             verified = world.verify(core)
-            self.assertEqual(verified, [bastion, chassis])
+            self.assertEqual(verified, [bastion, chassis, bindings])
 
             removed = world.remove(core)
-            self.assertEqual(len(removed), 2)
+            self.assertEqual(len(removed), 3)
             self.assertTrue(all(was_removed for _target, was_removed in removed))
             self.assertFalse(bastion.exists())
             self.assertFalse(chassis.exists())
+            self.assertFalse(bindings.exists())
+
+    def test_guardian_script_binding_range_is_owned_and_explicit(self):
+        sql = (ROOT / "sql" / "world" / "004_guardian_script_bindings.sql").read_text(encoding="utf-8")
+        self.assertEqual(world.GUARDIAN_SPELL_MIN, 290000)
+        self.assertEqual(world.GUARDIAN_SPELL_MAX, 299999)
+        self.assertIn("DELETE FROM `spell_script_names`", sql)
+        self.assertEqual(sql.count("spell_warr_last_stand"), 2)
+        self.assertNotIn("spell_pal_ardent_defender", sql)
+        self.assertNotIn("spell_warr_sweeping_strikes", sql)
 
     def test_refuses_to_overwrite_or_remove_different_pending_update(self):
         with tempfile.TemporaryDirectory() as td:
