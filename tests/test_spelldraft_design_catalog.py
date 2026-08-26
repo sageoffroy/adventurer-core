@@ -45,7 +45,9 @@ class SpellDraftDesignCatalogTests(unittest.TestCase):
 
             parsed = spelldraft_runtime.parse_talent_dbc(path)
             self.assertEqual(parsed[11069], [11069, 12338, 12339, 12340, 12341])
+            self.assertEqual(parsed[12339], [11069, 12338, 12339, 12340, 12341])
             self.assertEqual(parsed[33213], [33213, 33214])
+            self.assertEqual(parsed[33214], [33213, 33214])
 
     def test_runtime_catalog_overlays_rarity_and_builds_talents_from_owned_abilities(self) -> None:
         base = """id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unlocks;replaces_previous;name
@@ -93,6 +95,27 @@ class SpellDraftDesignCatalogTests(unittest.TestCase):
         maul_talent = rows[spelldraft_runtime.SYNTHETIC_TALENT_CARD_BASE + 16934]
         self.assertEqual(maul_talent["requires_any"], "21:1")
         self.assertIn(467, ignored)  # spell itself, not a Talent.dbc first-rank entry
+
+    def test_intermediate_design_rank_is_canonicalized_to_first_talent_rank(self) -> None:
+        base = """id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unlocks;replaces_previous;name
+63;mind_blast;active;10;common;100;8092;;;;0;Explosión mental
+101;cruelty;talent;10;common;120;12320/12852;;;;1;Crueldad
+"""
+        metadata = """spell_id;rarity;talent_spells
+8092;uncommon;33214
+"""
+        chain = [33213, 33214, 33215]
+        talent_ranks = {spell_id: chain for spell_id in chain}
+
+        generated, ignored = spelldraft_runtime.build_runtime_cards(base, metadata, talent_ranks)
+        rows = {
+            int(row["id"]): row
+            for row in csv.DictReader(io.StringIO(generated), delimiter=";")
+        }
+        card = rows[spelldraft_runtime.SYNTHETIC_TALENT_CARD_BASE + 33213]
+        self.assertEqual(card["rank_grants"], "33213/33214/33215")
+        self.assertEqual(card["requires_any"], "63:1")
+        self.assertNotIn(33214, ignored)
 
     def test_catalog_has_hundreds_of_curated_talent_links(self) -> None:
         metadata = spelldraft_runtime.parse_catalog_metadata(METADATA.read_text(encoding="utf-8"))

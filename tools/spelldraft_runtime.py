@@ -161,7 +161,12 @@ def parse_talent_dbc(path: Path) -> dict[int, list[int]]:
         fields = struct.unpack_from(f"<{field_count}I", data, offset)
         ranks = [spell_id for spell_id in fields[4:9] if spell_id]
         if ranks:
-            result[ranks[0]] = ranks
+            # Design sheets are maintained by spell ID and may reference any
+            # rank of a native WotLK talent. Make every rank an alias of the
+            # canonical first-rank chain so those references are normalized
+            # instead of silently discarded.
+            for spell_id in ranks:
+                result[spell_id] = ranks
     return result
 
 
@@ -250,8 +255,9 @@ def build_runtime_cards(base_text: str, metadata_text: str, talent_ranks: dict[i
         if not meta:
             continue
         for talent_spell in meta["talent_spells"]:
-            if talent_spell in talent_ranks:
-                talent_sources.setdefault(talent_spell, set()).update(card_ids)
+            ranks = talent_ranks.get(talent_spell)
+            if ranks:
+                talent_sources.setdefault(ranks[0], set()).update(card_ids)
 
     explicit_by_first: dict[int, dict[str, str]] = {}
     for row in explicit_talents:
