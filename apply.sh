@@ -34,6 +34,12 @@ if (( status == 0 )); then
     python3 "$ROOT/tools/spelldraft_runtime.py" install "$@" || status=$?
 fi
 
+# Apply the versioned small-world Playerbots profile. The first successful
+# management pass snapshots the original playerbots.conf for full rollback.
+if (( status == 0 )); then
+    python3 "$ROOT/tools/playerbots_runtime.py" install --core-dir "$core_dir" || status=$?
+fi
+
 # Versioned maintenance migrations are part of the official clean install.
 # Existing development installations can run tools/world.py directly, but a
 # fresh apply never depends on remembering that extra step.
