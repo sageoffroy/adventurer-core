@@ -20,7 +20,7 @@ if locale == "esES" or locale == "esMX" then
         cancel = "Cancelar",
         blocked = "Bloqueada",
         rerolls = "Relanzamientos: %d",
-        blessings = "Bendiciones: %s",
+        blessings = "Bendiciones: %d",
         destroys = "Destrucciones: %d",
         blessed = "Bendecida x%.1f",
         blessHint = "Selecciona una carta para bendecirla",
@@ -41,7 +41,7 @@ else
         cancel = "Cancel",
         blocked = "Blocked",
         rerolls = "Rerolls: %d",
-        blessings = "Blessings: %s",
+        blessings = "Blessings: %d",
         destroys = "Destroys: %d",
         blessed = "Blessed x%.1f",
         blessHint = "Select a card to bless it",
@@ -243,6 +243,7 @@ end
 
 local state = {
     rerolls = 0,
+    blesses = 0,
     destroys = 0,
     blessedCardId = 0,
     blessMultiplierPercent = 0,
@@ -252,6 +253,12 @@ local state = {
     destroyedAll = {},
     sessionRanks = {},
     pendingPickedCardId = nil,
+    serverConfigKnown = false,
+    serverRerollStart = 0,
+    serverBlessStart = 0,
+    serverDestroyStart = 0,
+    serverSourceCap = 0,
+    serverCatalogSize = 0,
 }
 
 DraftFrame.metaStatus = DraftFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -442,6 +449,10 @@ debugFrame.title = debugFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLa
 debugFrame.title:SetPoint("TOP", debugFrame, "TOP", 0, -20)
 debugFrame.title:SetText(text.debugTitle)
 
+debugFrame.runtime = debugFrame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+debugFrame.runtime:SetPoint("TOP", debugFrame, "TOP", 0, -43)
+debugFrame.runtime:SetText("")
+
 debugFrame.hint = debugFrame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 debugFrame.hint:SetPoint("BOTTOM", debugFrame, "BOTTOM", 0, 18)
 debugFrame.hint:SetText(text.debugHint)
@@ -550,6 +561,11 @@ ConfigureColumnRefresh(activeColumn)
 ConfigureColumnRefresh(talentColumn)
 
 local function RefreshDebugPool()
+    if state.serverConfigKnown then
+        debugFrame.runtime:SetText(string.format("Server config: R%d B%d D%d  cap %d  catalog %d", state.serverRerollStart, state.serverBlessStart, state.serverDestroyStart, state.serverSourceCap, state.serverCatalogSize))
+    else
+        debugFrame.runtime:SetText("Server config: old SpellDraft runtime / no report")
+    end
     activeColumn.items = BuildDebugList("active")
     talentColumn.items = BuildDebugList("talent")
     activeColumn.title:SetText(string.format(text.activePool, #activeColumn.items))
@@ -582,10 +598,9 @@ end
 
 local function RefreshMetaUI()
     local blessMultiplier = (state.blessMultiplierPercent or 0) / 100
-    local blessingCount = state.blessMultiplierPercent > 0 and "∞" or "0"
     local status = string.format(text.rerolls, state.rerolls)
         .. "   •   "
-        .. string.format(text.blessings, blessingCount)
+        .. string.format(text.blessings, state.blesses)
         .. "   •   "
         .. string.format(text.destroys, state.destroys)
     if state.blessedCardId and state.blessedCardId > 0 and blessMultiplier > 0 then
@@ -594,7 +609,7 @@ local function RefreshMetaUI()
     DraftFrame.metaStatus:SetText(status)
 
     if state.rerolls > 0 and DraftFrame:IsShown() then rerollButton:Enable() else rerollButton:Disable() end
-    if state.blessMultiplierPercent > 0 and DraftFrame:IsShown() then blessButton:Enable() else blessButton:Disable() end
+    if state.blesses > 0 and state.blessMultiplierPercent > 0 and DraftFrame:IsShown() then blessButton:Enable() else blessButton:Disable() end
     if state.destroys > 0 and DraftFrame:IsShown() then destroyButton:Enable() else destroyButton:Disable() end
 
     for _, button in ipairs(cardButtons) do
@@ -656,6 +671,7 @@ rerollButton:SetScript("OnClick", function()
 end)
 
 blessButton:SetScript("OnClick", function()
+    if state.blesses <= 0 then return end
     if state.mode == "bless" then
         ResetMode()
     else
@@ -725,6 +741,13 @@ local function ParseMeta(message)
     state.destroys = tonumber(fields[3]) or 0
     state.blessedCardId = tonumber(fields[4]) or 0
     state.blessMultiplierPercent = tonumber(fields[5]) or 0
+    state.blesses = tonumber(fields[6]) or 0
+    state.serverConfigKnown = #fields >= 11
+    state.serverRerollStart = tonumber(fields[7]) or 0
+    state.serverBlessStart = tonumber(fields[8]) or 0
+    state.serverDestroyStart = tonumber(fields[9]) or 0
+    state.serverSourceCap = tonumber(fields[10]) or 0
+    state.serverCatalogSize = tonumber(fields[11]) or 0
     RefreshMetaUI()
 end
 

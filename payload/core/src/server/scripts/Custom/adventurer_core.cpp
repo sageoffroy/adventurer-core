@@ -41,7 +41,7 @@ constexpr char ADVENTURER_COMBO_PREFIX[] = "AdventurerCP";
 // ---------------------------------------------------------------------------
 constexpr char ADVENTURER_DRAFT_PREFIX[] = "AdventurerDraft";
 constexpr char ADVENTURER_DRAFT_SETTINGS_SOURCE[] = "adventurer_draft_v1";
-constexpr uint32 ADVENTURER_DRAFT_SCHEMA = 2;
+constexpr uint32 ADVENTURER_DRAFT_SCHEMA = 3;
 constexpr uint32 ADVENTURER_DRAFT_STANDARD_WEIGHT = 100;
 constexpr uint32 ADVENTURER_DRAFT_MAX_OFFER_SIZE = 3;
 
@@ -93,7 +93,7 @@ struct DraftRuntimeConfig
 {
     uint8 offerSize = 3;
     uint16 initialActivePicks = 3;
-    uint8 initialActiveSourceLevelCap = 8;
+    uint8 initialActiveSourceLevelCap = 10;
     uint8 activeDraftFirstLevel = 5;
     uint8 activeDraftEveryLevels = 5;
     uint8 talentDraftFirstLevel = 10;
@@ -101,11 +101,15 @@ struct DraftRuntimeConfig
 
     std::array<uint32, 5> rarityMultipliers = { 100, 55, 25, 10, 3 };
 
-    uint16 rerollStartingCharges = 2;
+    uint16 rerollStartingCharges = 10;
     uint8 rerollGainEveryLevels = 5;
     uint16 rerollGainAmount = 1;
     uint16 rerollMaxCharges = 0;
 
+    uint16 blessStartingCharges = 1;
+    uint8 blessGainEveryLevels = 10;
+    uint16 blessGainAmount = 1;
+    uint16 blessMaxCharges = 0;
     uint8 blessMaxActive = 1;
     uint32 blessWeightMultiplierPercent = 300;
 
@@ -132,6 +136,7 @@ struct DraftState
     std::map<uint32, uint8> ownedRanks;
 
     uint16 rerollCharges = 0;
+    uint16 blessCharges = 0;
     uint16 destroyCharges = 0;
     uint32 blessedCardId = 0;
     std::set<uint32> destroyedCards;
@@ -478,6 +483,10 @@ bool LoadDraftConfig(std::string const& path, DraftRuntimeConfig& config, std::s
     parsed.rerollGainAmount = static_cast<uint16>(ReadOption(values, "Reroll.GainAmount", parsed.rerollGainAmount));
     parsed.rerollMaxCharges = static_cast<uint16>(ReadOption(values, "Reroll.MaxCharges", parsed.rerollMaxCharges));
 
+    parsed.blessStartingCharges = static_cast<uint16>(ReadOption(values, "Bless.StartingCharges", parsed.blessStartingCharges));
+    parsed.blessGainEveryLevels = static_cast<uint8>(ReadOption(values, "Bless.GainEveryLevels", parsed.blessGainEveryLevels));
+    parsed.blessGainAmount = static_cast<uint16>(ReadOption(values, "Bless.GainAmount", parsed.blessGainAmount));
+    parsed.blessMaxCharges = static_cast<uint16>(ReadOption(values, "Bless.MaxCharges", parsed.blessMaxCharges));
     parsed.blessMaxActive = static_cast<uint8>(ReadOption(values, "Bless.MaxActive", parsed.blessMaxActive));
     parsed.blessWeightMultiplierPercent = ReadOption(values, "Bless.WeightMultiplierPercent", parsed.blessWeightMultiplierPercent);
 
@@ -877,6 +886,8 @@ std::vector<uint32> SelectWeightedCards(Player* player, DraftState const& state,
 // v1: schema,level,pendingA,pendingT,type,o1,o2,o3,card:rank...
 // v2: schema,level,pendingA,pendingT,type,o1,o2,o3,rerolls,destroys,blessed,
 //     oCARD:RANK...,xCARD...
+// v3: schema,level,pendingA,pendingT,type,o1,o2,o3,rerolls,blesses,destroys,
+//     blessed,oCARD:RANK...,xCARD...
 // ---------------------------------------------------------------------------
 std::string SerializeDraftState(DraftState const& state)
 {
@@ -890,6 +901,7 @@ std::string SerializeDraftState(DraftState const& state)
         << ',' << state.offeredCards[1]
         << ',' << state.offeredCards[2]
         << ',' << state.rerollCharges
+        << ',' << state.blessCharges
         << ',' << state.destroyCharges
         << ',' << state.blessedCardId;
 
@@ -911,7 +923,7 @@ bool DeserializeDraftState(std::string const& data, DraftState& state)
     try
     {
         uint32 schema = std::stoul(tokens[0]);
-        if (schema != 1 && schema != ADVENTURER_DRAFT_SCHEMA)
+        if (schema != 1 && schema != 2 && schema != ADVENTURER_DRAFT_SCHEMA)
             return false;
 
         state = DraftState{};
@@ -926,9 +938,20 @@ bool DeserializeDraftState(std::string const& data, DraftState& state)
         size_t firstDynamic = 8;
         if (schema == ADVENTURER_DRAFT_SCHEMA)
         {
+            if (tokens.size() < 12)
+                return false;
+            state.rerollCharges = static_cast<uint16>(std::stoul(tokens[8]));
+            state.blessCharges = static_cast<uint16>(std::stoul(tokens[9]));
+            state.destroyCharges = static_cast<uint16>(std::stoul(tokens[10]));
+            state.blessedCardId = static_cast<uint32>(std::stoul(tokens[11]));
+            firstDynamic = 12;
+        }
+        else if (schema == 2)
+        {
             if (tokens.size() < 11)
                 return false;
             state.rerollCharges = static_cast<uint16>(std::stoul(tokens[8]));
+            state.blessCharges = GetDraftConfig().blessStartingCharges;
             state.destroyCharges = static_cast<uint16>(std::stoul(tokens[9]));
             state.blessedCardId = static_cast<uint32>(std::stoul(tokens[10]));
             firstDynamic = 11;
@@ -936,6 +959,7 @@ bool DeserializeDraftState(std::string const& data, DraftState& state)
         else
         {
             state.rerollCharges = GetDraftConfig().rerollStartingCharges;
+            state.blessCharges = GetDraftConfig().blessStartingCharges;
             state.destroyCharges = GetDraftConfig().destroyStartingCharges;
         }
 
@@ -1006,6 +1030,8 @@ void ApplyLevelRewards(DraftState& state, uint32 level)
 
     if (config.rerollGainEveryLevels > 0 && level > 1 && (level % config.rerollGainEveryLevels) == 0)
         AddCharge(state.rerollCharges, config.rerollGainAmount, config.rerollMaxCharges);
+    if (config.blessGainEveryLevels > 0 && level > 1 && (level % config.blessGainEveryLevels) == 0)
+        AddCharge(state.blessCharges, config.blessGainAmount, config.blessMaxCharges);
     if (config.destroyGainEveryLevels > 0 && level > 1 && (level % config.destroyGainEveryLevels) == 0)
         AddCharge(state.destroyCharges, config.destroyGainAmount, config.destroyMaxCharges);
 }
@@ -1018,6 +1044,7 @@ DraftState BuildFreshDraftState(uint8 currentLevel)
     state.processedLevel = currentLevel;
     state.pendingActive = config.initialActivePicks;
     state.rerollCharges = config.rerollStartingCharges;
+    state.blessCharges = config.blessStartingCharges;
     state.destroyCharges = config.destroyStartingCharges;
 
     for (uint32 level = 1; level <= currentLevel; ++level)
@@ -1171,11 +1198,18 @@ void GenerateDraftOffer(Player* player, DraftState& state, DraftCardType type, b
 
 void SendDraftMeta(Player* player, DraftState const& state)
 {
+    DraftRuntimeConfig const& config = GetDraftConfig();
     std::ostringstream payload;
     payload << "M|" << state.rerollCharges
             << '|' << state.destroyCharges
             << '|' << state.blessedCardId
-            << '|' << (GetDraftConfig().blessMaxActive > 0 ? GetDraftConfig().blessWeightMultiplierPercent : 0);
+            << '|' << (config.blessMaxActive > 0 ? config.blessWeightMultiplierPercent : 0)
+            << '|' << state.blessCharges
+            << '|' << config.rerollStartingCharges
+            << '|' << config.blessStartingCharges
+            << '|' << config.destroyStartingCharges
+            << '|' << uint32(config.initialActiveSourceLevelCap)
+            << '|' << GetDraftCards().size();
     SendAddonPayload(player, ADVENTURER_DRAFT_PREFIX, payload.str());
 }
 
@@ -1446,6 +1480,12 @@ void HandleDraftBless(Player* player, uint32 cardId)
         return;
     }
 
+    if (state.blessCharges == 0)
+    {
+        SendDraftError(player, "NO_BLESSES", &state);
+        return;
+    }
+
     DraftCard const* card = FindDraftCard(cardId);
     if (!card || !IsCardInCurrentOffer(state, cardId) || !IsCardEligible(player, state, *card, state.offerType))
     {
@@ -1453,6 +1493,7 @@ void HandleDraftBless(Player* player, uint32 cardId)
         return;
     }
 
+    --state.blessCharges;
     state.blessedCardId = cardId;
     PersistDraftState(player, state);
     SendDraftMeta(player, state);

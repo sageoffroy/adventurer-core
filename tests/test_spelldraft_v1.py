@@ -207,9 +207,10 @@ class SpellDraftV1Tests(unittest.TestCase):
         self.assertIn('button.meta:SetText("")', self.meta_client)
         self.assertNotIn("Incluye %d habilidades", self.meta_client)
 
-    def test_meta_ui_reports_unlimited_blessing_and_has_debug_pool_viewer(self) -> None:
-        self.assertIn('blessings = "Bendiciones: %s"', self.meta_client)
-        self.assertIn('local blessingCount = state.blessMultiplierPercent > 0 and "∞" or "0"', self.meta_client)
+    def test_meta_ui_reports_finite_blessing_and_has_debug_pool_viewer(self) -> None:
+        self.assertIn('blessings = "Bendiciones: %d"', self.meta_client)
+        self.assertIn('state.blesses > 0', self.meta_client)
+        self.assertNotIn('"∞"', self.meta_client)
         self.assertIn("AdventurerDraftPoolDebugButton", self.meta_client)
         self.assertIn("AdventurerDraftPoolDebugFrame", self.meta_client)
         self.assertIn('SLASH_ADVENTURERDRAFTPOOL1 = "/adraftpool"', self.meta_client)
