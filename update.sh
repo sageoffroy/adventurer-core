@@ -31,9 +31,14 @@ python3 "$ROOT/tools/upgrade.py" "$@"
 # are deliberately preserved; fresh package defaults are refreshed as *.dist.
 python3 "$ROOT/tools/spelldraft_runtime.py" install "$@"
 
+# Playerbots remains an external module, but the small-world runtime profile
+# used by this project is versioned here. Only owned AiPlayerbot.* assignments
+# are changed; every other Playerbots option remains untouched.
+python3 "$ROOT/tools/playerbots_runtime.py" install --core-dir "$core_dir"
+
 # Maintenance migrations are versioned and copied into AzerothCore's normal
 # pending world-update directory. Worldserver applies only those not already
 # recorded by its database updater.
 python3 "$ROOT/tools/world.py" install --core-dir "$core_dir"
 
-printf '%s\n' "Adventurer Core update staged successfully. Rebuild worldserver and restart it to activate new core code; later SpellDraft config/card edits are runtime data and do not require recompilation."
+printf '%s\n' "Adventurer Core update staged successfully. Rebuild worldserver only when core source changed; runtime SpellDraft/Playerbots data changes require only a restart."
