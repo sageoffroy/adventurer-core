@@ -61,19 +61,25 @@ class SpellDraftV1Tests(unittest.TestCase):
             for row in self.cards.values()
             if row["type"] == "active"
         }
-        for bundled_child in (100, 355, 921, 6770, 6807, 6795, 99, 883, 2641, 6991, 982):
+        for bundled_child in (100, 355, 921, 6770, 6807, 6795, 99, 883, 2641, 6991, 982, 1082, 5215, 1079):
             self.assertNotIn(bundled_child, active_primary_spells)
 
-    def test_level_ten_active_catalog_is_populated_and_excludes_auto_shot(self) -> None:
+    def test_active_catalog_reaches_level_twenty_and_excludes_auto_shot(self) -> None:
         active_rows = [row for row in self.cards.values() if row["type"] == "active"]
-        self.assertGreaterEqual(len(active_rows), 80)
-        self.assertTrue(all(int(row["source_level"]) <= 10 for row in active_rows))
+        self.assertGreaterEqual(len(active_rows), 190)
+        source_levels = {int(row["source_level"]) for row in active_rows}
+        self.assertTrue({12, 14, 16, 18, 20}.issubset(source_levels))
+        self.assertEqual(max(source_levels), 20)
         primary_spells = {
             int(row["rank_grants"].split("/")[0].split("+")[0])
             for row in active_rows
         }
         self.assertNotIn(75, primary_spells)
-        for spell_id in (5185, 2457, 71, 21084, 1515, 1784, 585, 403, 133, 686):
+        for spell_id in (
+            5185, 2457, 71, 21084, 1515, 1784, 585, 403, 133, 686,
+            8936, 7384, 7328, 136, 1766, 588, 2008, 604, 755,
+            2912, 20230, 20217, 1499, 1943, 14914, 52127, 1953, 5784,
+        ):
             self.assertIn(spell_id, primary_spells)
 
     def test_rarity_weight_and_blessing_are_independent_inputs_to_selection(self) -> None:
@@ -86,16 +92,34 @@ class SpellDraftV1Tests(unittest.TestCase):
         self.assertIn("SelectWeightedCards", self.runtime)
         self.assertIn("urand(1, totalWeight)", self.runtime)
 
-    def test_progression_matches_configured_level_one_five_and_ten_contract(self) -> None:
+    def test_progression_matches_initial_cap_then_level_plus_lookahead_contract(self) -> None:
         for token in (
             "InitialActivePicks = 3",
             "InitialActiveSourceLevelCap = 10",
+            "ActiveSourceLevelLookahead = 3",
             "ActiveDraftFirstLevel = 5",
             "ActiveDraftEveryLevels = 5",
             "TalentDraftFirstLevel = 10",
             "TalentDraftEveryLevels = 1",
         ):
             self.assertIn(token, self.config)
+
+        self.assertIn('ReadOption(values, "Draft.ActiveSourceLevelLookahead"', self.runtime)
+        self.assertIn("playerLevel <= config.initialActiveSourceLevelCap", self.runtime)
+        self.assertIn("playerLevel + config.activeSourceLevelLookahead", self.runtime)
+
+        initial_cap = 10
+        lookahead = 3
+        def source_cap(level: int) -> int:
+            return initial_cap if level <= initial_cap else level + lookahead
+
+        self.assertEqual(source_cap(1), 10)
+        self.assertEqual(source_cap(5), 10)
+        self.assertEqual(source_cap(10), 10)
+        self.assertEqual(source_cap(11), 14)
+        self.assertEqual(source_cap(15), 18)
+        self.assertEqual(source_cap(17), 20)
+        self.assertEqual(source_cap(20), 23)
 
         self.assertIn("state.pendingActive = config.initialActivePicks", self.runtime)
         self.assertIn("ApplyLevelRewards", self.runtime)
