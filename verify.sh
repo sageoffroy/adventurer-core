@@ -24,5 +24,6 @@ fi
 
 python3 "$ROOT/tools/database.py" verify "$@"
 python3 "$ROOT/tools/adventurer.py" verify "$@"
+python3 "$ROOT/tools/playerbots_source_patch.py" verify --core-dir "$core_dir"
 python3 "$ROOT/tools/playerbots_runtime.py" verify --core-dir "$core_dir"
 python3 "$ROOT/tools/world.py" verify --core-dir "$core_dir"
