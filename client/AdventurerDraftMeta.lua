@@ -576,11 +576,7 @@ local function ResetMode()
     blessButton:SetText(text.bless)
     destroyButton:SetText(text.destroy)
     if DraftFrame.hint then
-        if locale == "esES" or locale == "esMX" then
-            DraftFrame.hint:SetText("Mouseover: detalles de la habilidad")
-        else
-            DraftFrame.hint:SetText("Mouseover: ability details")
-        end
+        DraftFrame.hint:SetText("")
     end
 end
 
