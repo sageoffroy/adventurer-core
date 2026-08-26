@@ -27,6 +27,11 @@ fi
 # to the pre-Adventurer server rather than merely to the previous package build.
 python3 "$ROOT/tools/upgrade.py" "$@"
 
+# Class 10 is playable in Adventurer Core but is not a native Playerbots class.
+# Keep randombot generation on the ten stock WotLK classes and protect old
+# class-10 bot rows from the stock zero-weight talent-spec path.
+python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir"
+
 # Install editable SpellDraft runtime data beside DataDir. Existing live files
 # are deliberately preserved; fresh package defaults are refreshed as *.dist.
 python3 "$ROOT/tools/spelldraft_runtime.py" install "$@"
@@ -41,4 +46,4 @@ python3 "$ROOT/tools/playerbots_runtime.py" install --core-dir "$core_dir"
 # recorded by its database updater.
 python3 "$ROOT/tools/world.py" install --core-dir "$core_dir"
 
-printf '%s\n' "Adventurer Core update staged successfully. Rebuild worldserver only when core source changed; runtime SpellDraft/Playerbots data changes require only a restart."
+printf '%s\n' "Adventurer Core update staged successfully. Rebuild worldserver when core or Playerbots source changed; runtime-only SpellDraft/Playerbots config changes require only a restart."
