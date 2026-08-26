@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+from collections import OrderedDict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,16 +14,24 @@ import playerbots_source_patch  # noqa: E402
 
 class PlayerbotsSourcePatchTests(unittest.TestCase):
     def make_core(self, root: Path) -> Path:
+        grouped: OrderedDict[str, list[str]] = OrderedDict()
         for spec in playerbots_source_patch.PATCHES:
-            target = root / spec.relative_path
+            grouped.setdefault(spec.relative_path, []).append(spec.clean)
+
+        for relative_path, anchors in grouped.items():
+            target = root / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(f"prefix\n{spec.clean}suffix\n", encoding="utf-8")
+            target.write_text(
+                "prefix\n" + "\nseparator\n".join(anchors) + "suffix\n",
+                encoding="utf-8",
+            )
         return root
 
-    def test_install_excludes_adventurer_and_guards_zero_weight_talents(self) -> None:
+    def test_install_excludes_adventurer_guards_talents_and_avoids_flush(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             core = self.make_core(Path(td) / "core")
             changed = playerbots_source_patch.install(core)
+            # Three exact patches currently touch two Playerbots source files.
             self.assertEqual(len(changed), 2)
 
             random_factory = (
@@ -31,6 +40,8 @@ class PlayerbotsSourcePatchTests(unittest.TestCase):
             ).read_text(encoding="utf-8")
             self.assertIn("if (cls == CLASS_ADVENTURER)", random_factory)
             self.assertIn("ten native WotLK classes", random_factory)
+            self.assertNotIn('Execute("FLUSH TABLES")', random_factory)
+            self.assertIn("RELOAD/FLUSH_TABLES", random_factory)
 
             talent_factory = (
                 core / "modules/mod-playerbots/src/Bot/Factory/PlayerbotFactory.cpp"
