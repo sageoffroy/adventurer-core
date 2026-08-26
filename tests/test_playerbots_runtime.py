@@ -12,8 +12,8 @@ import playerbots_runtime  # noqa: E402
 
 
 class PlayerbotsRuntimeTests(unittest.TestCase):
-    def make_core(self, root: Path, text: str) -> tuple[Path, Path]:
-        target = root / playerbots_runtime.TARGET_RELATIVE
+    def make_core(self, root: Path, text: str, relative: Path | None = None) -> tuple[Path, Path]:
+        target = root / (relative or playerbots_runtime.TARGET_RELATIVE)
         target.parent.mkdir(parents=True)
         target.write_text(text, encoding="utf-8")
         return root, target
@@ -29,6 +29,31 @@ class PlayerbotsRuntimeTests(unittest.TestCase):
         self.assertEqual(profile["AiPlayerbot.AddClassAccountPoolSize"], "5")
         self.assertEqual(profile["AiPlayerbot.IterationsPerTick"], "5")
         self.assertEqual(profile["AiPlayerbot.DeleteRandomBotAccounts"], "0")
+
+    def test_prefers_standard_azerothcore_module_config_path(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            core, target = self.make_core(Path(td) / "core", "AiPlayerbot.Enabled = 1\n")
+            self.assertEqual(playerbots_runtime.target_path(core), target)
+
+    def test_supports_legacy_direct_etc_config_path(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            relative = Path("env/dist/etc/playerbots.conf")
+            core, target = self.make_core(Path(td) / "core", "AiPlayerbot.Enabled = 1\n", relative)
+            self.assertEqual(playerbots_runtime.target_path(core), target)
+
+    def test_discovers_one_custom_playerbots_config_below_etc(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            relative = Path("env/dist/etc/custom/modules/playerbots.conf")
+            core, target = self.make_core(Path(td) / "core", "AiPlayerbot.Enabled = 1\n", relative)
+            self.assertEqual(playerbots_runtime.target_path(core), target)
+
+    def test_refuses_ambiguous_custom_playerbots_configs(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            core = Path(td) / "core"
+            self.make_core(core, "AiPlayerbot.Enabled = 1\n", Path("env/dist/etc/a/playerbots.conf"))
+            self.make_core(core, "AiPlayerbot.Enabled = 1\n", Path("env/dist/etc/b/playerbots.conf"))
+            with self.assertRaises(playerbots_runtime.PlayerbotsConfigError):
+                playerbots_runtime.target_path(core)
 
     def test_install_overrides_only_managed_keys_and_is_idempotent(self) -> None:
         original = """# test playerbots config
