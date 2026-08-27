@@ -8,8 +8,8 @@ relationships. During install, Talent.dbc supplies the real WotLK talent rank
 chains, so the live cards.csv can be rebuilt without hardcoding talent ranks.
 
 subclasses.json is the single classification source for the Adventurer's four
-spell/talent families. The generated live cards.csv carries that classification
-so the server and client UI never need a duplicate hardcoded catalog.
+spell/talent families. Runtime generation emits card_subclasses.csv beside the
+normal 12-column cards.csv, keeping the stable SpellDraft parser contract intact.
 
 cards.csv remains file-managed: package updates advance it while unedited and
 preserve it wholesale after a real local edit. spelldraft.conf is merged
@@ -28,7 +28,6 @@ from pathlib import Path
 
 from subclasses import (
     SubclassError,
-    card_subclass_map,
     choose_synthetic_talent_subclass,
     load_spec as load_subclass_spec,
     talent_override_map,
@@ -37,7 +36,13 @@ from subclasses import (
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "config" / "spelldraft"
-FILES = ("spelldraft.conf", "cards.csv", "catalog_metadata.csv", "subclasses.json")
+FILES = (
+    "spelldraft.conf",
+    "cards.csv",
+    "catalog_metadata.csv",
+    "subclasses.json",
+    "card_subclasses.csv",
+)
 MARKER_SUFFIX = ".managed.sha256"
 SYNTHETIC_TALENT_CARD_BASE = 1_000_000
 VALID_RARITIES = {"common", "uncommon", "rare", "epic", "legendary"}
@@ -231,12 +236,7 @@ def render_cards(rows: list[dict[str, str]], fieldnames: list[str]) -> str:
     return output.getvalue()
 
 
-def build_runtime_cards(
-    base_text: str,
-    metadata_text: str,
-    talent_ranks: dict[int, list[int]],
-    subclass_spec: dict | None = None,
-) -> tuple[str, list[int]]:
+def build_runtime_cards(base_text: str, metadata_text: str, talent_ranks: dict[int, list[int]]) -> tuple[str, list[int]]:
     reader = csv.DictReader(io.StringIO(base_text), delimiter=";")
     fieldnames = reader.fieldnames
     if fieldnames is None or len(fieldnames) != 12 or fieldnames[0] != "id" or "rank_grants" not in fieldnames:
@@ -244,21 +244,11 @@ def build_runtime_cards(
     rows = [dict(row) for row in reader]
     metadata = parse_catalog_metadata(metadata_text)
 
-    subclass_spec = subclass_spec or load_subclass_spec()
-    try:
-        card_classes = validate_card_coverage(base_text, subclass_spec)
-    except SubclassError as exc:
-        raise SpellDraftRuntimeError(str(exc)) from exc
-    talent_overrides = talent_override_map(subclass_spec)
-    output_fieldnames = list(fieldnames) + ["subclass"]
-
     active_rows: list[dict[str, str]] = []
     explicit_talents: list[dict[str, str]] = []
     active_by_granted_spell: dict[int, set[int]] = {}
 
     for row in rows:
-        card_id = int(row["id"])
-        row["subclass"] = card_classes[card_id]
         if row["type"] == "active":
             spells = split_grant_spells(row["rank_grants"])
             if not spells:
@@ -269,6 +259,7 @@ def build_runtime_cards(
             if primary_meta and primary_meta["rarity"]:
                 row["rarity"] = str(primary_meta["rarity"])
             active_rows.append(row)
+            card_id = int(row["id"])
             for spell_id in spells:
                 active_by_granted_spell.setdefault(spell_id, set()).add(card_id)
         elif row["type"] == "talent":
@@ -309,15 +300,6 @@ def build_runtime_cards(
             raise SpellDraftRuntimeError(f"synthetic talent card id collision: {card_id}")
         used_card_ids.add(card_id)
         sources = sorted(talent_sources[first_spell])
-        try:
-            subclass = choose_synthetic_talent_subclass(
-                first_spell,
-                sources,
-                card_classes,
-                talent_overrides,
-            )
-        except SubclassError as exc:
-            raise SpellDraftRuntimeError(str(exc)) from exc
         synthetic.append({
             "id": str(card_id),
             "key": f"talent_{first_spell}",
@@ -331,7 +313,6 @@ def build_runtime_cards(
             "unlocks": "",
             "replaces_previous": "1",
             "name": f"Talent {first_spell}",
-            "subclass": subclass,
         })
 
     output_rows = active_rows + explicit_talents + synthetic
@@ -343,7 +324,66 @@ def build_runtime_cards(
         for talent_spell in meta["talent_spells"]
         if talent_spell not in talent_ranks
     })
-    return render_cards(output_rows, output_fieldnames), ignored
+    return render_cards(output_rows, fieldnames), ignored
+
+
+def parse_requirement_card_ids(raw: str) -> list[int]:
+    result: list[int] = []
+    for item in raw.split("|"):
+        item = item.strip()
+        if not item:
+            continue
+        card_id, _, _rank = item.partition(":")
+        if not card_id:
+            continue
+        result.append(int(card_id))
+    return result
+
+
+def build_runtime_subclasses(
+    generated_cards_text: str,
+    base_cards_text: str,
+    subclass_spec: dict,
+) -> str:
+    try:
+        base_classes = validate_card_coverage(base_cards_text, subclass_spec)
+    except SubclassError as exc:
+        raise SpellDraftRuntimeError(str(exc)) from exc
+    overrides = talent_override_map(subclass_spec)
+
+    output = io.StringIO(newline="")
+    writer = csv.DictWriter(
+        output,
+        fieldnames=["card_id", "subclass"],
+        delimiter=";",
+        lineterminator="\n",
+    )
+    writer.writeheader()
+
+    seen: set[int] = set()
+    for row in csv.DictReader(io.StringIO(generated_cards_text), delimiter=";"):
+        card_id = int(row["id"])
+        if card_id in seen:
+            raise SpellDraftRuntimeError(f"duplicate generated card id {card_id}")
+        seen.add(card_id)
+
+        subclass = base_classes.get(card_id)
+        if subclass is None:
+            if row["type"] != "talent":
+                raise SpellDraftRuntimeError(f"generated active card {card_id} has no subclass")
+            grants = split_grant_spells(row["rank_grants"])
+            if not grants:
+                raise SpellDraftRuntimeError(f"generated talent {card_id} has no ranks")
+            sources = parse_requirement_card_ids(row["requires_any"])
+            try:
+                subclass = choose_synthetic_talent_subclass(
+                    grants[0], sources, base_classes, overrides
+                )
+            except SubclassError as exc:
+                raise SpellDraftRuntimeError(str(exc)) from exc
+
+        writer.writerow({"card_id": str(card_id), "subclass": subclass})
+    return output.getvalue()
 
 
 def build_packaged_files(core: Path, server_data_dir: Path | None, dbc_src: Path | None) -> tuple[dict[str, bytes], list[int]]:
@@ -354,16 +394,15 @@ def build_packaged_files(core: Path, server_data_dir: Path | None, dbc_src: Path
     }
     base_cards = (SOURCE / "cards.csv").read_text(encoding="utf-8")
     metadata_text = files["catalog_metadata.csv"].decode("utf-8")
+    subclass_spec = load_subclass_spec(SOURCE / "subclasses.json")
     talent_dbc = resolve_talent_dbc(core, server_data_dir, dbc_src)
     if talent_dbc is None:
         raise SpellDraftRuntimeError("Talent.dbc not found; pass --dbc-src pointing to the WotLK DBC directory")
-    generated_cards, ignored = build_runtime_cards(
-        base_cards,
-        metadata_text,
-        parse_talent_dbc(talent_dbc),
-        load_subclass_spec(SOURCE / "subclasses.json"),
-    )
+    generated_cards, ignored = build_runtime_cards(base_cards, metadata_text, parse_talent_dbc(talent_dbc))
     files["cards.csv"] = generated_cards.encode("utf-8")
+    files["card_subclasses.csv"] = build_runtime_subclasses(
+        generated_cards, base_cards, subclass_spec
+    ).encode("utf-8")
     return files, ignored
 
 
