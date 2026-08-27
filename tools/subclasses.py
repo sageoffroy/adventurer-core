@@ -34,7 +34,13 @@ SLA_RACE_MASK = 3
 SLA_CLASS_MASK = 4
 SLA_EXCLUDE_RACE = 5
 SLA_EXCLUDE_CLASS = 6
+SLA_MIN_SKILL_LINE_RANK = 7
 SLA_SUPERCEDED_BY = 8
+SLA_ACQUIRE_METHOD = 9
+SLA_TRIVIAL_RANK_HIGH = 10
+SLA_TRIVIAL_RANK_LOW = 11
+SLA_CHARACTER_POINTS_1 = 12
+SLA_CHARACTER_POINTS_2 = 13
 
 SKILLRACECLASS_FIELDS = 8
 SKILLRACECLASS_RECORD_SIZE = SKILLRACECLASS_FIELDS * 4
@@ -289,6 +295,34 @@ def rank_chain_closure(records: list[bytearray], spell_id: int) -> set[int]:
     return result
 
 
+def normalize_custom_skill_line_ability(
+    row: bytearray,
+    row_id: int,
+    skill_line: int,
+    spell_id: int,
+) -> bytearray:
+    """Make an SLA row presentation-only for the Adventurer spellbook.
+
+    AcquireMethod must remain zero: these rows categorize spells that SpellDraft
+    already granted and must never teach abilities merely because the subclass
+    SkillLine exists on the character.
+    """
+    set_u32(row, 0, row_id)
+    set_u32(row, SLA_SKILL_LINE, skill_line)
+    set_u32(row, SLA_SPELL, spell_id)
+    set_u32(row, SLA_RACE_MASK, 0)
+    set_u32(row, SLA_CLASS_MASK, ADVENTURER_CLASS_MASK)
+    set_u32(row, SLA_EXCLUDE_RACE, 0)
+    set_u32(row, SLA_EXCLUDE_CLASS, 0)
+    set_u32(row, SLA_MIN_SKILL_LINE_RANK, 0)
+    set_u32(row, SLA_ACQUIRE_METHOD, 0)
+    set_u32(row, SLA_TRIVIAL_RANK_HIGH, 0)
+    set_u32(row, SLA_TRIVIAL_RANK_LOW, 0)
+    set_u32(row, SLA_CHARACTER_POINTS_1, 0)
+    set_u32(row, SLA_CHARACTER_POINTS_2, 0)
+    return row
+
+
 def patch_skill_line_abilities(path: Path, cards_text: str, spec: dict) -> bool:
     dbc = DBC.read(path)
     if dbc.fields != SKILLLINEABILITY_FIELDS or dbc.record_size != SKILLLINEABILITY_RECORD_SIZE:
@@ -316,28 +350,24 @@ def patch_skill_line_abilities(path: Path, cards_text: str, spec: dict) -> bool:
     for row in dbc.records:
         rows_by_spell.setdefault(u32(row, SLA_SPELL), []).append(row)
 
-    # A drafted seed must have a real SkillLineAbility row so the client has a
-    # spellbook entry to clone. However SupercededBySpell is allowed to point at
-    # a later rank that has no row of its own; that is normal in the stock WotLK
-    # DBC and the cloned seed row already preserves that supersession chain.
-    missing_seeds = sorted(spell_id for spell_id in seeds if spell_id not in rows_by_spell)
-    if missing_seeds:
-        raise SubclassError(
-            "SkillLineAbility.dbc has no source row for drafted spells: "
-            + ", ".join(map(str, missing_seeds))
-        )
-
+    # Existing rows let us preserve stock SupercededBySpell links. A drafted
+    # seed such as Curse of Recklessness (704) can legitimately have no SLA row
+    # at all in 3.3.5a; for those seeds we synthesize a minimal class-10-only
+    # row. Missing terminal superseded ranks still do not need artificial rows.
     visible_classified = {
         spell_id: subclass
         for spell_id, subclass in classified.items()
         if spell_id in rows_by_spell
     }
+    for spell_id, subclass in seeds.items():
+        if spell_id not in rows_by_spell:
+            visible_classified[spell_id] = subclass
 
     # Generic SkillLineAbility rows (ClassMask=0) would otherwise also expose a
     # drafted spell under its stock/general skill line. Exclude only class 10;
     # stock classes remain byte-for-byte equivalent in behavior.
     for spell_id in visible_classified:
-        for row in rows_by_spell[spell_id]:
+        for row in rows_by_spell.get(spell_id, ()):
             if u32(row, SLA_CLASS_MASK) == 0:
                 set_u32(
                     row,
@@ -347,16 +377,23 @@ def patch_skill_line_abilities(path: Path, cards_text: str, spec: dict) -> bool:
 
     next_id = max((u32(row, 0) for row in dbc.records), default=0) + 1
     for spell_id in sorted(visible_classified):
-        candidates = rows_by_spell[spell_id]
-        template = next((row for row in candidates if u32(row, SLA_CLASS_MASK) != 0), candidates[0])
-        row = bytearray(template)
-        set_u32(row, 0, next_id)
+        candidates = rows_by_spell.get(spell_id, [])
+        if candidates:
+            template = next(
+                (row for row in candidates if u32(row, SLA_CLASS_MASK) != 0),
+                candidates[0],
+            )
+            row = bytearray(template)
+        else:
+            row = bytearray(SKILLLINEABILITY_RECORD_SIZE)
+
+        normalize_custom_skill_line_ability(
+            row,
+            next_id,
+            int(by_key[visible_classified[spell_id]]["skill_line_id"]),
+            spell_id,
+        )
         next_id += 1
-        set_u32(row, SLA_SKILL_LINE, int(by_key[visible_classified[spell_id]]["skill_line_id"]))
-        set_u32(row, SLA_RACE_MASK, 0)
-        set_u32(row, SLA_CLASS_MASK, ADVENTURER_CLASS_MASK)
-        set_u32(row, SLA_EXCLUDE_RACE, 0)
-        set_u32(row, SLA_EXCLUDE_CLASS, 0)
         dbc.records.append(row)
 
     dbc.records.sort(key=lambda row: u32(row, 0))
