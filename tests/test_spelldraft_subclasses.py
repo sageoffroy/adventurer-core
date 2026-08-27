@@ -146,26 +146,31 @@ class SpellDraftSubclassTests(unittest.TestCase):
         ):
             self.assertIn(token, self.collection_server)
 
-    def test_adventurer_talent_window_mirrors_spellbook_and_routes_live_button(self) -> None:
+    def test_adventurer_talent_window_uses_four_icon_branches_and_routes_live_button(self) -> None:
         for token in (
             'TALENT_COLLECTION_REQUEST = "ADRAFT_TALENTS"',
-            'CreateFrame("Frame", "AdventurerTalentCollectionFrame"',
+            'frame = CreateFrame("Frame", "AdventurerTalentCollectionFrame"',
             '"mercenary", "explorer", "spellcaster", "illuminated"',
-            "TALENTS_PER_PAGE = 12",
-            '"Interface\\\\Spellbook\\\\UI-SpellbookPanel-TopLeft"',
-            '"Interface\\\\Spellbook\\\\UI-SpellbookPanel-BotRight"',
-            '"Interface\\\\Spellbook\\\\UI-Spellbook-SpellBackground"',
-            '"Interface\\\\Buttons\\\\UI-SpellbookIcon-PrevPage-Up"',
-            '"Interface\\\\Buttons\\\\UI-SpellbookIcon-NextPage-Up"',
-            '"Interface\\\\SpellBook\\\\SpellBook-SkillLineTab"',
-            "entry.name:SetMaxLines(2)",
+            "BRANCH_PAGE_SIZE = 24",
+            "GRID_COLUMNS = 4",
+            'CreateFrame("Frame", "AdventurerTalentCollectionBranch" .. index',
+            '"Interface\\\\Buttons\\\\UI-Quickslot2"',
             'GameTooltip:SetHyperlink("spell:" .. self.spellId)',
+            'GameTooltip:AddLine(string.format(text.rank',
             "local NativeToggleTalentFrame = ToggleTalentFrame",
-            "function ToggleTalentFrame()",
-            "return NativeToggleTalentFrame()",
-            'TalentMicroButton:SetScript("OnClick"',
+            "local function AdventurerToggleTalentFrame()",
+            'TalentMicroButton:SetScript("OnClick", AdventurerToggleTalentFrame)',
+            'eventFrame:RegisterEvent("ADDON_LOADED")',
+            'addonName == "Blizzard_TalentUI"',
         ):
             self.assertIn(token, self.client)
+
+        for forbidden in (
+            "SetMaxLines",
+            "FauxScrollFrame",
+            "UI-SpellbookPanel-TopLeft",
+        ):
+            self.assertNotIn(forbidden, self.client)
 
         self.assertIn("AdventurerCollections.lua", self.client_builder)
         self.assertIn("build_adventurer_collections_lua", self.client_builder)
