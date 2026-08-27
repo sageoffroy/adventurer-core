@@ -41,11 +41,16 @@ jobs:
           payload = (root / "payload" / "core").resolve()
           planned = plan(core, payload)
           runtime_rel = "src/server/scripts/Custom/adventurer_core.cpp"
+          collection_rel = "src/server/scripts/Custom/adventurer_collections.cpp"
           runtime = next(item for item in planned if item.relative_path == runtime_rel)
+          collection = next(item for item in planned if item.relative_path == collection_rel)
 
-          assert len(planned) == 7
+          assert len(planned) == 8
           assert runtime.original is None
           assert runtime.patched == (payload / runtime_rel).read_bytes()
+          assert collection.original is None
+          assert collection.patched == (payload / collection_rel).read_bytes()
+
           text = runtime.patched.decode("utf-8")
           assert "ADVENTURER_MAX_RAGE = 1000" in text
           assert "ADVENTURER_MAX_ENERGY = 100" in text
@@ -65,6 +70,12 @@ jobs:
               "PLAYERHOOK_ON_PLAYER_IS_CLASS",
           ):
               assert token not in text, token
+
+          collection_text = collection.patched.decode("utf-8")
+          assert 'TALENT_COLLECTION_REQUEST[] = "ADRAFT_TALENTS"' in collection_text
+          assert 'ADVENTURER_SUBCLASS_SKILLS[] = {900, 901, 902, 903}' in collection_text
+          assert '"card_subclasses.csv"' in collection_text
+          assert 'payload << "T|C|"' in collection_text
 
           player_h = (core / "src/server/game/Entities/Player/Player.h").read_text(encoding="utf-8")
           spell_mgr_h = (core / "src/server/game/Spells/SpellMgr.h").read_text(encoding="utf-8")
