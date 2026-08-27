@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "name": "Aventureros de Azeroth - Server Foundation v1",
+  "core": {
+    "repository": "azerothcore/azerothcore-wotlk",
+    "commit": "4f9040b4f354c052763cbb554b06031b8caafa04",
+    "policy": "pinned-clean-upstream"
+  },
+  "modules": {
+    "selected": [
+      {
+        "name": "mod-TimeIsTime",
+        "repository": "dunjeon/mod-TimeIsTime",
+        "commit": "abfb3a7a031c168c481642604c1389a5d92f4499",
+        "role": "day-night clock",
+        "adaptation": "keep time cycle; implement darker-night visuals separately"
+      },
+      {
+        "name": "mod-ale",
+        "repository": "azerothcore/mod-ale",
+        "commit": "9eeb1f3c47a81291548874fa4be2f4cde35e2ec3",
+        "role": "Lua gameplay engine",
+        "adaptation": "target ALE API for all custom Lua systems"
+      },
+      {
+        "name": "mod-aoe-loot",
+        "repository": "azerothcore/mod-aoe-loot",
+        "commit": "b5c663572d936985c19dc8b499ecea60e1da570d",
+        "role": "quality of life",
+        "adaptation": "none initially; tune range/group behavior after smoke test"
+      }
+    ],
+    "candidate_next": [
+      {
+        "name": "mod-autobalance",
+        "repository": "azerothcore/mod-autobalance",
+        "commit": "5d2778e301ae7684051cdc446efbe81c7ff2a79b",
+        "ref": "stable",
+        "role": "scale instance creatures for small groups",
+        "note": "instance-only; validate against pinned 2026 core before enabling"
+      }
+    ],
+    "deferred": [
+      {
+        "name": "mod-playerbots",
+        "reason": "not wanted for current gameplay direction"
+      },
+      {
+        "name": "mod-dungeon-master",
+        "reason": "requires substantial Aventureros-specific redesign"
+      },
+      {
+        "name": "mod-individual-progression",
+        "reason": "overlaps custom Adventurer progression"
+      },
+      {
+        "name": "mod-challenge-modes",
+        "reason": "overlaps future custom dungeon systems"
+      }
+    ]
+  },
+  "adapted_content_sources": [
+    {
+      "name": "Rare Drops",
+      "repository": "StraysFromPath/mod-rare-drops",
+      "commit": "cf6ea06d32d751328836b65d9b7270975aa3c68a",
+      "policy": "import audited loot data only; do not install repository as a module"
+    },
+    {
+      "name": "Bonus Loot Chest",
+      "repository": "Brytenwally/Bonus-Loot-Chest",
+      "commit": "1f2b8263c68746977f65b2c885d1cf6b485c4dc5",
+      "policy": "reimplement for ALE; boss-only; curated loot pool; custom gameobject id"
+    },
+    {
+      "name": "Cursed Relic",
+      "repository": "zyggy123/Cursed-Relic",
+      "commit": "5b9ae96c2ada04271c640b302dfca20f0e589fc0",
+      "policy": "reimplement for ALE with persistent world state and risk-reward design"
+    }
+  ]
+}
