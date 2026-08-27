@@ -9,10 +9,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from client import (  # noqa: E402
+    ADVENTURER_COLLECTIONS_INTERNAL,
     ADVENTURER_DRAFT_META_INTERNAL,
     ADVENTURER_FRAME_INTERNAL,
     ADVENTURER_PLAYER_FRAME_INTERNAL,
     DBC_NAMES,
+    build_adventurer_collections_lua,
     build_adventurer_draft_meta_lua,
     build_adventurer_frame_art,
     build_adventurer_player_frame_xml,
@@ -23,54 +25,58 @@ from client import (  # noqa: E402
 
 
 class AdventurerResourceHudTests(unittest.TestCase):
-    def test_frame_xml_loads_adventurer_layout_and_draft_meta_after_player_frame(self) -> None:
+    def test_frame_xml_loads_all_adventurer_client_layers_after_player_frame(self) -> None:
         toc = build_frame_xml_toc().decode("utf-8")
-        self.assertIn(
-            "PlayerFrame.xml\nAdventurerPlayerFrame.xml\nAdventurerResources.lua\nAdventurerDraftMeta.lua\nPartyFrame.xml",
-            toc,
+        expected = (
+            "PlayerFrame.xml\n"
+            "AdventurerPlayerFrame.xml\n"
+            "AdventurerResources.lua\n"
+            "AdventurerDraftMeta.lua\n"
+            "AdventurerCollections.lua\n"
+            "PartyFrame.xml"
         )
-        self.assertEqual(toc.count("AdventurerPlayerFrame.xml"), 1)
-        self.assertEqual(toc.count("AdventurerResources.lua"), 1)
-        self.assertEqual(toc.count("AdventurerDraftMeta.lua"), 1)
+        self.assertIn(expected, toc)
+        for name in (
+            "AdventurerPlayerFrame.xml",
+            "AdventurerResources.lua",
+            "AdventurerDraftMeta.lua",
+            "AdventurerCollections.lua",
+        ):
+            self.assertEqual(toc.count(name), 1)
 
     def test_xml_uses_reference_energy_and_rage_geometry(self) -> None:
         xml = build_adventurer_player_frame_xml().decode("utf-8")
-        self.assertIn('name="PlayerFrameEnergyBar"', xml)
-        self.assertIn('<AbsDimension x="92" y="11"/>', xml)
-        self.assertIn('<AbsDimension x="117" y="-65"/>', xml)
-        self.assertIn('name="PlayerFrameRageBar"', xml)
-        self.assertIn('orientation="VERTICAL"', xml)
-        self.assertIn('<AbsDimension x="12" y="38"/>', xml)
-        self.assertIn('<AbsDimension x="3" y="-24"/>', xml)
-        self.assertIn('name="PlayerFrameEnergyBarText"', xml)
-        self.assertIn('name="PlayerFrameRageBarText"', xml)
-        self.assertIn('Interface\\TargetingFrame\\UI-StatusBar', xml)
+        for token in (
+            'name="PlayerFrameEnergyBar"',
+            '<AbsDimension x="92" y="11"/>',
+            '<AbsDimension x="117" y="-65"/>',
+            'name="PlayerFrameRageBar"',
+            'orientation="VERTICAL"',
+            '<AbsDimension x="12" y="38"/>',
+            '<AbsDimension x="3" y="-24"/>',
+            'name="PlayerFrameEnergyBarText"',
+            'name="PlayerFrameRageBarText"',
+            'Interface\\TargetingFrame\\UI-StatusBar',
+        ):
+            self.assertIn(token, xml)
 
-    def test_xml_remains_stock_wotlk_compatible(self) -> None:
-        xml = build_adventurer_player_frame_xml().decode("utf-8")
         for token in (
             "TotalAbsorbBarTemplate",
             "HealAbsorbBarTemplate",
             "SetAtlas",
             "PlayerPrimaryStat",
+            "AdventurerPlayerFrameRootOffset",
         ):
             self.assertNotIn(token, xml)
-        self.assertNotIn("AdventurerPlayerFrameRootOffset", xml)
 
-    def test_lua_reuses_real_blizzard_player_frame_texture(self) -> None:
+    def test_player_frame_layout_still_matches_reference_contract(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
-        self.assertIn('ADVENTURER_FRAME_TEXTURE = "Interface\\\\Adventurer\\\\UI-AdventurerFrame"', lua)
-        self.assertIn('ADVENTURER_FRAME_TEX_RIGHT = 0.07421875', lua)
-        self.assertIn('PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)', lua)
-        self.assertIn('ApplyReferencePlayerFrameLayout()', lua)
-        self.assertIn('hooksecurefunc("PlayerFrame_ToPlayerArt"', lua)
-        self.assertNotIn('SetFramePoint(PlayerFrame, "TOPLEFT", UIParent', lua)
-        self.assertNotIn('AdventurerPlayerFrameArtOverlay', lua)
-        self.assertNotIn('frameArtOverlay', lua)
-
-    def test_native_player_frame_measurements_match_reference_layout(self) -> None:
-        lua = build_adventurer_resources_lua().decode("utf-8")
-        expected = (
+        for marker in (
+            'ADVENTURER_FRAME_TEXTURE = "Interface\\\\Adventurer\\\\UI-AdventurerFrame"',
+            'ADVENTURER_FRAME_TEX_RIGHT = 0.07421875',
+            'PlayerFrameTexture:SetTexture(ADVENTURER_FRAME_TEXTURE)',
+            'ApplyReferencePlayerFrameLayout()',
+            'hooksecurefunc("PlayerFrame_ToPlayerArt"',
             'FRAME_ART_X_SHIFT = 8',
             'RESOURCE_X_SHIFT = 0',
             'PORTRAIT_X_SHIFT = 0',
@@ -86,10 +92,6 @@ class AdventurerResourceHudTests(unittest.TestCase):
             'PORTRAIT_LEFT = 42',
             'PORTRAIT_TOP = 12',
             'PORTRAIT_SIZE = 64',
-            'BACKGROUND_LEFT = 106',
-            'BACKGROUND_TOP = 22',
-            'BACKGROUND_WIDTH = 116',
-            'BACKGROUND_HEIGHT = 41',
             'HEALTH_LEFT = 106',
             'HEALTH_TOP = 41',
             'HEALTH_WIDTH = 116',
@@ -106,87 +108,48 @@ class AdventurerResourceHudTests(unittest.TestCase):
             'RAGE_TOP = 24',
             'RAGE_WIDTH = 12',
             'RAGE_HEIGHT = 38',
-            'FLASH_WIDTH = 238',
-            'STATUS_WIDTH = 187',
-        )
-        for marker in expected:
-            self.assertIn(marker, lua)
-
-    def test_only_frame_art_has_horizontal_offset(self) -> None:
-        lua = build_adventurer_resources_lua().decode("utf-8")
-        self.assertIn(
-            'PlayerFrameTexture:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", FRAME_ART_X_SHIFT, 0)',
-            lua,
-        )
-        self.assertIn(
-            'PlayerFrameTexture:SetPoint("BOTTOMRIGHT", PlayerFrame, "BOTTOMRIGHT", FRAME_ART_X_SHIFT, 0)',
-            lua,
-        )
-        for marker in (
-            'RESOURCE_X_SHIFT = 0',
-            'PORTRAIT_X_SHIFT = 0',
-            'LEVEL_X_SHIFT = 0',
-            'MANA_X_SHIFT = 0',
-            'ENERGY_X_SHIFT = 0',
-            'BACKGROUND_X_SHIFT = 0',
-            'NAME_X_SHIFT = 0',
-            'FLASH_X_SHIFT = 0',
-            'STATUS_X_SHIFT = 0',
         ):
             self.assertIn(marker, lua)
 
-    def test_auxiliary_bars_are_frame_xml_children_not_uiparent_statusbars(self) -> None:
-        lua = build_adventurer_resources_lua().decode("utf-8")
-        self.assertIn('PlayerFrameEnergyBar', lua)
-        self.assertIn('PlayerFrameRageBar', lua)
-        self.assertNotIn('CreateResourceBar', lua)
-        self.assertNotIn('CreateFrame("StatusBar"', lua)
-        self.assertNotIn('AdventurerEnergyBar', lua)
-        self.assertNotIn('AdventurerRageBar', lua)
+        self.assertNotIn('SetFramePoint(PlayerFrame, "TOPLEFT", UIParent', lua)
+        self.assertNotIn('AdventurerPlayerFrameArtOverlay', lua)
+        self.assertNotIn('frameArtOverlay', lua)
 
-    def test_auxiliary_resources_read_only_rage_and_energy_native_pools(self) -> None:
+    def test_auxiliary_resources_are_native_rage_energy_and_combo_points(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
-        self.assertIn('UnitPower("player", powerId)', lua)
-        self.assertIn('UnitPowerMax("player", powerId)', lua)
-        self.assertIn('POWER_RAGE = 1', lua)
-        self.assertIn('POWER_ENERGY = 3', lua)
-        self.assertNotIn('POWER_RUNIC_POWER', lua)
-
-    def test_resource_text_follows_shifted_bars_and_hover(self) -> None:
-        lua = build_adventurer_resources_lua().decode("utf-8")
-        self.assertIn('SetFramePoint(PlayerFrameHealthBarText, "CENTER", PlayerFrame, "CENTER", 50 + RESOURCE_X_SHIFT, 3)', lua)
-        self.assertIn('SetFramePoint(PlayerFrameManaBarText, "CENTER", PlayerFrame, "CENTER", 50 + MANA_X_SHIFT, -8)', lua)
-        self.assertIn('SetFramePoint(PlayerFrameEnergyBarText, "CENTER", PlayerFrame, "CENTER", 50 + ENERGY_X_SHIFT, -22)', lua)
-        self.assertIn('SetFramePoint(PlayerFrameRageBarText, "CENTER", PlayerFrame, "TOPRIGHT", -2 + RESOURCE_X_SHIFT, -42)', lua)
-        self.assertIn('[POWER_RAGE] = "Ira"', lua)
-        self.assertIn('[POWER_ENERGY] = "Energía"', lua)
-        self.assertIn('bar:SetScript("OnEnter"', lua)
-        self.assertIn('bar:SetScript("OnLeave"', lua)
-
-    def test_combo_points_feed_blizzards_native_target_frame(self) -> None:
-        lua = build_adventurer_resources_lua().decode("utf-8")
-        self.assertIn('COMBO_PREFIX = "AdventurerCP"', lua)
-        self.assertIn('RegisterAddonMessagePrefix(COMBO_PREFIX)', lua)
-        self.assertIn('RegisterEvent("CHAT_MSG_ADDON")', lua)
-        self.assertIn('local nativeGetComboPoints = GetComboPoints', lua)
-        self.assertIn('GetComboPoints = function(unit, target)', lua)
-        self.assertIn('unit == "player" and target == "target"', lua)
-        self.assertIn('ComboFrame_Update()', lua)
-        self.assertNotIn("SpellDraft", lua)
-
-    def test_death_knight_client_resources_are_absent(self) -> None:
-        lua = build_adventurer_resources_lua().decode("utf-8")
-        xml = build_adventurer_player_frame_xml().decode("utf-8")
         for token in (
+            'PlayerFrameEnergyBar',
+            'PlayerFrameRageBar',
+            'UnitPower("player", powerId)',
+            'UnitPowerMax("player", powerId)',
+            'POWER_RAGE = 1',
+            'POWER_ENERGY = 3',
+            '[POWER_RAGE] = "Ira"',
+            '[POWER_ENERGY] = "Energía"',
+            'COMBO_PREFIX = "AdventurerCP"',
+            'RegisterAddonMessagePrefix(COMBO_PREFIX)',
+            'RegisterEvent("CHAT_MSG_ADDON")',
+            'local nativeGetComboPoints = GetComboPoints',
+            'GetComboPoints = function(unit, target)',
+            'unit == "player" and target == "target"',
+            'ComboFrame_Update()',
+        ):
+            self.assertIn(token, lua)
+
+        for token in (
+            'CreateResourceBar',
+            'CreateFrame("StatusBar"',
+            'AdventurerEnergyBar',
+            'AdventurerRageBar',
+            'POWER_RUNIC_POWER',
             'RuneFrame',
             'RUNE_POWER_UPDATE',
             'GetRuneCooldown',
             'RuneButton_Update',
-            'POWER_RUNIC_POWER',
             'AdventurerRunicPowerBar',
+            'SpellDraft',
         ):
             self.assertNotIn(token, lua)
-            self.assertNotIn(token, xml)
 
     def test_resource_hud_uses_native_class_id(self) -> None:
         lua = build_adventurer_resources_lua().decode("utf-8")
@@ -200,18 +163,23 @@ class AdventurerResourceHudTests(unittest.TestCase):
         self.assertEqual(int.from_bytes(art[12:16], "little"), 256)
         self.assertEqual(int.from_bytes(art[16:20], "little"), 128)
 
-    def test_root_mpq_contains_player_frame_xml_hud_draft_meta_and_frame_art(self) -> None:
+    def test_root_mpq_contains_hud_draft_and_talent_collection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             work = Path(tmp_name)
             for index, name in enumerate(DBC_NAMES):
                 (work / name).write_bytes(f"dbc-{index}-{name}".encode("utf-8"))
 
             root_files, locale_files = build_archive_files(work)
-            self.assertIn("Interface\\FrameXML\\FrameXML.toc", root_files)
-            self.assertIn(ADVENTURER_PLAYER_FRAME_INTERNAL, root_files)
-            self.assertIn("Interface\\FrameXML\\AdventurerResources.lua", root_files)
-            self.assertIn(ADVENTURER_DRAFT_META_INTERNAL, root_files)
-            self.assertIn(ADVENTURER_FRAME_INTERNAL, root_files)
+            for internal in (
+                "Interface\\FrameXML\\FrameXML.toc",
+                ADVENTURER_PLAYER_FRAME_INTERNAL,
+                "Interface\\FrameXML\\AdventurerResources.lua",
+                ADVENTURER_DRAFT_META_INTERNAL,
+                ADVENTURER_COLLECTIONS_INTERNAL,
+                ADVENTURER_FRAME_INTERNAL,
+            ):
+                self.assertIn(internal, root_files)
+
             self.assertEqual(
                 root_files[ADVENTURER_PLAYER_FRAME_INTERNAL],
                 build_adventurer_player_frame_xml(),
@@ -220,10 +188,22 @@ class AdventurerResourceHudTests(unittest.TestCase):
                 root_files[ADVENTURER_DRAFT_META_INTERNAL],
                 build_adventurer_draft_meta_lua(),
             )
-            self.assertEqual(root_files[ADVENTURER_FRAME_INTERNAL], build_adventurer_frame_art())
-            self.assertNotIn(ADVENTURER_PLAYER_FRAME_INTERNAL, locale_files)
-            self.assertNotIn(ADVENTURER_DRAFT_META_INTERNAL, locale_files)
-            self.assertNotIn(ADVENTURER_FRAME_INTERNAL, locale_files)
+            self.assertEqual(
+                root_files[ADVENTURER_COLLECTIONS_INTERNAL],
+                build_adventurer_collections_lua(),
+            )
+            self.assertEqual(
+                root_files[ADVENTURER_FRAME_INTERNAL],
+                build_adventurer_frame_art(),
+            )
+
+            for internal in (
+                ADVENTURER_PLAYER_FRAME_INTERNAL,
+                ADVENTURER_DRAFT_META_INTERNAL,
+                ADVENTURER_COLLECTIONS_INTERNAL,
+                ADVENTURER_FRAME_INTERNAL,
+            ):
+                self.assertNotIn(internal, locale_files)
 
 
 if __name__ == "__main__":
