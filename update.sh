@@ -32,6 +32,11 @@ python3 "$ROOT/tools/upgrade.py" "$@"
 # class-10 bot rows from the stock zero-weight talent-spec path.
 python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir"
 
+# Dungeon Master normal mode belongs to the Adventurer experience: preserve the
+# selected instance's native creatures/scripts/mechanics and scale them instead
+# of clearing the instance and replacing it with a themed population.
+python3 "$ROOT/tools/dungeon_master_source_patch.py" install --core-dir "$core_dir"
+
 # Install editable SpellDraft runtime data beside DataDir. Existing live files
 # are deliberately preserved; fresh package defaults are refreshed as *.dist.
 python3 "$ROOT/tools/spelldraft_runtime.py" install "$@"
@@ -41,9 +46,13 @@ python3 "$ROOT/tools/spelldraft_runtime.py" install "$@"
 # are changed; every other Playerbots option remains untouched.
 python3 "$ROOT/tools/playerbots_runtime.py" install --core-dir "$core_dir"
 
+# Own only the Dungeon Master values that define the Adventurer experience.
+# In particular, Novice starts at level 1; unrelated module settings stay local.
+python3 "$ROOT/tools/dungeon_master_runtime.py" install --core-dir "$core_dir"
+
 # Maintenance migrations are versioned and copied into AzerothCore's normal
 # pending world-update directory. Worldserver applies only those not already
 # recorded by its database updater.
 python3 "$ROOT/tools/world.py" install --core-dir "$core_dir"
 
-printf '%s\n' "Adventurer Core update staged successfully. Rebuild worldserver when core or Playerbots source changed; runtime-only SpellDraft/Playerbots config changes require only a restart."
+printf '%s\n' "Adventurer Core update staged successfully. Rebuild worldserver when core, Playerbots, or Dungeon Master source changed; runtime-only SpellDraft/Playerbots/Dungeon Master config changes require only a restart."
