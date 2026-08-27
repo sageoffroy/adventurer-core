@@ -42,6 +42,9 @@ python3 "$ROOT/tools/dungeon_master_source_fixup.py" install --core-dir "$core_d
 # Dungeon Master is a level-1-to-80 game mode in Aventureros: bypass stock map
 # entry requirements for its scripted teleport and expose its UI in Spanish.
 python3 "$ROOT/tools/dungeon_master_experience_patch.py" install --core-dir "$core_dir"
+# The upstream dungeon list is hard-coded in C++; localize those display names
+# too so the dungeon-selection menu is consistently Spanish.
+python3 "$ROOT/tools/dungeon_master_dungeon_names_patch.py" install --core-dir "$core_dir"
 
 # Install editable SpellDraft runtime data beside DataDir. Existing live files
 # are deliberately preserved; fresh package defaults are refreshed as *.dist.
