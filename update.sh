@@ -27,6 +27,11 @@ fi
 # to the pre-Adventurer server rather than merely to the previous package build.
 python3 "$ROOT/tools/upgrade.py" "$@"
 
+# Active spell ranks are upgraded by AzerothCore from db_world.spell_ranks.
+# Mirror that exact server chain into the four custom SkillLineAbility tabs so
+# automatically learned higher ranks never fall back into another spell tab.
+python3 "$ROOT/tools/spell_rank_tabs.py" install "$@"
+
 # Class 10 is playable in Adventurer Core but is not a native Playerbots class.
 # Keep randombot generation on the ten stock WotLK classes and protect old
 # class-10 bot rows from the stock zero-weight talent-spec path.
