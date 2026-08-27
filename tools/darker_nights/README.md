@@ -12,7 +12,9 @@ Darker Nights must never modify or replace `patch-Z.MPQ`.
 
 Darker Nights is packaged separately as:
 
-`patch-ZB.MPQ`
+`patch-Y.MPQ`
+
+`patch-Y.MPQ` is reserved exclusively for Darker Nights in this project. The earlier experimental `patch-ZB.MPQ` name is retired and the installer disables it if found.
 
 This lets the lighting layer be enabled, disabled and iterated without coupling it to Adventurer, SpellDraft, talents or other client changes.
 
@@ -49,4 +51,4 @@ The curve is deliberately strong so the first in-game test can clearly show whet
 bash tools/darker_nights/build.sh
 ```
 
-The generated DBC is not committed to Git. The client artifact for this feature is always `patch-ZB.MPQ`, never `patch-Z.MPQ`.
+The generated DBC is not committed to Git. The client artifact for this feature is always `patch-Y.MPQ`, never `patch-Z.MPQ`.
