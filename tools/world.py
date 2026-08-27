@@ -14,8 +14,16 @@ from database import _run_mysql, query_scalar, read_database_info
 ROOT = Path(__file__).resolve().parent.parent
 PENDING_WORLD_RELATIVE = Path("data/sql/updates/pending_db_world")
 DEFAULT_CONF_RELATIVE = Path("env/dist/etc/worldserver.conf")
-GUARDIAN_SPELL_MIN = 290000
-GUARDIAN_SPELL_MAX = 299999
+
+# Old development revisions generated a fixed Guardian/Champion/Scholar talent
+# tree in the 290000 spell reservation. SpellDraft now owns all Adventurer
+# talents, so these identifiers are cleanup-only and are never installed.
+LEGACY_FIXED_TALENT_SPELL_MIN = 290000
+LEGACY_FIXED_TALENT_SPELL_MAX = 299999
+LEGACY_FIXED_TALENT_UPDATE_NAMES = (
+    "rev_1787446800000000000.sql",
+    "rev_1787779800000000000.sql",
+)
 
 
 @dataclass(frozen=True)
@@ -28,18 +36,12 @@ class WorldUpdate:
         return PENDING_WORLD_RELATIVE / self.name
 
 
+# Only native Adventurer chassis data remains. Talents are exclusively
+# SpellDraft cards and therefore have no fixed-tree world migrations.
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
-    WorldUpdate(
-        ROOT / "sql" / "world" / "002_guardian_last_bastion.sql",
-        "rev_1787446800000000000.sql",
-    ),
     WorldUpdate(
         ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
         "rev_1787446800000000001.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "004_guardian_script_bindings.sql",
-        "rev_1787779800000000000.sql",
     ),
 )
 
@@ -127,12 +129,12 @@ def remove(core: Path) -> list[tuple[Path, bool]]:
 
 
 def cleanup_database(core: Path, conf: Path | None = None) -> None:
-    """Remove DB rows uniquely owned by Adventurer maintenance updates 002+.
+    """Remove package markers plus any legacy fixed-talent residue.
 
-    The main database rollback snapshot already restores every class-10 stat
-    range touched by 001/003. This cleanup covers the Adventurer-owned Guardian
-    SpellScript reservation and AzerothCore update markers, which older
-    snapshots could not have known about when they were created.
+    The main database rollback snapshot restores the class-10 chassis ranges.
+    This explicit cleanup also understands historical Guardian development
+    revisions so updating/rolling back cannot leave cloned fixed-talent script
+    bindings or obsolete AzerothCore update markers behind.
     """
     core = validate_core(core)
     conf = (
@@ -141,11 +143,13 @@ def cleanup_database(core: Path, conf: Path | None = None) -> None:
         else (core / DEFAULT_CONF_RELATIVE).resolve()
     )
     db = read_database_info(conf, "WorldDatabaseInfo")
-    names = ", ".join("'" + update.name.replace("'", "''") + "'" for update in WORLD_UPDATES)
+
+    update_names = tuple(update.name for update in WORLD_UPDATES) + LEGACY_FIXED_TALENT_UPDATE_NAMES
+    names = ", ".join("'" + name.replace("'", "''") + "'" for name in update_names)
     sql = f"""
 DELETE FROM `spell_script_names`
-WHERE (`spell_id` BETWEEN {GUARDIAN_SPELL_MIN} AND {GUARDIAN_SPELL_MAX})
-   OR (`spell_id` BETWEEN {-GUARDIAN_SPELL_MAX} AND {-GUARDIAN_SPELL_MIN});
+WHERE (`spell_id` BETWEEN {LEGACY_FIXED_TALENT_SPELL_MIN} AND {LEGACY_FIXED_TALENT_SPELL_MAX})
+   OR (`spell_id` BETWEEN {-LEGACY_FIXED_TALENT_SPELL_MAX} AND {-LEGACY_FIXED_TALENT_SPELL_MIN});
 
 DELETE FROM `updates`
 WHERE `name` IN ({names});
@@ -155,8 +159,8 @@ WHERE `name` IN ({names});
     binding_count = int(query_scalar(
         db,
         "SELECT COUNT(*) FROM `spell_script_names` "
-        f"WHERE (`spell_id` BETWEEN {GUARDIAN_SPELL_MIN} AND {GUARDIAN_SPELL_MAX}) "
-        f"OR (`spell_id` BETWEEN {-GUARDIAN_SPELL_MAX} AND {-GUARDIAN_SPELL_MIN})",
+        f"WHERE (`spell_id` BETWEEN {LEGACY_FIXED_TALENT_SPELL_MIN} AND {LEGACY_FIXED_TALENT_SPELL_MAX}) "
+        f"OR (`spell_id` BETWEEN {-LEGACY_FIXED_TALENT_SPELL_MAX} AND {-LEGACY_FIXED_TALENT_SPELL_MIN})",
     ))
     marker_count = int(query_scalar(
         db,
@@ -165,7 +169,7 @@ WHERE `name` IN ({names});
     if binding_count or marker_count:
         raise WorldUpdateError(
             "Maintenance DB cleanup did not converge: "
-            f"bindings={binding_count}, update_markers={marker_count}"
+            f"legacy_fixed_talent_bindings={binding_count}, update_markers={marker_count}"
         )
 
 
@@ -215,7 +219,7 @@ def main() -> int:
                 print(f"  {state}: {target}")
         else:
             cleanup_database(args.core_dir, args.worldserver_conf)
-            print("Adventurer maintenance DB rows cleaned.")
+            print("Adventurer maintenance DB rows and legacy fixed-talent residue cleaned.")
         return 0
     except (WorldUpdateError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
