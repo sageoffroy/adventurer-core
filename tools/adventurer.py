@@ -27,7 +27,6 @@ from core_patch import PatchError, plan as plan_core
 from dbc import DBCError
 
 ROOT = Path(__file__).resolve().parent.parent
-COMPATIBILITY = ROOT / "compatibility.json"
 PAYLOAD_ROOT = ROOT / "payload" / "core"
 WORLD_SQL = ROOT / "sql" / "world" / "001_adventurer.sql"
 STATE_DIR_NAME = ".adventurer-core"
@@ -75,28 +74,6 @@ def validate_core_root(core: Path) -> str:
         if not (core / relative).is_file():
             raise InstallError(f"Not a compatible AzerothCore source tree: missing {relative}")
     return git(core, "rev-parse", "HEAD").stdout.strip()
-
-
-def load_compatibility() -> dict:
-    return json.loads(COMPATIBILITY.read_text(encoding="utf-8"))
-
-
-def enforce_compatibility(commit: str, allow_unverified: bool) -> None:
-    data = load_compatibility()
-    supported = set(data.get("supported_core_commits", []))
-    if commit in supported:
-        return
-    if allow_unverified:
-        print(f"WARNING: applying to unverified core commit {commit}")
-        return
-    if not supported:
-        raise InstallError(
-            "Adventurer Core is still in bootstrap: no Playerbots core commit has "
-            "been frozen as supported yet. Nothing was changed."
-        )
-    raise InstallError(
-        f"Unsupported core commit {commit}. Supported: {', '.join(sorted(supported))}"
-    )
 
 
 def ensure_target_files_clean(core: Path, relatives: list[str]) -> None:
@@ -309,7 +286,6 @@ def validate_runtime_inputs(core: Path, args, build_smoke_test: bool = True) -> 
 def cmd_preflight(args) -> None:
     core = args.core_dir.resolve()
     commit = validate_core_root(core)
-    enforce_compatibility(commit, args.allow_unverified_core)
     planned = plan_core(core, PAYLOAD_ROOT)
     ensure_target_files_clean(core, [p.relative_path for p in planned] + [SQL_TARGET])
     if (core / SQL_TARGET).exists():
@@ -323,20 +299,20 @@ def cmd_preflight(args) -> None:
     print(f"  server DBC: {server_dbc}")
     print(f"  client:     {client_dir}")
     print(f"  locale:     {args.locale}")
-    print("  Guardian talent/client bundle built successfully in temporary storage")
+    print("  SpellDraft client/subclass bundle built successfully in temporary storage")
+    print("  fixed talents: none; legacy Guardian/Champion/Scholar rows are purged if present")
     print("  no files changed")
 
 
 def cmd_apply(args) -> None:
     core = args.core_dir.resolve()
     commit = validate_core_root(core)
-    enforce_compatibility(commit, args.allow_unverified_core)
     planned = plan_core(core, PAYLOAD_ROOT)
     ensure_target_files_clean(core, [p.relative_path for p in planned] + [SQL_TARGET])
     server_dbc, dbc_source, client_dir = validate_runtime_inputs(core, args, build_smoke_test=False)
 
     # Build the entire data/client bundle before mutating the core. A bad source
-    # DBC, talent source ID, baseline Lua, or MPQ build therefore fails safely.
+    # DBC, SpellDraft metadata, baseline Lua, or MPQ build therefore fails safely.
     with tempfile.TemporaryDirectory(prefix="adventurer-apply-") as tmp:
         staged = Path(tmp) / "build"
         build_patch(dbc_source, staged, args.locale)
@@ -376,8 +352,9 @@ def cmd_apply(args) -> None:
     print(f"  owned source:  {len(state['files'])} files")
     print(f"  server DBC:    {len(dbc_hashes)} files")
     print(f"  client locale: {args.locale}")
-    print("  talent tabs:   Guardian / Champion / Scholar")
-    print("  Guardian:      first 29-talent playable pass")
+    print("  SpellDraft:    active abilities and talents enabled")
+    print("  talent UI:     Libro de talentos (SpellDraft collection)")
+    print("  fixed talents: none")
     print("  NEXT: rebuild/install worldserver, start it, then create a NEW Adventurer.")
 
 
@@ -472,7 +449,6 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument("--server-data-dir", type=Path)
             command.add_argument("--dbc-src", type=Path)
             command.add_argument("--locale", default=DEFAULT_LOCALE)
-            command.add_argument("--allow-unverified-core", action="store_true")
         command.set_defaults(func=func)
     return parser
 
