@@ -192,16 +192,25 @@ def patch_stat_system(text: str) -> str:
 
 
 def patch_custom_loader(text: str) -> str:
-    text = replace_once(
+    clean_decl = "// This is where scripts' loading functions should be declared:\n// void MyExampleScript()"
+    legacy_decl = clean_decl + "\nvoid AddAdventurerCoreScripts();"
+    current_decl = legacy_decl + "\nvoid AddAdventurerCollectionScripts();"
+    text = replace_transition(
         text,
-        "// This is where scripts' loading functions should be declared:\n// void MyExampleScript()",
-        "// This is where scripts' loading functions should be declared:\n// void MyExampleScript()\nvoid AddAdventurerCoreScripts();",
-        "Custom script declaration",
+        clean_decl,
+        legacy_decl,
+        current_decl,
+        "Custom script declarations",
     )
-    return replace_once(
+
+    clean_body = "void AddCustomScripts()\n{\n    // MyExampleScript()\n}"
+    legacy_body = "void AddCustomScripts()\n{\n    // MyExampleScript()\n    AddAdventurerCoreScripts();\n}"
+    current_body = "void AddCustomScripts()\n{\n    // MyExampleScript()\n    AddAdventurerCoreScripts();\n    AddAdventurerCollectionScripts();\n}"
+    return replace_transition(
         text,
-        "void AddCustomScripts()\n{\n    // MyExampleScript()\n}",
-        "void AddCustomScripts()\n{\n    // MyExampleScript()\n    AddAdventurerCoreScripts();\n}",
+        clean_body,
+        legacy_body,
+        current_body,
         "Custom script registration",
     )
 
@@ -499,6 +508,11 @@ TRANSFORMS = {
     "src/server/scripts/Custom/custom_script_loader.cpp": patch_custom_loader,
 }
 
+PAYLOAD_FILES = (
+    "src/server/scripts/Custom/adventurer_core.cpp",
+    "src/server/scripts/Custom/adventurer_collections.cpp",
+)
+
 
 def plan(core: Path, payload_root: Path, *, allow_payload_replace: bool = False) -> list[PlannedFile]:
     planned: list[PlannedFile] = []
@@ -514,16 +528,16 @@ def plan(core: Path, payload_root: Path, *, allow_payload_replace: bool = False)
         patched = transform(source).encode("utf-8")
         planned.append(PlannedFile(relative, original, patched))
 
-    payload_rel = "src/server/scripts/Custom/adventurer_core.cpp"
-    payload = payload_root / payload_rel
-    if not payload.is_file():
-        raise PatchError(f"Installer payload is missing: {payload}")
-    destination = core / payload_rel
-    original = destination.read_bytes() if destination.exists() else None
-    patched = payload.read_bytes()
-    if original is not None and original != patched and not allow_payload_replace:
-        raise PatchError(
-            f"{payload_rel}: target already exists with content not owned by this package"
-        )
-    planned.append(PlannedFile(payload_rel, original, patched))
+    for payload_rel in PAYLOAD_FILES:
+        payload = payload_root / payload_rel
+        if not payload.is_file():
+            raise PatchError(f"Installer payload is missing: {payload}")
+        destination = core / payload_rel
+        original = destination.read_bytes() if destination.exists() else None
+        patched = payload.read_bytes()
+        if original is not None and original != patched and not allow_payload_replace:
+            raise PatchError(
+                f"{payload_rel}: target already exists with content not owned by this package"
+            )
+        planned.append(PlannedFile(payload_rel, original, patched))
     return planned
