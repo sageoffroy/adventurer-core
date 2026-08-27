@@ -34,6 +34,34 @@ jobs:
         run: python tests/test_talent_layout.py
       - name: Test upgrade contract
         run: python tests/test_upgrade.py
+      - name: Test blessing charges
+        run: python tests/test_bless_charges.py
+      - name: Test chassis audit
+        run: python tests/test_chassis_audit.py
+      - name: Test database tools
+        run: python tests/test_database.py
+      - name: Test DBC base patch
+        run: python tests/test_dbc.py
+      - name: Test installer safety
+        run: python tests/test_installer.py
+      - name: Test Playerbots runtime
+        run: python tests/test_playerbots_runtime.py
+      - name: Test Playerbots source patch
+        run: python tests/test_playerbots_source_patch.py
+      - name: Test resource HUD
+        run: python tests/test_resource_hud.py
+      - name: Test resource runtime
+        run: python tests/test_resources.py
+      - name: Test authoritative draft pool
+        run: python tests/test_spelldraft_authoritative_pool.py
+      - name: Test catalog sync
+        run: python tests/test_spelldraft_catalog_sync.py
+      - name: Test SpellDraft config
+        run: python tests/test_spelldraft_config.py
+      - name: Test generated characters
+        run: python tests/test_test_characters.py
+      - name: Test world migrations
+        run: python tests/test_world.py
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
       - name: Check shell entry points
