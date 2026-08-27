@@ -35,6 +35,13 @@ if (( status == 0 )); then
     python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir" || status=$?
 fi
 
+# Keep normal Dungeon Master runs faithful to each selected instance: original
+# creatures, original AI/scripts and original encounter mechanics, scaled to
+# the challenge level. Roguelike keeps the upstream procedural population.
+if (( status == 0 )); then
+    python3 "$ROOT/tools/dungeon_master_source_patch.py" install --core-dir "$core_dir" || status=$?
+fi
+
 # SpellDraft balance/catalog data is intentionally outside the compiled C++.
 # Install editable live copies only after the core/client transaction succeeded.
 if (( status == 0 )); then
@@ -45,6 +52,12 @@ fi
 # management pass snapshots the original playerbots.conf for full rollback.
 if (( status == 0 )); then
     python3 "$ROOT/tools/playerbots_runtime.py" install --core-dir "$core_dir" || status=$?
+fi
+
+# Apply the small Adventurer-owned Dungeon Master runtime profile. Unrelated
+# module settings remain untouched and the original config is backed up.
+if (( status == 0 )); then
+    python3 "$ROOT/tools/dungeon_master_runtime.py" install --core-dir "$core_dir" || status=$?
 fi
 
 # Versioned maintenance migrations are part of the official clean install.
