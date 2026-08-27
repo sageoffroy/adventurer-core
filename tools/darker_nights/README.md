@@ -4,6 +4,18 @@ Experimental client-side lighting layer for WoW 3.3.5a.
 
 This branch is intentionally isolated from Adventurer class, SpellDraft and talent work.
 
+## Client patch ownership
+
+Darker Nights must never modify or replace `patch-Z.MPQ`.
+
+`patch-Z.MPQ` remains owned by the Adventurer / SpellDraft client pipeline and may change independently on other branches.
+
+Darker Nights is packaged separately as:
+
+`patch-ZB.MPQ`
+
+This lets the lighting layer be enabled, disabled and iterated without coupling it to Adventurer, SpellDraft, talents or other client changes.
+
 ## Input
 
 Stock `LightIntBand.dbc`, defaulting to:
@@ -37,4 +49,4 @@ The curve is deliberately strong so the first in-game test can clearly show whet
 bash tools/darker_nights/build.sh
 ```
 
-The generated DBC is not committed to Git. It must be packed into a temporary client MPQ for testing.
+The generated DBC is not committed to Git. The client artifact for this feature is always `patch-ZB.MPQ`, never `patch-Z.MPQ`.
