@@ -1,16 +1,17 @@
--- Adventurer talent collection UI.
+-- Adventurer acquired-talent collection UI.
 --
--- Adventurers do not spend native talent points. SpellDraft grants passive
--- talent spells directly, so the stock branching TalentFrame is misleading.
--- The Adventurer collection deliberately mirrors the native 3.3.5 SpellBook
--- presentation: parchment panel, two columns, page navigation and vertical
--- category tabs. Native classes still use Blizzard_TalentUI unchanged.
+-- Adventurers receive talents through SpellDraft instead of spending native
+-- talent points. Present the acquired collection as four permanent branches:
+-- Mercenary, Explorer, Spellcaster and Illuminated. Talent names stay out of
+-- the layout; the native spell tooltip provides name/description on hover.
 
 local ADVENTURER_CLASS_ID = 10
 local DRAFT_PREFIX = "AdventurerDraft"
 local TALENT_COLLECTION_REQUEST = "ADRAFT_TALENTS"
-local TALENTS_PER_PAGE = 12
-local ROWS_PER_COLUMN = 6
+local BRANCH_PAGE_SIZE = 24
+local GRID_COLUMNS = 4
+local GRID_ROWS = 6
+local ICON_SIZE = 36
 
 local locale = GetLocale()
 local isSpanish = locale == "esES" or locale == "esMX"
@@ -19,32 +20,28 @@ local text
 if isSpanish then
     text = {
         title = "Talentos",
+        summary = "%d talentos obtenidos",
         mercenary = "Mercenario",
         explorer = "Explorador",
         spellcaster = "Hechicero",
         illuminated = "Iluminado",
         rank = "Rango %d/%d",
-        empty = "Todavía no obtuviste talentos de esta subclase.",
         loading = "Cargando talentos...",
         error = "No se pudo cargar la colección de talentos.",
-        page = "Página %d",
-        prev = "Ant.",
-        next = "Sig.",
+        empty = "Todavía no obtuviste talentos.",
     }
 else
     text = {
         title = "Talents",
+        summary = "%d acquired talents",
         mercenary = "Mercenary",
         explorer = "Explorer",
         spellcaster = "Spellcaster",
         illuminated = "Illuminated",
         rank = "Rank %d/%d",
-        empty = "You have not acquired talents from this subclass yet.",
         loading = "Loading talents...",
         error = "The talent collection could not be loaded.",
-        page = "Page %d",
-        prev = "Prev",
-        next = "Next",
+        empty = "You have not acquired any talents yet.",
     }
 end
 
@@ -69,6 +66,39 @@ local function IsAdventurer()
     end
     return className == "Adventurer" or className == "Aventurero" or className == "Aventurera"
 end
+
+local frame
+local NativeToggleTalentFrame = ToggleTalentFrame
+
+local function AdventurerToggleTalentFrame()
+    if not IsAdventurer() then
+        return NativeToggleTalentFrame()
+    end
+
+    if UnitLevel("player") < SHOW_TALENT_LEVEL or not frame then
+        return
+    end
+
+    if PlayerTalentFrame and PlayerTalentFrame:IsShown() then
+        HideUIPanel(PlayerTalentFrame)
+    end
+
+    if frame:IsShown() then
+        HideUIPanel(frame)
+    else
+        ShowUIPanel(frame)
+    end
+end
+
+ToggleTalentFrame = AdventurerToggleTalentFrame
+
+local function RebindTalentMicroButton()
+    if TalentMicroButton then
+        TalentMicroButton:SetScript("OnClick", AdventurerToggleTalentFrame)
+    end
+end
+
+RebindTalentMicroButton()
 
 local function SplitText(value, separator)
     local parts = {}
@@ -109,65 +139,59 @@ if RegisterAddonMessagePrefix then
     RegisterAddonMessagePrefix(DRAFT_PREFIX)
 end
 
-local frame = CreateFrame("Frame", "AdventurerTalentCollectionFrame", UIParent)
-frame:SetWidth(384)
-frame:SetHeight(512)
+frame = CreateFrame("Frame", "AdventurerTalentCollectionFrame", UIParent)
+frame:SetWidth(760)
+frame:SetHeight(510)
 frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
 frame:SetFrameStrata("HIGH")
 frame:EnableMouse(true)
 frame:SetClampedToScreen(true)
 frame:Hide()
+frame:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true,
+    tileSize = 32,
+    edgeSize = 32,
+    insets = {left = 11, right = 12, top = 12, bottom = 11},
+})
 
 UIPanelWindows["AdventurerTalentCollectionFrame"] = {
-    area = "left",
+    area = "doublewide",
     pushable = 0,
     whileDead = 1,
 }
 
-local function AddPanelTexture(name, texture, width, height, point, relativePoint)
-    local region = frame:CreateTexture(name, "ARTWORK")
-    region:SetTexture(texture)
-    region:SetWidth(width)
-    region:SetHeight(height)
-    region:SetPoint(point, frame, relativePoint or point, 0, 0)
-    return region
-end
-
-frame.topLeft = AddPanelTexture(
-    nil, "Interface\\Spellbook\\UI-SpellbookPanel-TopLeft", 256, 256, "TOPLEFT")
-frame.topRight = AddPanelTexture(
-    nil, "Interface\\Spellbook\\UI-SpellbookPanel-TopRight", 128, 256, "TOPRIGHT")
-frame.botLeft = AddPanelTexture(
-    nil, "Interface\\Spellbook\\UI-SpellbookPanel-BotLeft", 256, 256, "BOTTOMLEFT")
-frame.botRight = AddPanelTexture(
-    nil, "Interface\\Spellbook\\UI-SpellbookPanel-BotRight", 128, 256, "BOTTOMRIGHT")
-
-frame.bookIcon = frame:CreateTexture(nil, "BACKGROUND")
-frame.bookIcon:SetTexture("Interface\\Spellbook\\Spellbook-Icon")
-frame.bookIcon:SetWidth(58)
-frame.bookIcon:SetHeight(58)
-frame.bookIcon:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -8)
-
-frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-frame.title:SetPoint("CENTER", frame, "CENTER", 6, 230)
+frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+frame.title:SetPoint("TOP", frame, "TOP", 0, -18)
 frame.title:SetText(text.title)
 
-frame.pageText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-frame.pageText:SetWidth(102)
-frame.pageText:SetPoint("BOTTOM", frame, "BOTTOM", -14, 96)
-frame.pageText:SetText(string.format(text.page, 1))
+frame.summary = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+frame.summary:SetPoint("TOP", frame.title, "BOTTOM", 0, -5)
+frame.summary:SetText("")
 
 frame.close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-frame.close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -29, -8)
+frame.close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -6, -6)
 frame.close:SetScript("OnClick", function()
     HideUIPanel(frame)
 end)
 
+frame.status = frame:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+frame.status:SetWidth(500)
+frame.status:SetPoint("CENTER", frame, "CENTER", 0, 0)
+frame.status:SetJustifyH("CENTER")
+frame.status:SetText("")
+frame.status:Hide()
+
 local state = {
-    selected = "mercenary",
-    page = 1,
     loading = false,
     error = false,
+    pages = {
+        mercenary = 1,
+        explorer = 1,
+        spellcaster = 1,
+        illuminated = 1,
+    },
     items = {
         mercenary = {},
         explorer = {},
@@ -176,260 +200,245 @@ local state = {
     },
 }
 
-local function GetSpellDisplay(spellId)
-    local name, rank, icon = GetSpellInfo(spellId)
-    if not name or name == "" then
-        name = "Talent " .. tostring(spellId)
+local function TotalTalentCount()
+    local total = 0
+    for _, key in ipairs(subclassOrder) do
+        total = total + #state.items[key]
     end
-    if not icon then
-        icon = "Interface\\Icons\\INV_Misc_QuestionMark"
-    end
-    return name, rank, icon
+    return total
 end
 
 local function SortCollection(items)
     table.sort(items, function(left, right)
-        local leftName = GetSpellInfo(left.spellId) or ""
-        local rightName = GetSpellInfo(right.spellId) or ""
-        if leftName == rightName then
-            return left.cardId < right.cardId
-        end
-        return leftName < rightName
+        return left.cardId < right.cardId
     end)
 end
 
-frame.entries = {}
-for index = 1, TALENTS_PER_PAGE do
-    local column = index > ROWS_PER_COLUMN and 1 or 0
-    local rowIndex = (index - 1) % ROWS_PER_COLUMN
+local function PageCount(items)
+    local pages = math.ceil(#items / BRANCH_PAGE_SIZE)
+    if pages < 1 then
+        pages = 1
+    end
+    return pages
+end
 
-    local entry = CreateFrame("Button", nil, frame)
-    entry:SetWidth(150)
-    entry:SetHeight(48)
-    entry:SetPoint("TOPLEFT", frame, "TOPLEFT", 43 + column * 169, -99 - rowIndex * 57)
-    entry:Hide()
+local function CreateTalentIcon(parent)
+    local button = CreateFrame("Button", nil, parent)
+    button:SetWidth(ICON_SIZE)
+    button:SetHeight(ICON_SIZE)
+    button:Hide()
 
-    entry.background = entry:CreateTexture(nil, "BACKGROUND")
-    entry.background:SetTexture("Interface\\Spellbook\\UI-Spellbook-SpellBackground")
-    entry.background:SetWidth(64)
-    entry.background:SetHeight(64)
-    entry.background:SetPoint("TOPLEFT", entry, "TOPLEFT", -3, 3)
+    button.icon = button:CreateTexture(nil, "ARTWORK")
+    button.icon:SetAllPoints(button)
 
-    entry.icon = entry:CreateTexture(nil, "BORDER")
-    entry.icon:SetWidth(37)
-    entry.icon:SetHeight(37)
-    entry.icon:SetPoint("TOPLEFT", entry, "TOPLEFT", 0, 0)
+    button.slot = button:CreateTexture(nil, "OVERLAY")
+    button.slot:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+    button.slot:SetWidth(54)
+    button.slot:SetHeight(54)
+    button.slot:SetPoint("CENTER", button, "CENTER", 0, 0)
 
-    entry.iconBorder = entry:CreateTexture(nil, "OVERLAY")
-    entry.iconBorder:SetTexture("Interface\\Buttons\\UI-Quickslot2")
-    entry.iconBorder:SetWidth(64)
-    entry.iconBorder:SetHeight(64)
-    entry.iconBorder:SetPoint("CENTER", entry.icon, "CENTER", 0, 0)
+    button.highlight = button:CreateTexture(nil, "HIGHLIGHT")
+    button.highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+    button.highlight:SetBlendMode("ADD")
+    button.highlight:SetAllPoints(button)
 
-    entry.highlight = entry:CreateTexture(nil, "HIGHLIGHT")
-    entry.highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
-    entry.highlight:SetBlendMode("ADD")
-    entry.highlight:SetWidth(45)
-    entry.highlight:SetHeight(45)
-    entry.highlight:SetPoint("CENTER", entry.icon, "CENTER", 0, 0)
+    button.rankText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    button.rankText:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 1, 1)
+    button.rankText:SetJustifyH("RIGHT")
 
-    entry.name = entry:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    entry.name:SetWidth(106)
-    entry.name:SetHeight(30)
-    entry.name:SetPoint("TOPLEFT", entry.icon, "TOPRIGHT", 5, 2)
-    entry.name:SetJustifyH("LEFT")
-    entry.name:SetJustifyV("TOP")
-    entry.name:SetMaxLines(2)
-
-    entry.rank = entry:CreateFontString(nil, "OVERLAY", "SubSpellFont")
-    entry.rank:SetWidth(106)
-    entry.rank:SetHeight(14)
-    entry.rank:SetPoint("BOTTOMLEFT", entry.icon, "BOTTOMRIGHT", 5, 1)
-    entry.rank:SetJustifyH("LEFT")
-
-    entry:SetScript("OnEnter", function(self)
+    button:SetScript("OnEnter", function(self)
         if not self.spellId then
             return
         end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetHyperlink("spell:" .. self.spellId)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(string.format(text.rank, self.rank or 0, self.maxRank or 0), 1.0, 0.82, 0.0)
         GameTooltip:Show()
     end)
-    entry:SetScript("OnLeave", function()
+    button:SetScript("OnLeave", function()
         GameTooltip:Hide()
     end)
 
-    frame.entries[index] = entry
-end
-
-frame.empty = frame:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-frame.empty:SetWidth(260)
-frame.empty:SetPoint("CENTER", frame, "CENTER", -5, 7)
-frame.empty:SetJustifyH("CENTER")
-frame.empty:SetText("")
-frame.empty:Hide()
-
-local function MakePageButton(name, x, nextPage)
-    local button = CreateFrame("Button", name, frame)
-    button:SetWidth(32)
-    button:SetHeight(32)
-    button:SetPoint("CENTER", frame, "BOTTOMLEFT", x, 105)
-    if nextPage then
-        button:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
-        button:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down")
-        button:SetDisabledTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Disabled")
-    else
-        button:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up")
-        button:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Down")
-        button:SetDisabledTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Disabled")
-    end
-    button:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
     return button
 end
 
-frame.prev = MakePageButton("AdventurerTalentCollectionPrevPageButton", 50, false)
-frame.prev.label = frame.prev:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-frame.prev.label:SetText(text.prev)
-frame.prev.label:SetPoint("LEFT", frame.prev, "RIGHT", 0, 0)
-
-frame.next = MakePageButton("AdventurerTalentCollectionNextPageButton", 306, true)
-frame.next.label = frame.next:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-frame.next.label:SetText(text.next)
-frame.next.label:SetPoint("RIGHT", frame.next, "LEFT", 0, 0)
-
-local function CreateSubclassTab(index, key)
-    local tab = CreateFrame("CheckButton", "AdventurerTalentCollectionTab" .. index, frame)
-    tab:SetWidth(32)
-    tab:SetHeight(32)
-    tab:SetPoint("TOPLEFT", frame, "TOPRIGHT", 2, -78 - (index - 1) * 46)
-    tab.subclassKey = key
-    tab.tooltip = subclassLabels[key]
-
-    tab.background = tab:CreateTexture(nil, "BACKGROUND")
-    tab.background:SetTexture("Interface\\SpellBook\\SpellBook-SkillLineTab")
-    tab.background:SetWidth(64)
-    tab.background:SetHeight(64)
-    tab.background:SetPoint("TOPLEFT", tab, "TOPLEFT", -3, 11)
-
-    tab:SetNormalTexture(subclassIcons[key])
-    tab:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-    tab:SetCheckedTexture("Interface\\Buttons\\CheckButtonHilight", "ADD")
-
-    tab:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(self.tooltip)
-        GameTooltip:Show()
-    end)
-    tab:SetScript("OnLeave", function()
-        GameTooltip:Hide()
-    end)
-    return tab
+local function CreatePageButton(parent, label)
+    local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    button:SetWidth(24)
+    button:SetHeight(20)
+    button:SetText(label)
+    button:Hide()
+    return button
 end
 
-frame.tabs = {}
+local function CreateBranch(index, key)
+    local panel = CreateFrame("Frame", "AdventurerTalentCollectionBranch" .. index, frame)
+    panel:SetWidth(170)
+    panel:SetHeight(410)
+    panel:SetPoint("TOPLEFT", frame, "TOPLEFT", 25 + (index - 1) * 178, -68)
+    panel:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true,
+        tileSize = 16,
+        edgeSize = 12,
+        insets = {left = 3, right = 3, top = 3, bottom = 3},
+    })
+    panel:SetBackdropColor(0.03, 0.03, 0.04, 0.92)
+
+    panel.headerIcon = panel:CreateTexture(nil, "ARTWORK")
+    panel.headerIcon:SetTexture(subclassIcons[key])
+    panel.headerIcon:SetWidth(24)
+    panel.headerIcon:SetHeight(24)
+    panel.headerIcon:SetPoint("TOPLEFT", panel, "TOPLEFT", 9, -9)
+
+    panel.headerIconBorder = panel:CreateTexture(nil, "OVERLAY")
+    panel.headerIconBorder:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+    panel.headerIconBorder:SetWidth(38)
+    panel.headerIconBorder:SetHeight(38)
+    panel.headerIconBorder:SetPoint("CENTER", panel.headerIcon, "CENTER", 0, 0)
+
+    panel.title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    panel.title:SetPoint("LEFT", panel.headerIcon, "RIGHT", 7, 0)
+    panel.title:SetWidth(122)
+    panel.title:SetJustifyH("LEFT")
+    panel.title:SetText(subclassLabels[key])
+
+    panel.icons = {}
+    for slot = 1, BRANCH_PAGE_SIZE do
+        local column = (slot - 1) % GRID_COLUMNS
+        local row = math.floor((slot - 1) / GRID_COLUMNS)
+        local icon = CreateTalentIcon(panel)
+        icon:SetPoint("TOPLEFT", panel, "TOPLEFT", 9 + column * 39, -52 - row * 51)
+        panel.icons[slot] = icon
+    end
+
+    panel.prev = CreatePageButton(panel, "<")
+    panel.prev:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 47, 9)
+
+    panel.pageText = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    panel.pageText:SetWidth(44)
+    panel.pageText:SetPoint("BOTTOM", panel, "BOTTOM", 0, 14)
+    panel.pageText:SetJustifyH("CENTER")
+    panel.pageText:Hide()
+
+    panel.next = CreatePageButton(panel, ">")
+    panel.next:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -47, 9)
+
+    panel.key = key
+    return panel
+end
+
+frame.branches = {}
 for index, key in ipairs(subclassOrder) do
-    frame.tabs[index] = CreateSubclassTab(index, key)
+    frame.branches[key] = CreateBranch(index, key)
 end
 
-local function PageCount(items)
-    local count = math.ceil(#items / TALENTS_PER_PAGE)
-    if count < 1 then
-        count = 1
+local function RefreshBranch(key)
+    local panel = frame.branches[key]
+    local items = state.items[key]
+    local pages = PageCount(items)
+    local page = state.pages[key]
+
+    if page > pages then
+        page = pages
+    elseif page < 1 then
+        page = 1
     end
-    return count
-end
+    state.pages[key] = page
 
-local function RefreshTabs()
-    for index, key in ipairs(subclassOrder) do
-        frame.tabs[index]:SetChecked(key == state.selected)
-    end
-end
+    panel.title:SetText(subclassLabels[key] .. " (" .. #items .. ")")
 
-local function RefreshPage()
-    RefreshTabs()
-
-    local items = state.items[state.selected] or {}
-    local pageCount = PageCount(items)
-    if state.page > pageCount then
-        state.page = pageCount
-    elseif state.page < 1 then
-        state.page = 1
-    end
-
-    frame.title:SetText(text.title .. " - " .. subclassLabels[state.selected])
-    frame.pageText:SetText(string.format(text.page, state.page))
-    frame.prev:SetEnabled(state.page > 1)
-    frame.next:SetEnabled(state.page < pageCount)
-
-    local first = (state.page - 1) * TALENTS_PER_PAGE
-    for index = 1, TALENTS_PER_PAGE do
-        local entry = frame.entries[index]
-        local item = items[first + index]
+    local first = (page - 1) * BRANCH_PAGE_SIZE
+    for slot = 1, BRANCH_PAGE_SIZE do
+        local button = panel.icons[slot]
+        local item = items[first + slot]
         if item then
-            local name, _, icon = GetSpellDisplay(item.spellId)
-            entry.spellId = item.spellId
-            entry.icon:SetTexture(icon)
-            entry.name:SetText(name)
-            entry.rank:SetText(string.format(text.rank, item.rank, item.maxRank))
-            entry:Show()
+            local _, _, icon = GetSpellInfo(item.spellId)
+            if not icon then
+                icon = "Interface\\Icons\\INV_Misc_QuestionMark"
+            end
+            button.spellId = item.spellId
+            button.rank = item.rank
+            button.maxRank = item.maxRank
+            button.icon:SetTexture(icon)
+            button.rankText:SetText(item.rank .. "/" .. item.maxRank)
+            button:Show()
         else
-            entry.spellId = nil
-            entry:Hide()
+            button.spellId = nil
+            button.rank = nil
+            button.maxRank = nil
+            button:Hide()
         end
     end
 
-    if state.loading then
-        frame.empty:SetText(text.loading)
-        frame.empty:Show()
-    elseif state.error then
-        frame.empty:SetText(text.error)
-        frame.empty:Show()
-    elseif #items == 0 then
-        frame.empty:SetText(text.empty)
-        frame.empty:Show()
+    if pages > 1 then
+        panel.prev:Show()
+        panel.next:Show()
+        panel.pageText:SetText(page .. "/" .. pages)
+        panel.pageText:Show()
+        panel.prev:SetEnabled(page > 1)
+        panel.next:SetEnabled(page < pages)
     else
-        frame.empty:Hide()
+        panel.prev:Hide()
+        panel.next:Hide()
+        panel.pageText:Hide()
     end
 end
 
-frame.prev:SetScript("OnClick", function()
-    if state.page > 1 then
-        state.page = state.page - 1
-        RefreshPage()
-        PlaySound("igAbiliityPageTurn")
+local function RefreshCollection()
+    frame.summary:SetText(string.format(text.summary, TotalTalentCount()))
+    for _, key in ipairs(subclassOrder) do
+        RefreshBranch(key)
     end
-end)
 
-frame.next:SetScript("OnClick", function()
-    local items = state.items[state.selected] or {}
-    if state.page < PageCount(items) then
-        state.page = state.page + 1
-        RefreshPage()
-        PlaySound("igAbiliityPageTurn")
+    if state.loading then
+        frame.status:SetText(text.loading)
+        frame.status:Show()
+    elseif state.error then
+        frame.status:SetText(text.error)
+        frame.status:Show()
+    elseif TotalTalentCount() == 0 then
+        frame.status:SetText(text.empty)
+        frame.status:Show()
+    else
+        frame.status:Hide()
     end
-end)
+end
 
-for _, tab in ipairs(frame.tabs) do
-    tab:SetScript("OnClick", function(self)
-        state.selected = self.subclassKey
-        state.page = 1
-        RefreshPage()
-        PlaySound("igCharacterInfoTab")
+for _, key in ipairs(subclassOrder) do
+    local branchKey = key
+    local panel = frame.branches[branchKey]
+    panel.prev:SetScript("OnClick", function()
+        if state.pages[branchKey] > 1 then
+            state.pages[branchKey] = state.pages[branchKey] - 1
+            RefreshBranch(branchKey)
+            PlaySound("igAbiliityPageTurn")
+        end
+    end)
+    panel.next:SetScript("OnClick", function()
+        local pages = PageCount(state.items[branchKey])
+        if state.pages[branchKey] < pages then
+            state.pages[branchKey] = state.pages[branchKey] + 1
+            RefreshBranch(branchKey)
+            PlaySound("igAbiliityPageTurn")
+        end
     end)
 end
 
 local function ResetIncomingCollection()
     for _, key in ipairs(subclassOrder) do
         state.items[key] = {}
+        state.pages[key] = 1
     end
-    state.page = 1
     state.loading = true
     state.error = false
 end
 
 local function RequestCollection()
     ResetIncomingCollection()
-    RefreshPage()
+    RefreshCollection()
     SendCollectionRequest()
 end
 
@@ -475,14 +484,14 @@ local function HandleCollectionMessage(message)
         for _, key in ipairs(subclassOrder) do
             SortCollection(state.items[key])
         end
-        RefreshPage()
+        RefreshCollection()
         return true
     end
 
     if fields[2] == "X" then
         state.loading = false
         state.error = true
-        RefreshPage()
+        RefreshCollection()
         return true
     end
 
@@ -493,6 +502,7 @@ local eventFrame = CreateFrame("Frame", "AdventurerTalentCollectionEventFrame", 
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("CHAT_MSG_ADDON")
 eventFrame:RegisterEvent("SPELLS_CHANGED")
+eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "CHAT_MSG_ADDON" then
         local prefix, message = ...
@@ -502,7 +512,16 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         return
     end
 
+    if event == "ADDON_LOADED" then
+        local addonName = ...
+        if addonName == "Blizzard_TalentUI" then
+            RebindTalentMicroButton()
+        end
+        return
+    end
+
     if event == "PLAYER_ENTERING_WORLD" then
+        RebindTalentMicroButton()
         if not IsAdventurer() and frame:IsShown() then
             HideUIPanel(frame)
         end
@@ -513,30 +532,3 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         RequestCollection()
     end
 end)
-
--- Keep the stock talent window untouched for every native class. The Adventurer
--- alone opens this SpellBook-style collection frame.
-local NativeToggleTalentFrame = ToggleTalentFrame
-function ToggleTalentFrame()
-    if not IsAdventurer() then
-        return NativeToggleTalentFrame()
-    end
-
-    if UnitLevel("player") < SHOW_TALENT_LEVEL then
-        return
-    end
-
-    if frame:IsShown() then
-        HideUIPanel(frame)
-    else
-        ShowUIPanel(frame)
-    end
-end
-
--- MainMenuBarMicroButtons.xml binds the original function object before this
--- file loads. Rebind the live button so Adventurers route through our wrapper.
-if TalentMicroButton then
-    TalentMicroButton:SetScript("OnClick", function()
-        ToggleTalentFrame()
-    end)
-end
