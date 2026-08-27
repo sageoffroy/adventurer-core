@@ -235,10 +235,9 @@ local function CreateTalentEntry(index)
     local column = index > ROWS_PER_COLUMN and 1 or 0
     local row = (index - 1) % ROWS_PER_COLUMN
 
-    -- Match Blizzard's native SpellButtonTemplate geometry exactly.
-    local entry = CreateFrame("CheckButton", "AdventurerTalentCollectionEntry" .. index, frame)
-    entry:SetWidth(37)
-    entry:SetHeight(37)
+    local entry = CreateFrame("Button", "AdventurerTalentCollectionEntry" .. index, frame)
+    entry:SetWidth(150)
+    entry:SetHeight(48)
     entry:SetPoint("TOPLEFT", frame, "TOPLEFT", 34 + column * 157, -85 - row * 51)
     entry:Show()
 
@@ -249,18 +248,24 @@ local function CreateTalentEntry(index)
     entry.background:SetPoint("TOPLEFT", entry, "TOPLEFT", -3, 3)
 
     entry.icon = entry:CreateTexture(nil, "BORDER")
-    entry.icon:SetAllPoints(entry)
+    entry.icon:SetWidth(37)
+    entry.icon:SetHeight(37)
+    entry.icon:SetPoint("TOPLEFT", entry, "TOPLEFT", 0, 0)
     entry.icon:Hide()
 
-    entry:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2")
-    entry.normal = entry:GetNormalTexture()
-    entry.normal:SetWidth(64)
-    entry.normal:SetHeight(64)
-    entry.normal:SetPoint("CENTER", entry, "CENTER", 0, 0)
-    entry.normal:Hide()
-    entry:SetPushedTexture("Interface\\Buttons\\UI-Quickslot-Depress")
-    entry:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-    entry:SetCheckedTexture("Interface\\Buttons\\CheckButtonHilight", "ADD")
+    entry.slot = entry:CreateTexture(nil, "OVERLAY")
+    entry.slot:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+    entry.slot:SetWidth(64)
+    entry.slot:SetHeight(64)
+    entry.slot:SetPoint("CENTER", entry.icon, "CENTER", 0, 0)
+    entry.slot:Hide()
+
+    entry.highlight = entry:CreateTexture(nil, "HIGHLIGHT")
+    entry.highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+    entry.highlight:SetBlendMode("ADD")
+    entry.highlight:SetWidth(43)
+    entry.highlight:SetHeight(43)
+    entry.highlight:SetPoint("CENTER", entry.icon, "CENTER", 0, 0)
 
     entry.name = entry:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     entry.name:SetWidth(103)
@@ -350,8 +355,9 @@ local function CreateSubclassTab(index, key)
 
     tab.icon = tab:CreateTexture(nil, "ARTWORK")
     tab.icon:SetTexture(subclassIcons[key])
-    tab.icon:SetAllPoints(tab)
-    tab.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    tab.icon:SetWidth(28)
+    tab.icon:SetHeight(28)
+    tab.icon:SetPoint("CENTER", tab, "CENTER", 0, 0)
 
     tab.highlight = tab:CreateTexture(nil, "HIGHLIGHT")
     tab.highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
@@ -444,7 +450,7 @@ RefreshPage = function()
             entry.name:SetText(name)
             entry.rank:SetText(string.format(text.rank, item.rank, item.maxRank))
             entry.icon:Show()
-            entry.normal:Show()
+            entry.slot:Show()
             entry.name:Show()
             entry.rank:Show()
         else
@@ -452,7 +458,7 @@ RefreshPage = function()
             entry.rankValue = nil
             entry.maxRank = nil
             entry.icon:Hide()
-            entry.normal:Hide()
+            entry.slot:Hide()
             entry.name:Hide()
             entry.rank:Hide()
         end
