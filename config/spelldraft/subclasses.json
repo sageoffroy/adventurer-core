@@ -9,6 +9,7 @@
       "order": 0,
       "enUS": "Mercenary",
       "esMX": "Mercenario",
+      "icon": "Spell_nature_shamanrage",
       "card_ids": [
         1, 8, 10, 14, 15, 23, 24, 25, 26, 27, 28, 29, 40,
         50, 51, 53, 54, 55, 56,
@@ -27,6 +28,7 @@
       "order": 1,
       "enUS": "Explorer",
       "esMX": "Explorador",
+      "icon": "Spell_nature_shamanrage",
       "card_ids": [41, 42, 46, 48, 145, 146, 152, 153, 155]
     },
     {
@@ -37,6 +39,7 @@
       "order": 2,
       "enUS": "Spellcaster",
       "esMX": "Hechicero",
+      "icon": "Ability_mage_coldasice",
       "card_ids": [
         2, 3, 4, 6, 7, 9, 12, 13, 16, 17, 18, 19, 20, 21, 22,
         43, 44, 45, 47, 49,
@@ -61,6 +64,7 @@
       "order": 3,
       "enUS": "Illuminated",
       "esMX": "Iluminado",
+      "icon": "Spell_holy_holyguidance",
       "card_ids": [
         5,
         30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
