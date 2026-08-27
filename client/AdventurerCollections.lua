@@ -25,7 +25,6 @@ if isSpanish then
         rank = "Rango %d/%d",
         loading = "Cargando talentos...",
         error = "No se pudo cargar la colección de talentos.",
-        empty = "Todavía no obtuviste talentos de esta subclase.",
         page = "Página %d",
         prev = "Ant.",
         next = "Sig.",
@@ -40,7 +39,6 @@ else
         rank = "Rank %d/%d",
         loading = "Loading talents...",
         error = "The talent collection could not be loaded.",
-        empty = "You have not acquired talents from this subclass yet.",
         page = "Page %d",
         prev = "Prev",
         next = "Next",
@@ -55,10 +53,10 @@ local subclassLabels = {
     illuminated = text.illuminated,
 }
 local subclassIcons = {
-    mercenary = "Interface\\Icons\\Ability_Warrior_OffensiveStance",
-    explorer = "Interface\\Icons\\Ability_Hunter_BeastTaming",
-    spellcaster = "Interface\\Icons\\Spell_Frost_FrostBolt02",
-    illuminated = "Interface\\Icons\\Spell_Holy_HolyBolt",
+    mercenary = "Interface\\Icons\\Spell_nature_shamanrage",
+    explorer = "Interface\\Icons\\Spell_nature_shamanrage",
+    spellcaster = "Interface\\Icons\\Ability_mage_coldasice",
+    illuminated = "Interface\\Icons\\Spell_holy_holyguidance",
 }
 
 local function IsAdventurer()
@@ -470,9 +468,6 @@ RefreshPage = function()
         frame.status:Show()
     elseif state.error then
         frame.status:SetText(text.error)
-        frame.status:Show()
-    elseif #items == 0 then
-        frame.status:SetText(text.empty)
         frame.status:Show()
     else
         frame.status:Hide()
