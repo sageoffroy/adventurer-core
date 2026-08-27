@@ -94,8 +94,8 @@ class SpellDraftSubclassTests(unittest.TestCase):
         self.assertEqual(
             [item["icon"] for item in self.spec["subclasses"]],
             [
-                "Ability_hunter_zenarchery",
                 "Spell_nature_shamanrage",
+                "Ability_hunter_zenarchery",
                 "Ability_mage_coldasice",
                 "Spell_holy_holyguidance",
             ],
@@ -169,8 +169,8 @@ class SpellDraftSubclassTests(unittest.TestCase):
             '"Interface\\\\Buttons\\\\UI-SpellbookIcon-NextPage-Up"',
             '"Interface\\\\SpellBook\\\\SpellBook-SkillLineTab"',
             'local subclassIcons = {',
-            'Ability_hunter_zenarchery',
             'Spell_nature_shamanrage',
+            'Ability_hunter_zenarchery',
             'Ability_mage_coldasice',
             'Spell_holy_holyguidance',
             'CreateFrame("CheckButton", "AdventurerTalentCollectionTab" .. index, frame)',
@@ -188,11 +188,11 @@ class SpellDraftSubclassTests(unittest.TestCase):
             self.assertIn(token, self.client)
 
         self.assertIn(
-            'mercenary = "Interface\\\\Icons\\\\Ability_hunter_zenarchery"',
+            'mercenary = "Interface\\\\Icons\\\\Spell_nature_shamanrage"',
             self.client,
         )
         self.assertIn(
-            'explorer = "Interface\\\\Icons\\\\Spell_nature_shamanrage"',
+            'explorer = "Interface\\\\Icons\\\\Ability_hunter_zenarchery"',
             self.client,
         )
         self.assertNotIn(
