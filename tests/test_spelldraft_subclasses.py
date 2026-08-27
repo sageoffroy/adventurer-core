@@ -65,24 +65,20 @@ class SpellDraftSubclassTests(unittest.TestCase):
 
     def test_requested_identity_examples_are_classified_by_function(self) -> None:
         expected = {
-            # Physical melee
-            14: "mercenary",  # Sinister Strike
-            40: "mercenary",  # Raptor Strike
-            128: "mercenary",  # Cleave
-            # Physical ranged / hunter utility
-            42: "explorer",  # Aspect of the Monkey
-            46: "explorer",  # Concussive Shot
-            152: "explorer",  # Multi-Shot
-            # Magical schools
-            2: "spellcaster",  # Fireball
-            4: "spellcaster",  # Shadow Bolt
-            44: "spellcaster",  # Arcane Shot: magic wins over hunter origin
-            59: "spellcaster",  # Shadow Word: Pain
-            184: "spellcaster",  # Frost Shock
-            # Holy school always wins
-            5: "illuminated",  # Smite
-            30: "illuminated",  # Holy Light
-            172: "illuminated",  # Holy Fire
+            14: "mercenary",
+            40: "mercenary",
+            128: "mercenary",
+            42: "explorer",
+            46: "explorer",
+            152: "explorer",
+            2: "spellcaster",
+            4: "spellcaster",
+            44: "spellcaster",
+            59: "spellcaster",
+            184: "spellcaster",
+            5: "illuminated",
+            30: "illuminated",
+            172: "illuminated",
         }
         for card_id, subclass in expected.items():
             self.assertEqual(self.mapping[card_id], subclass, card_id)
@@ -158,7 +154,9 @@ class SpellDraftSubclassTests(unittest.TestCase):
             '"Interface\\\\Spellbook\\\\UI-Spellbook-SpellBackground"',
             '"Interface\\\\Buttons\\\\UI-SpellbookIcon-PrevPage-Up"',
             '"Interface\\\\Buttons\\\\UI-SpellbookIcon-NextPage-Up"',
-            '"SpellBookFrameTabButtonTemplate"',
+            '"Interface\\\\SpellBook\\\\UI-SpellBook-Tab-Unselected"',
+            '"Interface\\\\SpellBook\\\\UI-SpellBook-Tab1-Selected"',
+            '"Interface\\\\SpellBook\\\\UI-SpellbookPanel-Tab-Highlight"',
             'entry.name:SetWidth(103)',
             'GameTooltip:SetHyperlink("spell:" .. self.spellId)',
             'GameTooltip:AddLine(string.format(text.rank',
@@ -170,6 +168,11 @@ class SpellDraftSubclassTests(unittest.TestCase):
             'addonName == "Blizzard_TalentUI"',
         ):
             self.assertIn(token, self.client)
+
+        self.assertNotIn(
+            'CreateFrame(\n        "Button",\n        "AdventurerTalentCollectionTab" .. index,\n        frame,\n        "SpellBookFrameTabButtonTemplate")',
+            self.client,
+        )
 
         for forbidden in (
             "SetMaxLines",
