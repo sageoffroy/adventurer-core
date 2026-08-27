@@ -32,6 +32,20 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
     return text.replace(old, new, 1)
 
 
+def replace_optional_once(text: str, old: str, new: str, label: str) -> str:
+    """Patch one optional extension when present, while still rejecting ambiguity."""
+    clean_count = text.count(old)
+    patched_count = text.count(new)
+    if clean_count == 1 and patched_count == 0:
+        return text.replace(old, new, 1)
+    if clean_count == 0 and patched_count in (0, 1):
+        return text
+    raise PatchError(
+        f"{label}: optional anchor is ambiguous; "
+        f"found clean={clean_count}, patched={patched_count}"
+    )
+
+
 def replace_transition(text: str, clean: str, legacy: str, new: str, label: str) -> str:
     """Accept a stock core or the previous Adventurer-owned form, never fuzz."""
     if new in text:
@@ -249,9 +263,9 @@ def patch_player_storage(text: str) -> str:
             f"unbraced anchor in the same state, found clean={clean_counts}, patched={patched_counts}"
         )
 
-    # Playerbots has hard class gates in addition to AllowableClass. Without
-    # these exceptions an Adventurer can know the proficiency and still be
-    # rejected before CanUseItem reaches the generic skill checks.
+    # Playerbots adds BotCanUseItem class gates that stock AzerothCore does not
+    # contain. Adapt those gates when the extension is present, but their absence
+    # is not a compatibility failure for a stock AzerothCore installation.
     bot_relics = (
         ("ITEM_SUBCLASS_ARMOR_IDOL", "CLASS_DRUID"),
         ("ITEM_SUBCLASS_ARMOR_TOTEM", "CLASS_SHAMAN"),
@@ -267,7 +281,9 @@ def patch_player_storage(text: str) -> str:
             f"    if (getClass() != CLASS_ADVENTURER && proto->Class == ITEM_CLASS_ARMOR && "
             f"proto->SubClass == {subclass} && !IsClass({native_class}, CLASS_CONTEXT_EQUIP_RELIC))"
         )
-        text = replace_once(text, old_bot, new_bot, f"PlayerStorage bot relic gate {subclass}")
+        text = replace_optional_once(
+            text, old_bot, new_bot, f"PlayerStorage optional Playerbots relic gate {subclass}"
+        )
 
     old_shield = """        if (proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD && !(
             IsClass(CLASS_PALADIN, CLASS_CONTEXT_EQUIP_SHIELDS)
@@ -363,7 +379,7 @@ def patch_player_cpp(text: str) -> str:
     )
 
     # These anchors intentionally include the blank separator present in the
-    # validated Playerbot baseline. Keeping the exact source shape makes a
+    # validated AzerothCore shape. Keeping the exact source shape makes a
     # mismatch fail before mutation instead of silently patching another core.
     melee_anchor = """    if (level > GT_MAX_LEVEL)
         level = GT_MAX_LEVEL;
