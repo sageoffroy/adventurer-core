@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Repair/verify compatibility issues from the first Dungeon Master native-mode patch.
 
-The original Adventurer compatibility patch needed three small in-place repairs:
+The original Adventurer compatibility patch needed a few small in-place repairs:
 - DungeonMasterMgr::Update(): restore the brace closing `if (ref)` before auto-rez.
 - dm_unit_script::ScaleDamage(): restore the brace closing `if (attacker)` before
   the environmental-damage path.
 - DungeonMasterMgr::PrepareOriginalCreature(): ignore decorative creatures whose
   server-side unit is alive but whose stand state is DEAD. These are intentional
   corpse props in Blizzard instances and must never become challenge enemies.
+- Upgrade the first corpse guard, which used the wrong AzerothCore accessor name
+  (`GetStandState`); AzerothCore 3.3.5a exposes `getStandState()`.
 
 This fixup is intentionally small and idempotent so already-patched development
 trees can be repaired in place without rolling back the Dungeon Master module.
@@ -52,16 +54,20 @@ UNIT_FIXED = (
 
 CORPSE_PATCH_MARKER = "// Aventureros: preserve and scale the dungeon's original inhabitants."
 CORPSE_FIX_MARKER = "// Aventureros source fixup v4: ignore decorative dead-pose creatures."
+CORPSE_ACCESSOR_FIX_MARKER = "// Aventureros source fixup v5: AzerothCore uses getStandState()."
 CORPSE_ANCHOR = (
     "    if (!c || !session || !c->IsInWorld() || !c->IsAlive())\n"
     "        return false;\n"
 )
+CORPSE_BAD_ACCESSOR = "c->GetStandState() == UNIT_STAND_STATE_DEAD"
+CORPSE_GOOD_ACCESSOR = "c->getStandState() == UNIT_STAND_STATE_DEAD"
 CORPSE_FIXED = (
     "    if (!c || !session || !c->IsInWorld() || !c->IsAlive())\n"
     "        return false;\n"
     "    // Aventureros source fixup v4: ignore decorative dead-pose creatures.\n"
     "    // Blizzard uses alive Creature objects with UNIT_STAND_STATE_DEAD for corpse props.\n"
-    "    if (c->GetStandState() == UNIT_STAND_STATE_DEAD)\n"
+    "    // Aventureros source fixup v5: AzerothCore uses getStandState().\n"
+    "    if (c->getStandState() == UNIT_STAND_STATE_DEAD)\n"
     "        return false;\n"
 )
 
@@ -96,10 +102,38 @@ def _repair_decorative_corpses(path: Path) -> bool:
     text = path.read_text(encoding="utf-8")
     if CORPSE_PATCH_MARKER not in text:
         raise FixupError("Dungeon Master original-creature native-mode patch is not installed")
+
+    # Upgrade trees that already received the first v4 corpse guard. That guard
+    # compiled against an API spelling AzerothCore does not expose.
     if CORPSE_FIX_MARKER in text:
-        if "c->GetStandState() == UNIT_STAND_STATE_DEAD" not in text:
+        if CORPSE_BAD_ACCESSOR in text:
+            text = text.replace(CORPSE_BAD_ACCESSOR, CORPSE_GOOD_ACCESSOR, 1)
+            if CORPSE_ACCESSOR_FIX_MARKER not in text:
+                guard = "    if (c->getStandState() == UNIT_STAND_STATE_DEAD)\n"
+                text = text.replace(
+                    guard,
+                    "    // Aventureros source fixup v5: AzerothCore uses getStandState().\n" + guard,
+                    1,
+                )
+            path.write_text(text, encoding="utf-8")
+            return True
+        if CORPSE_GOOD_ACCESSOR not in text:
             raise FixupError("Dungeon Master corpse fix marker exists but stand-state guard is missing")
+        if CORPSE_ACCESSOR_FIX_MARKER not in text:
+            guard = "    if (c->getStandState() == UNIT_STAND_STATE_DEAD)\n"
+            if text.count(guard) != 1:
+                raise FixupError("Dungeon Master corpse accessor guard is ambiguous")
+            path.write_text(
+                text.replace(
+                    guard,
+                    "    // Aventureros source fixup v5: AzerothCore uses getStandState().\n" + guard,
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            return True
         return False
+
     count = text.count(CORPSE_ANCHOR)
     if count != 1:
         raise FixupError(f"Expected exactly one original-creature alive guard, found {count}")
@@ -141,8 +175,12 @@ def verify(core: Path) -> None:
         raise FixupError("Dungeon Master original-creature native-mode patch is not installed")
     if CORPSE_FIX_MARKER not in mgr:
         raise FixupError("Dungeon Master decorative-corpse fixup is not installed")
-    if "c->GetStandState() == UNIT_STAND_STATE_DEAD" not in mgr:
+    if CORPSE_ACCESSOR_FIX_MARKER not in mgr:
+        raise FixupError("Dungeon Master corpse accessor compatibility fix is not installed")
+    if CORPSE_GOOD_ACCESSOR not in mgr:
         raise FixupError("Dungeon Master decorative-corpse stand-state guard is missing")
+    if CORPSE_BAD_ACCESSOR in mgr:
+        raise FixupError("Dungeon Master still uses invalid GetStandState accessor")
 
 
 def main() -> int:
