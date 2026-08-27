@@ -7,6 +7,10 @@ and is authoritative for active-card rarity/availability and ability-to-talent
 relationships. During install, Talent.dbc supplies the real WotLK talent rank
 chains, so the live cards.csv can be rebuilt without hardcoding talent ranks.
 
+subclasses.json is the single classification source for the Adventurer's four
+spell/talent families. The generated live cards.csv carries that classification
+so the server and client UI never need a duplicate hardcoded catalog.
+
 cards.csv remains file-managed: package updates advance it while unedited and
 preserve it wholesale after a real local edit. spelldraft.conf is merged
 option-by-option against the previous packaged .dist.
@@ -22,9 +26,18 @@ import shutil
 import struct
 from pathlib import Path
 
+from subclasses import (
+    SubclassError,
+    card_subclass_map,
+    choose_synthetic_talent_subclass,
+    load_spec as load_subclass_spec,
+    talent_override_map,
+    validate_card_coverage,
+)
+
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "config" / "spelldraft"
-FILES = ("spelldraft.conf", "cards.csv", "catalog_metadata.csv")
+FILES = ("spelldraft.conf", "cards.csv", "catalog_metadata.csv", "subclasses.json")
 MARKER_SUFFIX = ".managed.sha256"
 SYNTHETIC_TALENT_CARD_BASE = 1_000_000
 VALID_RARITIES = {"common", "uncommon", "rare", "epic", "legendary"}
@@ -218,7 +231,12 @@ def render_cards(rows: list[dict[str, str]], fieldnames: list[str]) -> str:
     return output.getvalue()
 
 
-def build_runtime_cards(base_text: str, metadata_text: str, talent_ranks: dict[int, list[int]]) -> tuple[str, list[int]]:
+def build_runtime_cards(
+    base_text: str,
+    metadata_text: str,
+    talent_ranks: dict[int, list[int]],
+    subclass_spec: dict | None = None,
+) -> tuple[str, list[int]]:
     reader = csv.DictReader(io.StringIO(base_text), delimiter=";")
     fieldnames = reader.fieldnames
     if fieldnames is None or len(fieldnames) != 12 or fieldnames[0] != "id" or "rank_grants" not in fieldnames:
@@ -226,11 +244,21 @@ def build_runtime_cards(base_text: str, metadata_text: str, talent_ranks: dict[i
     rows = [dict(row) for row in reader]
     metadata = parse_catalog_metadata(metadata_text)
 
+    subclass_spec = subclass_spec or load_subclass_spec()
+    try:
+        card_classes = validate_card_coverage(base_text, subclass_spec)
+    except SubclassError as exc:
+        raise SpellDraftRuntimeError(str(exc)) from exc
+    talent_overrides = talent_override_map(subclass_spec)
+    output_fieldnames = list(fieldnames) + ["subclass"]
+
     active_rows: list[dict[str, str]] = []
     explicit_talents: list[dict[str, str]] = []
     active_by_granted_spell: dict[int, set[int]] = {}
 
     for row in rows:
+        card_id = int(row["id"])
+        row["subclass"] = card_classes[card_id]
         if row["type"] == "active":
             spells = split_grant_spells(row["rank_grants"])
             if not spells:
@@ -241,7 +269,6 @@ def build_runtime_cards(base_text: str, metadata_text: str, talent_ranks: dict[i
             if primary_meta and primary_meta["rarity"]:
                 row["rarity"] = str(primary_meta["rarity"])
             active_rows.append(row)
-            card_id = int(row["id"])
             for spell_id in spells:
                 active_by_granted_spell.setdefault(spell_id, set()).add(card_id)
         elif row["type"] == "talent":
@@ -282,6 +309,15 @@ def build_runtime_cards(base_text: str, metadata_text: str, talent_ranks: dict[i
             raise SpellDraftRuntimeError(f"synthetic talent card id collision: {card_id}")
         used_card_ids.add(card_id)
         sources = sorted(talent_sources[first_spell])
+        try:
+            subclass = choose_synthetic_talent_subclass(
+                first_spell,
+                sources,
+                card_classes,
+                talent_overrides,
+            )
+        except SubclassError as exc:
+            raise SpellDraftRuntimeError(str(exc)) from exc
         synthetic.append({
             "id": str(card_id),
             "key": f"talent_{first_spell}",
@@ -295,6 +331,7 @@ def build_runtime_cards(base_text: str, metadata_text: str, talent_ranks: dict[i
             "unlocks": "",
             "replaces_previous": "1",
             "name": f"Talent {first_spell}",
+            "subclass": subclass,
         })
 
     output_rows = active_rows + explicit_talents + synthetic
@@ -306,20 +343,26 @@ def build_runtime_cards(base_text: str, metadata_text: str, talent_ranks: dict[i
         for talent_spell in meta["talent_spells"]
         if talent_spell not in talent_ranks
     })
-    return render_cards(output_rows, fieldnames), ignored
+    return render_cards(output_rows, output_fieldnames), ignored
 
 
 def build_packaged_files(core: Path, server_data_dir: Path | None, dbc_src: Path | None) -> tuple[dict[str, bytes], list[int]]:
     files = {
         "spelldraft.conf": (SOURCE / "spelldraft.conf").read_bytes(),
         "catalog_metadata.csv": (SOURCE / "catalog_metadata.csv").read_bytes(),
+        "subclasses.json": (SOURCE / "subclasses.json").read_bytes(),
     }
     base_cards = (SOURCE / "cards.csv").read_text(encoding="utf-8")
     metadata_text = files["catalog_metadata.csv"].decode("utf-8")
     talent_dbc = resolve_talent_dbc(core, server_data_dir, dbc_src)
     if talent_dbc is None:
         raise SpellDraftRuntimeError("Talent.dbc not found; pass --dbc-src pointing to the WotLK DBC directory")
-    generated_cards, ignored = build_runtime_cards(base_cards, metadata_text, parse_talent_dbc(talent_dbc))
+    generated_cards, ignored = build_runtime_cards(
+        base_cards,
+        metadata_text,
+        parse_talent_dbc(talent_dbc),
+        load_subclass_spec(SOURCE / "subclasses.json"),
+    )
     files["cards.csv"] = generated_cards.encode("utf-8")
     return files, ignored
 
@@ -465,7 +508,7 @@ def main() -> int:
         else:
             remove(args.core_dir, args.server_data_dir)
         return 0
-    except (SpellDraftRuntimeError, OSError, UnicodeError, ValueError, struct.error) as exc:
+    except (SpellDraftRuntimeError, SubclassError, OSError, UnicodeError, ValueError, struct.error) as exc:
         print(f"ERROR: {exc}")
         return 1
 
