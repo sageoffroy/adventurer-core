@@ -63,7 +63,9 @@ class DungeonMasterSourceFixupTests(unittest.TestCase):
             self.assertIn("                    }\n                }\n\n", mgr_text)
             self.assertNotIn(fixup.MGR_LEGACY, mgr_text)
             self.assertIn(fixup.CORPSE_FIX_MARKER, mgr_text)
-            self.assertIn("c->GetStandState() == UNIT_STAND_STATE_DEAD", mgr_text)
+            self.assertIn(fixup.CORPSE_ACCESSOR_FIX_MARKER, mgr_text)
+            self.assertIn("c->getStandState() == UNIT_STAND_STATE_DEAD", mgr_text)
+            self.assertNotIn("c->GetStandState() == UNIT_STAND_STATE_DEAD", mgr_text)
 
             unit_text = unit.read_text(encoding="utf-8")
             self.assertIn(fixup.UNIT_FIX_MARKER, unit_text)
@@ -99,6 +101,38 @@ class DungeonMasterSourceFixupTests(unittest.TestCase):
             self.assertTrue(fixup.install(core))
             fixup.verify(core)
             self.assertIn(fixup.CORPSE_FIX_MARKER, mgr.read_text(encoding="utf-8"))
+
+    def test_upgrades_bad_v4_getstandstate_accessor(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            core = Path(td) / "core"
+            mgr, unit = self.make_core(core)
+            mgr.write_text(
+                mgr.read_text(encoding="utf-8")
+                .replace(fixup.MGR_LEGACY, fixup.MGR_FIXED, 1)
+                .replace(
+                    fixup.CORPSE_ANCHOR,
+                    "    if (!c || !session || !c->IsInWorld() || !c->IsAlive())\n"
+                    "        return false;\n"
+                    "    // Aventureros source fixup v4: ignore decorative dead-pose creatures.\n"
+                    "    // Blizzard uses alive Creature objects with UNIT_STAND_STATE_DEAD for corpse props.\n"
+                    "    if (c->GetStandState() == UNIT_STAND_STATE_DEAD)\n"
+                    "        return false;\n",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            unit.write_text(
+                unit.read_text(encoding="utf-8").replace(fixup.UNIT_LEGACY, fixup.UNIT_FIXED, 1),
+                encoding="utf-8",
+            )
+
+            self.assertTrue(fixup.install(core))
+            fixup.verify(core)
+            text = mgr.read_text(encoding="utf-8")
+            self.assertIn(fixup.CORPSE_ACCESSOR_FIX_MARKER, text)
+            self.assertIn(fixup.CORPSE_GOOD_ACCESSOR, text)
+            self.assertNotIn(fixup.CORPSE_BAD_ACCESSOR, text)
+            self.assertFalse(fixup.install(core))
 
     def test_refuses_unpatched_source(self) -> None:
         with tempfile.TemporaryDirectory() as td:
