@@ -21,7 +21,11 @@ class DungeonMasterConfigError(RuntimeError):
     pass
 
 
-def read_profile(path: Path = PROFILE) -> dict[str, str]:
+def read_profile(path: Path | None = None) -> dict[str, str]:
+    # Resolve PROFILE at call time so tests and callers can safely inject an
+    # alternate profile without being defeated by Python default-argument binding.
+    if path is None:
+        path = PROFILE
     if not path.is_file():
         raise DungeonMasterConfigError(f"Managed Dungeon Master profile not found: {path}")
     out: dict[str, str] = {}
