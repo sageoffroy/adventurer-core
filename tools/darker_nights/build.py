@@ -3,20 +3,47 @@ import argparse
 import struct
 from pathlib import Path
 
-CURVE = [
-    (0, 0.25),      # 00:00
-    (480, 0.30),    # 04:00
+# WoW 3.3.5a LightIntBand time units are half-minutes: 120 = one hour.
+# Deep night remains flat from midnight through 04:00. Dawn starts only after 04:00.
+AMBIENT_CURVE = [
+    (0, 0.15),      # 00:00
+    (480, 0.15),    # 04:00 - dawn begins after this point
     (720, 0.65),    # 06:00
     (960, 1.00),    # 08:00
     (2160, 0.85),   # 18:00
     (2400, 0.55),   # 20:00
-    (2640, 0.35),   # 22:00
-    (2880, 0.25),   # 24:00
+    (2640, 0.30),   # 22:00
+    (2880, 0.15),   # 24:00
+]
+
+# Keep enough colour in the sky for stars/moon while making night unmistakable.
+SKY_CURVE = [
+    (0, 0.30),
+    (480, 0.30),
+    (720, 0.70),
+    (960, 1.00),
+    (2160, 0.90),
+    (2400, 0.65),
+    (2640, 0.40),
+    (2880, 0.30),
+]
+
+# The background-fog band controls distant terrain such as mountains. It must
+# remain as dark as the foreground during deep night or snowy zones look lit.
+DISTANT_FOG_CURVE = [
+    (0, 0.15),
+    (480, 0.15),
+    (720, 0.60),
+    (960, 1.00),
+    (2160, 0.85),
+    (2400, 0.50),
+    (2640, 0.25),
+    (2880, 0.15),
 ]
 
 
-def brightness_factor(time_value: int) -> float:
-    for (t0, f0), (t1, f1) in zip(CURVE, CURVE[1:]):
+def curve_factor(curve: list[tuple[int, float]], time_value: int) -> float:
+    for (t0, f0), (t1, f1) in zip(curve, curve[1:]):
         if t0 <= time_value <= t1:
             if t1 == t0:
                 return f0
@@ -34,6 +61,24 @@ def darken_color(value: int, factor: float) -> int:
     c1 = round(c1 * factor)
     c2 = round(c2 * factor)
     return high | c0 | (c1 << 8) | (c2 << 16)
+
+
+def factor_for_band(band_offset: int, time_value: int) -> float:
+    # 0: general light, 1: dispersed/ambient light.
+    if band_offset in (0, 1):
+        return curve_factor(AMBIENT_CURVE, time_value)
+
+    # 2-6: top sky through horizon layers. These stay brighter than the world
+    # so stars/moon remain readable instead of turning the sky into flat black.
+    if 2 <= band_offset <= 6:
+        return curve_factor(SKY_CURVE, time_value)
+
+    # 7: background fog colour, which controls the apparent brightness of
+    # distant mountains and similar far terrain.
+    if band_offset == 7:
+        return curve_factor(DISTANT_FOG_CURVE, time_value)
+
+    return 1.0
 
 
 def build(source: Path, output: Path) -> None:
@@ -57,17 +102,15 @@ def build(source: Path, output: Path) -> None:
         row_id = values[0]
         num_entries = min(values[1], 16)
 
-        # LightIntBand rows are grouped in sets of 18 bands per lighting profile.
-        # We intentionally modify only the first two color bands for this experiment:
-        # global diffuse and global ambient light.
+        # Each LightParams profile owns 18 consecutive LightIntBand rows.
         band_offset = (row_id - 1) % 18
-        if band_offset not in (0, 1):
+        if band_offset > 7:
             continue
 
         changed = False
         for n in range(num_entries):
             time_value = values[2 + n]
-            factor = brightness_factor(time_value)
+            factor = factor_for_band(band_offset, time_value)
             if factor >= 0.999:
                 continue
 
