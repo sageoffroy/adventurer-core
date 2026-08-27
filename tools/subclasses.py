@@ -3,8 +3,8 @@
 
 The four subclasses are presentation/organisation families for the classless
 Adventurer. They do not change spell mechanics or eligibility. A single JSON
-spec owns the classification used by both SpellDraft talents and the native
-spellbook skill-line tabs.
+spec owns the classification and iconography used by both SpellDraft talents
+and the native spellbook skill-line tabs.
 """
 
 from __future__ import annotations
@@ -24,7 +24,12 @@ SKILLLINE_FIELDS = 56
 SKILLLINE_RECORD_SIZE = SKILLLINE_FIELDS * 4
 SKILLLINE_NAME_START = 3
 SKILLLINE_DESCRIPTION_START = 20
+SKILLLINE_SPELL_ICON = 37
 SKILLLINE_ALTERNATE_VERB_START = 38
+
+SPELLICON_FIELDS = 2
+SPELLICON_RECORD_SIZE = SPELLICON_FIELDS * 4
+SPELLICON_PATH_FIELD = 1
 
 SKILLLINEABILITY_FIELDS = 14
 SKILLLINEABILITY_RECORD_SIZE = SKILLLINEABILITY_FIELDS * 4
@@ -78,6 +83,8 @@ def load_spec(path: Path = SPEC_PATH) -> dict:
     for item in subclasses:
         if not item.get("enUS") or not item.get("esMX"):
             raise SubclassError(f"subclass {item['key']} is missing localized names")
+        if not item.get("icon"):
+            raise SubclassError(f"subclass {item['key']} is missing its icon")
         for raw_card_id in item.get("card_ids", []):
             card_id = int(raw_card_id)
             previous = seen_cards.get(card_id)
@@ -175,7 +182,48 @@ def clear_localized_block(row: bytearray, start: int) -> None:
         set_u32(row, start + locale, 0)
 
 
-def patch_skill_lines(path: Path, spec: dict) -> bool:
+def dbc_string(dbc: DBC, offset: int) -> str:
+    if not offset:
+        return ""
+    raw = bytes(dbc.strings)
+    end = raw.find(b"\0", offset)
+    if end < 0:
+        raise SubclassError(f"Unterminated DBC string at offset {offset}")
+    return raw[offset:end].decode("utf-8", errors="strict")
+
+
+def normalized_icon_name(value: str) -> str:
+    name = value.replace("/", "\\").rsplit("\\", 1)[-1]
+    if name.lower().endswith(".blp"):
+        name = name[:-4]
+    return name.lower()
+
+
+def resolve_subclass_icon_ids(path: Path, spec: dict) -> dict[str, int]:
+    """Resolve subclass icon names against stock SpellIcon.dbc; never create icons."""
+    icons = DBC.read(path)
+    if icons.fields != SPELLICON_FIELDS or icons.record_size != SPELLICON_RECORD_SIZE:
+        raise SubclassError(f"{path}: unexpected SpellIcon layout {icons.fields}/{icons.record_size}")
+
+    by_name: dict[str, int] = {}
+    for row in icons.records:
+        raw_path = dbc_string(icons, u32(row, SPELLICON_PATH_FIELD))
+        if raw_path:
+            by_name.setdefault(normalized_icon_name(raw_path), u32(row, 0))
+
+    result: dict[str, int] = {}
+    for item in spec["subclasses"]:
+        authored = str(item["icon"])
+        icon_id = by_name.get(normalized_icon_name(authored))
+        if icon_id is None:
+            raise SubclassError(
+                f"SpellIcon.dbc: stock icon {authored!r} for subclass {item['key']} not found"
+            )
+        result[str(item["key"])] = icon_id
+    return result
+
+
+def patch_skill_lines(path: Path, spec: dict, icon_ids: dict[str, int]) -> bool:
     dbc = DBC.read(path)
     if dbc.fields != SKILLLINE_FIELDS or dbc.record_size != SKILLLINE_RECORD_SIZE:
         raise SubclassError(f"{path}: unexpected SkillLine layout {dbc.fields}/{dbc.record_size}")
@@ -201,6 +249,7 @@ def patch_skill_lines(path: Path, spec: dict) -> bool:
         set_u32(row, 0, int(item["skill_line_id"]))
         set_localized_name(dbc, row, SKILLLINE_NAME_START, str(item["enUS"]), str(item["esMX"]))
         clear_localized_block(row, SKILLLINE_DESCRIPTION_START)
+        set_u32(row, SKILLLINE_SPELL_ICON, icon_ids[str(item["key"])])
         clear_localized_block(row, SKILLLINE_ALTERNATE_VERB_START)
         dbc.records.append(row)
 
@@ -403,15 +452,26 @@ def patch_skill_line_abilities(path: Path, cards_text: str, spec: dict) -> bool:
     return after != before
 
 
-def validate_subclass_dbcs(dbc_dir: Path, cards_text: str, spec: dict) -> None:
+def validate_subclass_dbcs(
+    dbc_dir: Path,
+    cards_text: str,
+    spec: dict,
+    icon_ids: dict[str, int],
+) -> None:
     skill_lines = DBC.read(dbc_dir / "SkillLine.dbc")
     skill_race = DBC.read(dbc_dir / "SkillRaceClassInfo.dbc")
     abilities = DBC.read(dbc_dir / "SkillLineAbility.dbc")
 
     for item in spec["subclasses"]:
         skill_id = int(item["skill_line_id"])
-        if not any(u32(row, 0) == skill_id for row in skill_lines.records):
+        skill_row = next((row for row in skill_lines.records if u32(row, 0) == skill_id), None)
+        if skill_row is None:
             raise SubclassError(f"missing custom SkillLine {skill_id}")
+        expected_icon = icon_ids[str(item["key"])]
+        if u32(skill_row, SKILLLINE_SPELL_ICON) != expected_icon:
+            raise SubclassError(
+                f"custom SkillLine {skill_id} has icon {u32(skill_row, SKILLLINE_SPELL_ICON)}, expected {expected_icon}"
+            )
         if not any(
             u32(row, SRC_SKILL) == skill_id
             and u32(row, SRC_CLASS_MASK) == ADVENTURER_CLASS_MASK
@@ -440,13 +500,19 @@ def patch_subclass_directory(
     cards_text = cards_text if cards_text is not None else CARDS_PATH.read_text(encoding="utf-8")
     validate_card_coverage(cards_text, spec)
 
-    required = ("SkillLine.dbc", "SkillRaceClassInfo.dbc", "SkillLineAbility.dbc")
+    required = (
+        "SkillLine.dbc",
+        "SkillRaceClassInfo.dbc",
+        "SkillLineAbility.dbc",
+        "SpellIcon.dbc",
+    )
     missing = [name for name in required if not (dbc_dir / name).is_file()]
     if missing:
         raise SubclassError("Missing subclass DBC(s): " + ", ".join(missing))
 
+    icon_ids = resolve_subclass_icon_ids(dbc_dir / "SpellIcon.dbc", spec)
     changed = {
-        "SkillLine.dbc": patch_skill_lines(dbc_dir / "SkillLine.dbc", spec),
+        "SkillLine.dbc": patch_skill_lines(dbc_dir / "SkillLine.dbc", spec, icon_ids),
         "SkillRaceClassInfo.dbc": patch_skill_race_class(
             dbc_dir / "SkillRaceClassInfo.dbc", spec
         ),
@@ -454,5 +520,5 @@ def patch_subclass_directory(
             dbc_dir / "SkillLineAbility.dbc", cards_text, spec
         ),
     }
-    validate_subclass_dbcs(dbc_dir, cards_text, spec)
+    validate_subclass_dbcs(dbc_dir, cards_text, spec, icon_ids)
     return changed
