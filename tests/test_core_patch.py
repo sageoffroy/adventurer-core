@@ -222,17 +222,20 @@ class CorePatchTests(unittest.TestCase):
             path = root / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8")
-        payload = root / "payload" / "src/server/scripts/Custom/adventurer_core.cpp"
-        payload.parent.mkdir(parents=True, exist_ok=True)
-        payload.write_text("void AddAdventurerCoreScripts() {}\n", encoding="utf-8")
-        return root / "payload"
+        payload_root = root / "payload"
+        runtime = payload_root / "src/server/scripts/Custom/adventurer_core.cpp"
+        runtime.parent.mkdir(parents=True, exist_ok=True)
+        runtime.write_text("void AddAdventurerCoreScripts() {}\n", encoding="utf-8")
+        collection = payload_root / "src/server/scripts/Custom/adventurer_collections.cpp"
+        collection.write_text("void AddAdventurerCollectionScripts() {}\n", encoding="utf-8")
+        return payload_root
 
     def test_plan_is_idempotent_after_first_application(self):
         with tempfile.TemporaryDirectory() as td:
             core = Path(td)
             payload = self.make_tree(core)
             first = plan(core, payload)
-            self.assertEqual(len(first), 7)
+            self.assertEqual(len(first), 8)
             storage = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("PlayerStorage.cpp"))
             self.assertEqual(storage.count("getClass() != CLASS_ADVENTURER) ||"), 2)
             self.assertIn("getClass() != CLASS_ADVENTURER && proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD", storage)
@@ -253,6 +256,13 @@ class CorePatchTests(unittest.TestCase):
             self.assertIn("Universal ranged baseline: 95% of Hunter's native formula", stat)
             self.assertIn("Universal melee baseline", stat)
             self.assertIn("145.560408f,    // Adventurer", stat)
+
+            collection = next(
+                item for item in first
+                if item.relative_path.endswith("adventurer_collections.cpp")
+            )
+            self.assertIsNone(collection.original)
+            self.assertIn(b"AddAdventurerCollectionScripts", collection.patched)
 
             for item in first:
                 target = core / item.relative_path
