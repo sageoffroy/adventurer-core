@@ -95,7 +95,7 @@ class SpellDraftSubclassTests(unittest.TestCase):
             [item["icon"] for item in self.spec["subclasses"]],
             [
                 "Spell_nature_shamanrage",
-                "Spell_nature_shamanrage",
+                "Ability_hunter_zenarchery",
                 "Ability_mage_coldasice",
                 "Spell_holy_holyguidance",
             ],
@@ -170,6 +170,7 @@ class SpellDraftSubclassTests(unittest.TestCase):
             '"Interface\\\\SpellBook\\\\SpellBook-SkillLineTab"',
             'local subclassIcons = {',
             'Spell_nature_shamanrage',
+            'Ability_hunter_zenarchery',
             'Ability_mage_coldasice',
             'Spell_holy_holyguidance',
             'CreateFrame("CheckButton", "AdventurerTalentCollectionTab" .. index, frame)',
