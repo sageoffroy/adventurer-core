@@ -21,9 +21,11 @@ FRAME_XML_BASELINE = ROOT / "client" / "baseline" / "FrameXML.toc"
 ADVENTURER_PLAYER_FRAME = ROOT / "client" / "AdventurerPlayerFrame.xml"
 ADVENTURER_RESOURCES = ROOT / "client" / "AdventurerResources.lua"
 ADVENTURER_DRAFT_META = ROOT / "client" / "AdventurerDraftMeta.lua"
+ADVENTURER_COLLECTIONS = ROOT / "client" / "AdventurerCollections.lua"
 ADVENTURER_FRAME_ART = ROOT / "client" / "art" / "UI-AdventurerFrame.blp"
 ADVENTURER_PLAYER_FRAME_INTERNAL = "Interface\\FrameXML\\AdventurerPlayerFrame.xml"
 ADVENTURER_DRAFT_META_INTERNAL = "Interface\\FrameXML\\AdventurerDraftMeta.lua"
+ADVENTURER_COLLECTIONS_INTERNAL = "Interface\\FrameXML\\AdventurerCollections.lua"
 ADVENTURER_FRAME_INTERNAL = "Interface\\Adventurer\\UI-AdventurerFrame.blp"
 DEFAULT_LOCALE = "esMX"
 PROJECT_SUFFIX = "Z"
@@ -184,7 +186,14 @@ def build_frame_xml_toc() -> bytes:
 
     text = FRAME_XML_BASELINE.read_text(encoding="utf-8")
     marker = "PlayerFrame.xml\nPartyFrame.xml"
-    replacement = "PlayerFrame.xml\nAdventurerPlayerFrame.xml\nAdventurerResources.lua\nAdventurerDraftMeta.lua\nPartyFrame.xml"
+    replacement = (
+        "PlayerFrame.xml\n"
+        "AdventurerPlayerFrame.xml\n"
+        "AdventurerResources.lua\n"
+        "AdventurerDraftMeta.lua\n"
+        "AdventurerCollections.lua\n"
+        "PartyFrame.xml"
+    )
 
     if replacement in text:
         raise ClientError("FrameXML baseline must remain pristine")
@@ -322,6 +331,33 @@ def build_adventurer_draft_meta_lua() -> bytes:
     return payload
 
 
+def build_adventurer_collections_lua() -> bytes:
+    if not ADVENTURER_COLLECTIONS.is_file():
+        raise ClientError(f"Missing Adventurer talent collection UI: {ADVENTURER_COLLECTIONS}")
+
+    payload = ADVENTURER_COLLECTIONS.read_bytes()
+    required = (
+        b'ADRAFT_TALENTS',
+        b'AdventurerTalentCollectionFrame',
+        b'AdventurerTalentCollectionTab',
+        b'FauxScrollFrameTemplate',
+        b'NativeToggleTalentFrame',
+        b'function ToggleTalentFrame()',
+        b'mercenary',
+        b'explorer',
+        b'spellcaster',
+        b'illuminated',
+        b'CHAT_MSG_ADDON',
+    )
+    missing = [token.decode("ascii") for token in required if token not in payload]
+    if missing:
+        raise ClientError(
+            "Adventurer talent collection UI is missing required contract markers: "
+            + ", ".join(missing)
+        )
+    return payload
+
+
 def build_adventurer_frame_art() -> bytes:
     if not ADVENTURER_FRAME_ART.is_file():
         raise ClientError(f"Missing Adventurer frame art: {ADVENTURER_FRAME_ART}")
@@ -359,6 +395,7 @@ def build_archive_files(work: Path) -> tuple[dict[str, bytes], dict[str, bytes]]
         ADVENTURER_PLAYER_FRAME_INTERNAL: build_adventurer_player_frame_xml(),
         "Interface\\FrameXML\\AdventurerResources.lua": build_adventurer_resources_lua(),
         ADVENTURER_DRAFT_META_INTERNAL: build_adventurer_draft_meta_lua(),
+        ADVENTURER_COLLECTIONS_INTERNAL: build_adventurer_collections_lua(),
         ADVENTURER_FRAME_INTERNAL: build_adventurer_frame_art(),
         **{
             f"DBFilesClient\\{name}": (work / name).read_bytes()
@@ -423,6 +460,7 @@ def build_patch(dbc_source: Path, output: Path, locale: str = DEFAULT_LOCALE) ->
         "player_frame_xml_sha256": hashlib.sha256(build_adventurer_player_frame_xml()).hexdigest(),
         "resource_hud_sha256": hashlib.sha256(build_adventurer_resources_lua()).hexdigest(),
         "draft_meta_sha256": hashlib.sha256(build_adventurer_draft_meta_lua()).hexdigest(),
+        "talent_collection_sha256": hashlib.sha256(build_adventurer_collections_lua()).hexdigest(),
         "adventurer_frame_sha256": hashlib.sha256(build_adventurer_frame_art()).hexdigest(),
     }
     (output / "manifest.json").write_text(
