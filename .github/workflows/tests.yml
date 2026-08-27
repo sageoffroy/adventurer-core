@@ -39,6 +39,8 @@ jobs:
           python tools/dungeon_master_source_fixup.py verify --core-dir _dm-core
           python tools/dungeon_master_experience_patch.py install --core-dir _dm-core
           python tools/dungeon_master_experience_patch.py verify --core-dir _dm-core
+          python tools/dungeon_master_dungeon_names_patch.py install --core-dir _dm-core
+          python tools/dungeon_master_dungeon_names_patch.py verify --core-dir _dm-core
           python tools/dungeon_master_source_patch.py verify --core-dir _dm-core
           python tools/dungeon_master_runtime.py install --core-dir _dm-core
           python tools/dungeon_master_runtime.py verify --core-dir _dm-core
@@ -55,12 +57,15 @@ jobs:
              _dm-core/modules/mod-dungeon-master/src/scripts/npc_dungeon_master.cpp
           grep -F 'Habitantes originales' \
              _dm-core/modules/mod-dungeon-master/src/scripts/npc_dungeon_master.cpp
+          grep -F 'Minas de la Muerte' \
+             _dm-core/modules/mod-dungeon-master/src/DMConfig.cpp
           grep -F 'Aventureros source fixup v2' \
              _dm-core/modules/mod-dungeon-master/src/DungeonMasterMgr.cpp
           grep -F 'Aventureros source fixup v3' \
              _dm-core/modules/mod-dungeon-master/src/scripts/dm_unit_script.cpp
 
           python tools/dungeon_master_runtime.py rollback --core-dir _dm-core
+          python tools/dungeon_master_dungeon_names_patch.py rollback --core-dir _dm-core
           python tools/dungeon_master_experience_patch.py rollback --core-dir _dm-core
           python tools/dungeon_master_source_patch.py rollback --core-dir _dm-core
           git -C _dm-core/modules/mod-dungeon-master diff --exit-code
