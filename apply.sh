@@ -44,6 +44,9 @@ fi
 if (( status == 0 )); then
     python3 "$ROOT/tools/dungeon_master_source_fixup.py" install --core-dir "$core_dir" || status=$?
 fi
+if (( status == 0 )); then
+    python3 "$ROOT/tools/dungeon_master_experience_patch.py" install --core-dir "$core_dir" || status=$?
+fi
 
 # SpellDraft balance/catalog data is intentionally outside the compiled C++.
 # Install editable live copies only after the core/client transaction succeeded.
@@ -57,8 +60,8 @@ if (( status == 0 )); then
     python3 "$ROOT/tools/playerbots_runtime.py" install --core-dir "$core_dir" || status=$?
 fi
 
-# Apply the small Adventurer-owned Dungeon Master runtime profile. Unrelated
-# module settings remain untouched and the original config is backed up.
+# Dungeon Master is part of the continuous Aventurer loop: localized tier/theme
+# labels, level-1 Novice and no cooldown between runs.
 if (( status == 0 )); then
     python3 "$ROOT/tools/dungeon_master_runtime.py" install --core-dir "$core_dir" || status=$?
 fi
