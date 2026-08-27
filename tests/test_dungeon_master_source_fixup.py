@@ -21,6 +21,25 @@ class DungeonMasterSourceFixupTests(unittest.TestCase):
             "{\n"
             "    if (!c || !session || !c->IsInWorld() || !c->IsAlive())\n"
             "        return false;\n"
+            "    const CreatureTemplate* tmpl = c->GetCreatureTemplate();\n"
+            "    bool challengeBoss = false;\n"
+            "    bool elite = false;\n"
+            "    if (!challengeBoss)\n"
+            "    {\n"
+            "        bool hostile = true;\n"
+            "        if (!hostile)\n"
+            "            return false;\n"
+            "    }\n\n"
+            "    const uint8 targetLevel = session->EffectiveLevel;\n"
+            "    c->SetLevel(targetLevel);\n"
+            "    const uint8 unitClass = tmpl->unit_class;\n"
+            "    const ClassLevelStatEntry* baseStats = GetBaseStatsForLevel(unitClass, targetLevel);\n\n"
+            "    float hpMult = CalculateHealthMultiplier(session);\n"
+            "    float extraHpMult = challengeBoss ? sDMConfig->GetBossHealthMult()\n"
+            "        : (elite ? sDMConfig->GetEliteHealthMult() : 1.0f);\n"
+            "    float finalHP = baseStats\n"
+            "        ? static_cast<float>(baseStats->BaseHP) * hpMult * extraHpMult\n"
+            "        : static_cast<float>(c->GetMaxHealth()) * hpMult * extraHpMult;\n"
             "    return true;\n"
             "}\n"
             "void x()\n{\n"
@@ -62,10 +81,17 @@ class DungeonMasterSourceFixupTests(unittest.TestCase):
             self.assertIn(fixup.MGR_FIX_MARKER, mgr_text)
             self.assertIn("                    }\n                }\n\n", mgr_text)
             self.assertNotIn(fixup.MGR_LEGACY, mgr_text)
-            self.assertIn(fixup.CORPSE_FIX_MARKER, mgr_text)
-            self.assertIn(fixup.CORPSE_ACCESSOR_FIX_MARKER, mgr_text)
-            self.assertIn("c->getStandState() == UNIT_STAND_STATE_DEAD", mgr_text)
-            self.assertNotIn("c->GetStandState() == UNIT_STAND_STATE_DEAD", mgr_text)
+            self.assertIn(fixup.CORPSE_POSE_FIX_MARKER, mgr_text)
+            self.assertIn("const bool nativeDeadPose = c->getStandState() == UNIT_STAND_STATE_DEAD;", mgr_text)
+            self.assertIn("c->SetStandState(UNIT_STAND_STATE_STAND);", mgr_text)
+            self.assertNotIn("c->GetStandState()", mgr_text)
+            self.assertNotIn(
+                "if (c->getStandState() == UNIT_STAND_STATE_DEAD)\n        return false;",
+                mgr_text,
+            )
+            self.assertIn(fixup.HEALTH_FIX_MARKER, mgr_text)
+            self.assertIn("nativeHpRatio", mgr_text)
+            self.assertIn("roleFloor", mgr_text)
 
             unit_text = unit.read_text(encoding="utf-8")
             self.assertIn(fixup.UNIT_FIX_MARKER, unit_text)
@@ -83,7 +109,8 @@ class DungeonMasterSourceFixupTests(unittest.TestCase):
             self.assertTrue(fixup.install(core))
             fixup.verify(core)
             mgr_text = mgr.read_text(encoding="utf-8")
-            self.assertIn(fixup.CORPSE_FIX_MARKER, mgr_text)
+            self.assertIn(fixup.CORPSE_POSE_FIX_MARKER, mgr_text)
+            self.assertIn(fixup.HEALTH_FIX_MARKER, mgr_text)
             self.assertIn(fixup.UNIT_FIX_MARKER, unit.read_text(encoding="utf-8"))
 
     def test_upgrades_tree_with_both_braces_already_fixed(self) -> None:
@@ -100,7 +127,9 @@ class DungeonMasterSourceFixupTests(unittest.TestCase):
             )
             self.assertTrue(fixup.install(core))
             fixup.verify(core)
-            self.assertIn(fixup.CORPSE_FIX_MARKER, mgr.read_text(encoding="utf-8"))
+            text = mgr.read_text(encoding="utf-8")
+            self.assertIn(fixup.CORPSE_POSE_FIX_MARKER, text)
+            self.assertIn(fixup.HEALTH_FIX_MARKER, text)
 
     def test_upgrades_bad_v4_getstandstate_accessor(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -111,12 +140,7 @@ class DungeonMasterSourceFixupTests(unittest.TestCase):
                 .replace(fixup.MGR_LEGACY, fixup.MGR_FIXED, 1)
                 .replace(
                     fixup.CORPSE_ANCHOR,
-                    "    if (!c || !session || !c->IsInWorld() || !c->IsAlive())\n"
-                    "        return false;\n"
-                    "    // Aventureros source fixup v4: ignore decorative dead-pose creatures.\n"
-                    "    // Blizzard uses alive Creature objects with UNIT_STAND_STATE_DEAD for corpse props.\n"
-                    "    if (c->GetStandState() == UNIT_STAND_STATE_DEAD)\n"
-                    "        return false;\n",
+                    fixup.CORPSE_ANCHOR + fixup.CORPSE_V4_BAD_BLOCK,
                     1,
                 ),
                 encoding="utf-8",
@@ -129,10 +153,41 @@ class DungeonMasterSourceFixupTests(unittest.TestCase):
             self.assertTrue(fixup.install(core))
             fixup.verify(core)
             text = mgr.read_text(encoding="utf-8")
-            self.assertIn(fixup.CORPSE_ACCESSOR_FIX_MARKER, text)
+            self.assertIn(fixup.CORPSE_POSE_FIX_MARKER, text)
             self.assertIn(fixup.CORPSE_GOOD_ACCESSOR, text)
+            self.assertIn("c->SetStandState(UNIT_STAND_STATE_STAND);", text)
             self.assertNotIn(fixup.CORPSE_BAD_ACCESSOR, text)
+            self.assertIn(fixup.HEALTH_FIX_MARKER, text)
             self.assertFalse(fixup.install(core))
+
+    def test_upgrades_v5_early_return_without_leaving_crawling_combatants(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            core = Path(td) / "core"
+            mgr, unit = self.make_core(core)
+            mgr.write_text(
+                mgr.read_text(encoding="utf-8")
+                .replace(fixup.MGR_LEGACY, fixup.MGR_FIXED, 1)
+                .replace(
+                    fixup.CORPSE_ANCHOR,
+                    fixup.CORPSE_ANCHOR + fixup.CORPSE_V5_BLOCK,
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            unit.write_text(
+                unit.read_text(encoding="utf-8").replace(fixup.UNIT_LEGACY, fixup.UNIT_FIXED, 1),
+                encoding="utf-8",
+            )
+
+            self.assertTrue(fixup.install(core))
+            fixup.verify(core)
+            text = mgr.read_text(encoding="utf-8")
+            self.assertIn("const bool nativeDeadPose", text)
+            self.assertIn("SetStandState(UNIT_STAND_STATE_STAND)", text)
+            self.assertNotIn(
+                "if (c->getStandState() == UNIT_STAND_STATE_DEAD)\n        return false;",
+                text,
+            )
 
     def test_refuses_unpatched_source(self) -> None:
         with tempfile.TemporaryDirectory() as td:
