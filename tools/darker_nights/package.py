@@ -9,7 +9,7 @@ from mpq_writer import write_mpq
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Package Darker Nights as patch-ZB.MPQ")
+    parser = argparse.ArgumentParser(description="Package Darker Nights as patch-Y.MPQ")
     parser.add_argument(
         "--dbc",
         type=Path,
@@ -29,8 +29,19 @@ def main() -> None:
     if not data_dir.is_dir():
         raise SystemExit(f"ERROR: WoW Data directory not found: {data_dir}")
 
-    target = data_dir / "patch-ZB.MPQ"
-    backup = data_dir / "patch-ZB.MPQ.bak"
+    # WoW 3.3.5a custom patch discovery uses single-letter patch names.
+    # patch-Z.MPQ is owned by Adventurer / SpellDraft, so Darker Nights uses Y.
+    target = data_dir / "patch-Y.MPQ"
+    backup = data_dir / "patch-Y.MPQ.bak"
+
+    # Disable the earlier experimental two-letter name, which the client may ignore.
+    legacy = data_dir / "patch-ZB.MPQ"
+    legacy_disabled = data_dir / "patch-ZB.MPQ.disabled"
+    if legacy.exists():
+        if legacy_disabled.exists():
+            legacy_disabled.unlink()
+        legacy.replace(legacy_disabled)
+        print(f"Legacy two-letter patch disabled: {legacy_disabled}")
 
     if target.exists():
         shutil.copy2(target, backup)
