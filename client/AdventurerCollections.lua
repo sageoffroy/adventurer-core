@@ -149,7 +149,7 @@ frame:Hide()
 
 UIPanelWindows["AdventurerTalentCollectionFrame"] = {
     area = "left",
-    pushable = 0,
+    pushable = 6,
     whileDead = 1,
 }
 
