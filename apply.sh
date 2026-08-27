@@ -60,6 +60,8 @@ if (( status == 0 && has_playerbots == 1 )); then
 fi
 
 # Versioned maintenance migrations are part of the official clean install.
+# Existing development installations can run tools/world.py directly, but a
+# fresh apply never depends on remembering that extra step.
 if (( status == 0 )); then
     python3 "$ROOT/tools/world.py" install --core-dir "$core_dir" || status=$?
 fi
