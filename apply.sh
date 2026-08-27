@@ -28,6 +28,13 @@ python3 "$ROOT/tools/database.py" prepare "$@"
 status=0
 python3 "$ROOT/tools/adventurer.py" apply "$@" || status=$?
 
+# Active spell ranks are upgraded by AzerothCore from db_world.spell_ranks.
+# Mirror that exact server chain into the four custom SkillLineAbility tabs so
+# automatically learned higher ranks stay in the same subclass spellbook tab.
+if (( status == 0 )); then
+    python3 "$ROOT/tools/spell_rank_tabs.py" install "$@" || status=$?
+fi
+
 # Adventurer is native class 10 in our core but not in Playerbots. Patch the
 # external module transactionally so randombot generation never creates class
 # 10 and old class-10 bot rows cannot enter the zero-weight talent-spec path.
