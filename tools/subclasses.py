@@ -301,8 +301,9 @@ def patch_skill_line_abilities(path: Path, cards_text: str, spec: dict) -> bool:
     custom_ids = {int(item["skill_line_id"]) for item in spec["subclasses"]}
     dbc.records = [row for row in dbc.records if u32(row, SLA_SKILL_LINE) not in custom_ids]
 
+    seeds = active_spell_seeds(cards_text, spec)
     classified: dict[int, str] = {}
-    for seed_spell, subclass in active_spell_seeds(cards_text, spec).items():
+    for seed_spell, subclass in seeds.items():
         for spell_id in rank_chain_closure(dbc.records, seed_spell):
             previous = classified.get(spell_id)
             if previous and previous != subclass:
@@ -315,17 +316,27 @@ def patch_skill_line_abilities(path: Path, cards_text: str, spec: dict) -> bool:
     for row in dbc.records:
         rows_by_spell.setdefault(u32(row, SLA_SPELL), []).append(row)
 
-    missing = sorted(spell_id for spell_id in classified if spell_id not in rows_by_spell)
-    if missing:
+    # A drafted seed must have a real SkillLineAbility row so the client has a
+    # spellbook entry to clone. However SupercededBySpell is allowed to point at
+    # a later rank that has no row of its own; that is normal in the stock WotLK
+    # DBC and the cloned seed row already preserves that supersession chain.
+    missing_seeds = sorted(spell_id for spell_id in seeds if spell_id not in rows_by_spell)
+    if missing_seeds:
         raise SubclassError(
-            "SkillLineAbility.dbc has no source row for classified spells: "
-            + ", ".join(map(str, missing))
+            "SkillLineAbility.dbc has no source row for drafted spells: "
+            + ", ".join(map(str, missing_seeds))
         )
+
+    visible_classified = {
+        spell_id: subclass
+        for spell_id, subclass in classified.items()
+        if spell_id in rows_by_spell
+    }
 
     # Generic SkillLineAbility rows (ClassMask=0) would otherwise also expose a
     # drafted spell under its stock/general skill line. Exclude only class 10;
     # stock classes remain byte-for-byte equivalent in behavior.
-    for spell_id in classified:
+    for spell_id in visible_classified:
         for row in rows_by_spell[spell_id]:
             if u32(row, SLA_CLASS_MASK) == 0:
                 set_u32(
@@ -335,13 +346,13 @@ def patch_skill_line_abilities(path: Path, cards_text: str, spec: dict) -> bool:
                 )
 
     next_id = max((u32(row, 0) for row in dbc.records), default=0) + 1
-    for spell_id in sorted(classified):
+    for spell_id in sorted(visible_classified):
         candidates = rows_by_spell[spell_id]
         template = next((row for row in candidates if u32(row, SLA_CLASS_MASK) != 0), candidates[0])
         row = bytearray(template)
         set_u32(row, 0, next_id)
         next_id += 1
-        set_u32(row, SLA_SKILL_LINE, int(by_key[classified[spell_id]]["skill_line_id"]))
+        set_u32(row, SLA_SKILL_LINE, int(by_key[visible_classified[spell_id]]["skill_line_id"]))
         set_u32(row, SLA_RACE_MASK, 0)
         set_u32(row, SLA_CLASS_MASK, ADVENTURER_CLASS_MASK)
         set_u32(row, SLA_EXCLUDE_RACE, 0)
