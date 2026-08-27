@@ -8,5 +8,5 @@ python3 "$SCRIPT_DIR/build.py"
 python3 "$SCRIPT_DIR/package.py" --client-dir "$CLIENT_DIR"
 
 echo
-echo "Darker Nights installed as patch-ZB.MPQ"
+echo "Darker Nights installed as patch-Y.MPQ"
 echo "Close and reopen WoW before testing; MPQ archives are loaded at client startup."
