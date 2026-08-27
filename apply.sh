@@ -30,10 +30,10 @@ fi
 # Prepare the DB rollback snapshot before any source/client/runtime mutation.
 python3 "$ROOT/tools/database.py" prepare "$@"
 
-# Core compatibility is determined by exact patch anchors/APIs, not by a frozen
-# Git SHA. This allows both stock AzerothCore and mod-playerbots revisions.
+# Core compatibility is determined by exact source anchors/APIs, not a frozen
+# Git SHA. This supports both stock AzerothCore and mod-playerbots revisions.
 status=0
-python3 "$ROOT/tools/adventurer.py" apply "$@" --allow-unverified-core || status=$?
+python3 "$ROOT/tools/adventurer.py" apply "$@" || status=$?
 
 # Active spell ranks are upgraded by AzerothCore from db_world.spell_ranks.
 # Mirror that exact server chain into the four custom SkillLineAbility tabs so
