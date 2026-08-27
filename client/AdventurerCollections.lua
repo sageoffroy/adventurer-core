@@ -353,11 +353,7 @@ local function CreateSubclassTab(index, key)
     tab.rail:SetHeight(64)
     tab.rail:SetPoint("TOPLEFT", tab, "TOPLEFT", -3, 11)
 
-    tab.icon = tab:CreateTexture(nil, "ARTWORK")
-    tab.icon:SetTexture(subclassIcons[key])
-    tab.icon:SetWidth(28)
-    tab.icon:SetHeight(28)
-    tab.icon:SetPoint("CENTER", tab, "CENTER", 0, 0)
+    tab:SetNormalTexture(subclassIcons[key])
 
     tab.highlight = tab:CreateTexture(nil, "HIGHLIGHT")
     tab.highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
