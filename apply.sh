@@ -41,6 +41,9 @@ fi
 if (( status == 0 )); then
     python3 "$ROOT/tools/dungeon_master_source_patch.py" install --core-dir "$core_dir" || status=$?
 fi
+if (( status == 0 )); then
+    python3 "$ROOT/tools/dungeon_master_source_fixup.py" install --core-dir "$core_dir" || status=$?
+fi
 
 # SpellDraft balance/catalog data is intentionally outside the compiled C++.
 # Install editable live copies only after the core/client transaction succeeded.
