@@ -142,7 +142,7 @@ class SpellDraftSubclassTests(unittest.TestCase):
         ):
             self.assertIn(token, self.collection_server)
 
-    def test_adventurer_talent_window_mirrors_spellbook_with_four_bottom_tabs(self) -> None:
+    def test_adventurer_talent_window_mirrors_spellbook_with_vertical_subclass_tabs(self) -> None:
         for token in (
             'TALENT_COLLECTION_REQUEST = "ADRAFT_TALENTS"',
             'frame = CreateFrame("Frame", "AdventurerTalentCollectionFrame"',
@@ -154,9 +154,14 @@ class SpellDraftSubclassTests(unittest.TestCase):
             '"Interface\\\\Spellbook\\\\UI-Spellbook-SpellBackground"',
             '"Interface\\\\Buttons\\\\UI-SpellbookIcon-PrevPage-Up"',
             '"Interface\\\\Buttons\\\\UI-SpellbookIcon-NextPage-Up"',
-            '"Interface\\\\SpellBook\\\\UI-SpellBook-Tab-Unselected"',
-            '"Interface\\\\SpellBook\\\\UI-SpellBook-Tab1-Selected"',
-            '"Interface\\\\SpellBook\\\\UI-SpellbookPanel-Tab-Highlight"',
+            '"Interface\\\\SpellBook\\\\SpellBook-SkillLineTab"',
+            'local subclassIcons = {',
+            'Ability_Warrior_OffensiveStance',
+            'Ability_Hunter_BeastTaming',
+            'Spell_Frost_FrostBolt02',
+            'Spell_Holy_HolyBolt',
+            'CreateFrame("CheckButton", "AdventurerTalentCollectionTab" .. index, frame)',
+            'tab:SetPoint("TOPLEFT", frame, "TOPRIGHT", -32, -65 - (index - 1) * 46)',
             'entry.name:SetWidth(103)',
             'GameTooltip:SetHyperlink("spell:" .. self.spellId)',
             'GameTooltip:AddLine(string.format(text.rank',
