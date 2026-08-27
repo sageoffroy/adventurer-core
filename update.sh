@@ -22,6 +22,11 @@ if [[ -z "$core_dir" ]]; then
     exit 2
 fi
 
+has_playerbots=0
+if [[ -d "$core_dir/modules/mod-playerbots" ]]; then
+    has_playerbots=1
+fi
+
 # Upgrade only Adventurer-owned source/runtime/client state. The original clean
 # installation backups remain untouched, so rollback still returns all the way
 # to the pre-Adventurer server rather than merely to the previous package build.
@@ -32,23 +37,27 @@ python3 "$ROOT/tools/upgrade.py" "$@"
 # automatically learned higher ranks never fall back into another spell tab.
 python3 "$ROOT/tools/spell_rank_tabs.py" install "$@"
 
-# Class 10 is playable in Adventurer Core but is not a native Playerbots class.
-# Keep randombot generation on the ten stock WotLK classes and protect old
-# class-10 bot rows from the stock zero-weight talent-spec path.
-python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir"
+# Class 10 needs Playerbots-specific guards only when the external module exists.
+if (( has_playerbots == 1 )); then
+    python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir"
+fi
 
 # Install editable SpellDraft runtime data beside DataDir. Existing live files
 # are deliberately preserved; fresh package defaults are refreshed as *.dist.
 python3 "$ROOT/tools/spelldraft_runtime.py" install "$@"
 
-# Playerbots remains an external module, but the small-world runtime profile
-# used by this project is versioned here. Only owned AiPlayerbot.* assignments
-# are changed; every other Playerbots option remains untouched.
-python3 "$ROOT/tools/playerbots_runtime.py" install --core-dir "$core_dir"
+if (( has_playerbots == 1 )); then
+    python3 "$ROOT/tools/playerbots_runtime.py" install --core-dir "$core_dir"
+fi
 
 # Maintenance migrations are versioned and copied into AzerothCore's normal
 # pending world-update directory. Worldserver applies only those not already
 # recorded by its database updater.
 python3 "$ROOT/tools/world.py" install --core-dir "$core_dir"
 
-printf '%s\n' "Adventurer Core update staged successfully. Rebuild worldserver when core or Playerbots source changed; runtime-only SpellDraft/Playerbots config changes require only a restart."
+if (( has_playerbots == 1 )); then
+    printf '%s\n' "Adventurer Core update staged with Playerbots integration."
+else
+    printf '%s\n' "Adventurer Core update staged for stock AzerothCore; Playerbots integration skipped."
+fi
+printf '%s\n' "Rebuild worldserver when core source changed; runtime-only SpellDraft config changes require only a restart."
