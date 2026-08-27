@@ -378,8 +378,16 @@ local function RefreshBranch(key)
         panel.next:Show()
         panel.pageText:SetText(page .. "/" .. pages)
         panel.pageText:Show()
-        panel.prev:SetEnabled(page > 1)
-        panel.next:SetEnabled(page < pages)
+        if page > 1 then
+            panel.prev:Enable()
+        else
+            panel.prev:Disable()
+        end
+        if page < pages then
+            panel.next:Enable()
+        else
+            panel.next:Disable()
+        end
     else
         panel.prev:Hide()
         panel.next:Hide()
