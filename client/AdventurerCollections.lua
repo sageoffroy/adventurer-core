@@ -456,3 +456,13 @@ function ToggleTalentFrame()
         ShowUIPanel(frame)
     end
 end
+
+-- MainMenuBarMicroButtons.xml binds its OnClick handler before this file loads,
+-- so replacing the global ToggleTalentFrame alone does not update the button's
+-- captured function reference. Route the actual micro button through the new
+-- wrapper while preserving Blizzard behavior for every native class.
+if TalentMicroButton then
+    TalentMicroButton:SetScript("OnClick", function()
+        ToggleTalentFrame()
+    end)
+end
