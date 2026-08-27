@@ -146,19 +146,25 @@ class SpellDraftSubclassTests(unittest.TestCase):
         ):
             self.assertIn(token, self.collection_server)
 
-    def test_adventurer_talent_window_uses_four_icon_branches_and_routes_live_button(self) -> None:
+    def test_adventurer_talent_window_mirrors_spellbook_with_four_bottom_tabs(self) -> None:
         for token in (
             'TALENT_COLLECTION_REQUEST = "ADRAFT_TALENTS"',
             'frame = CreateFrame("Frame", "AdventurerTalentCollectionFrame"',
             '"mercenary", "explorer", "spellcaster", "illuminated"',
-            "BRANCH_PAGE_SIZE = 24",
-            "GRID_COLUMNS = 4",
-            'CreateFrame("Frame", "AdventurerTalentCollectionBranch" .. index',
-            '"Interface\\\\Buttons\\\\UI-Quickslot2"',
+            "TALENTS_PER_PAGE = 12",
+            "ROWS_PER_COLUMN = 6",
+            '"Interface\\\\Spellbook\\\\UI-SpellbookPanel-TopLeft"',
+            '"Interface\\\\Spellbook\\\\UI-SpellbookPanel-BotRight"',
+            '"Interface\\\\Spellbook\\\\UI-Spellbook-SpellBackground"',
+            '"Interface\\\\Buttons\\\\UI-SpellbookIcon-PrevPage-Up"',
+            '"Interface\\\\Buttons\\\\UI-SpellbookIcon-NextPage-Up"',
+            '"SpellBookFrameTabButtonTemplate"',
+            'entry.name:SetWidth(103)',
             'GameTooltip:SetHyperlink("spell:" .. self.spellId)',
             'GameTooltip:AddLine(string.format(text.rank',
             "local NativeToggleTalentFrame = ToggleTalentFrame",
             "local function AdventurerToggleTalentFrame()",
+            "local function RebindTalentEntryPoints()",
             'TalentMicroButton:SetScript("OnClick", AdventurerToggleTalentFrame)',
             'eventFrame:RegisterEvent("ADDON_LOADED")',
             'addonName == "Blizzard_TalentUI"',
@@ -168,7 +174,9 @@ class SpellDraftSubclassTests(unittest.TestCase):
         for forbidden in (
             "SetMaxLines",
             "FauxScrollFrame",
-            "UI-SpellbookPanel-TopLeft",
+            "BRANCH_PAGE_SIZE",
+            "AdventurerTalentCollectionBranch",
+            "GRID_COLUMNS",
         ):
             self.assertNotIn(forbidden, self.client)
 
