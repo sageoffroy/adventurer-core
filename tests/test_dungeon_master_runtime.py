@@ -17,7 +17,10 @@ class DungeonMasterRuntimeTests(unittest.TestCase):
         path = root / "managed.conf"
         path.write_text(
             'DungeonMaster.Enable = 1\n'
-            'DungeonMaster.Difficulty.1 = "Novice,1,19,0.6,0.6,1.0,0.5"\n',
+            'DungeonMaster.Cooldown.Minutes = 0\n'
+            'DungeonMaster.Difficulty.1 = "Novato,1,19,0.6,0.6,1.0,0.5"\n'
+            'DungeonMaster.Difficulty.2 = "Aprendiz,20,29,0.8,0.8,1.5,0.7"\n'
+            'DungeonMaster.Theme.1 = "Cacería de bestias,1"\n',
             encoding="utf-8",
         )
         return path
@@ -28,12 +31,14 @@ class DungeonMasterRuntimeTests(unittest.TestCase):
         original = (
             'DungeonMaster.Enable = 1\n'
             'DungeonMaster.Difficulty.1 = "Novice,10,19,0.6,0.6,1.0,0.5"\n'
+            'DungeonMaster.Difficulty.2 = "Apprentice,20,29,0.8,0.8,1.5,0.7"\n'
+            'DungeonMaster.Theme.1 = "Beast Hunt,1"\n'
             'DungeonMaster.Cooldown.Minutes = 5\n'
         )
         target.write_text(original, encoding="utf-8")
         return target, original
 
-    def test_level_one_profile_install_verify_and_rollback(self) -> None:
+    def test_level_one_localized_no_cooldown_profile_install_verify_and_rollback(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             core = root / "core"
@@ -41,10 +46,21 @@ class DungeonMasterRuntimeTests(unittest.TestCase):
             profile = self.profile(root)
             with patch.object(dm, "PROFILE", profile):
                 changed = dm.install(core)
-                self.assertEqual(changed, ["DungeonMaster.Difficulty.1"])
+                self.assertEqual(
+                    changed,
+                    [
+                        "DungeonMaster.Cooldown.Minutes",
+                        "DungeonMaster.Difficulty.1",
+                        "DungeonMaster.Difficulty.2",
+                        "DungeonMaster.Theme.1",
+                    ],
+                )
                 dm.verify(core)
-                self.assertIn('Novice,1,19', target.read_text(encoding="utf-8"))
-                self.assertIn('DungeonMaster.Cooldown.Minutes = 5', target.read_text(encoding="utf-8"))
+                text = target.read_text(encoding="utf-8")
+                self.assertIn('DungeonMaster.Cooldown.Minutes = 0', text)
+                self.assertIn('DungeonMaster.Difficulty.1 = "Novato,1,19', text)
+                self.assertIn('DungeonMaster.Difficulty.2 = "Aprendiz,20,29', text)
+                self.assertIn('DungeonMaster.Theme.1 = "Cacería de bestias,1"', text)
                 self.assertEqual(dm.install(core), [])
                 self.assertTrue(dm.rollback(core))
                 self.assertEqual(target.read_text(encoding="utf-8"), original)
