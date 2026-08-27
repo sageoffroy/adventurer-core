@@ -38,10 +38,15 @@ def replace_transition(text: str, clean: str, legacy: str, new: str, label: str)
         return text
     clean_count = text.count(clean)
     legacy_count = text.count(legacy)
+
+    # Some legacy forms deliberately extend the stock anchor, so counting the
+    # stock text also counts the copy nested inside the single legacy anchor.
+    # Accept that exact overlap, but still reject an independent extra stock
+    # anchor elsewhere in the file.
+    if legacy_count == 1 and clean_count == legacy.count(clean):
+        return text.replace(legacy, new, 1)
     if clean_count == 1 and legacy_count == 0:
         return text.replace(clean, new, 1)
-    if clean_count == 0 and legacy_count == 1:
-        return text.replace(legacy, new, 1)
     raise PatchError(
         f"{label}: expected exactly one stock or legacy anchor, "
         f"found stock={clean_count}, legacy={legacy_count}"
