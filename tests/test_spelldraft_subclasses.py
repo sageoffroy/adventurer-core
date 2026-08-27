@@ -159,6 +159,7 @@ class SpellDraftSubclassTests(unittest.TestCase):
         for token in (
             'TALENT_COLLECTION_REQUEST = "ADRAFT_TALENTS"',
             'frame = CreateFrame("Frame", "AdventurerTalentCollectionFrame"',
+            'title = "Libro de talentos"',
             '"mercenary", "explorer", "spellcaster", "illuminated"',
             "TALENTS_PER_PAGE = 12",
             "ROWS_PER_COLUMN = 6",
@@ -176,6 +177,7 @@ class SpellDraftSubclassTests(unittest.TestCase):
             'CreateFrame("CheckButton", "AdventurerTalentCollectionTab" .. index, frame)',
             'tab:SetPoint("TOPLEFT", frame, "TOPRIGHT", -32, -65 - (index - 1) * 46)',
             'entry.name:SetWidth(103)',
+            'entry.name:SetPoint("LEFT", entry.icon, "RIGHT", 4, 4)',
             'GameTooltip:SetHyperlink("spell:" .. self.spellId)',
             'GameTooltip:AddLine(string.format(text.rank',
             "local NativeToggleTalentFrame = ToggleTalentFrame",
