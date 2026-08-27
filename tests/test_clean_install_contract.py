@@ -18,7 +18,12 @@ class CleanInstallContractTests(unittest.TestCase):
             adventurer.PAYLOAD_ROOT
             / "src/server/scripts/Custom/adventurer_core.cpp"
         )
+        collection = (
+            adventurer.PAYLOAD_ROOT
+            / "src/server/scripts/Custom/adventurer_collections.cpp"
+        )
         self.assertTrue(runtime.is_file())
+        self.assertTrue(collection.is_file())
 
         source = runtime.read_text(encoding="utf-8")
         self.assertIn("ADVENTURER_MAX_RAGE = 1000", source)
@@ -38,15 +43,24 @@ class CleanInstallContractTests(unittest.TestCase):
         ):
             self.assertNotIn(token, source)
 
-    def test_core_patch_copies_packaged_runtime_verbatim(self) -> None:
+        collection_source = collection.read_text(encoding="utf-8")
+        self.assertIn('TALENT_COLLECTION_REQUEST[] = "ADRAFT_TALENTS"', collection_source)
+        self.assertIn('ADVENTURER_SUBCLASS_SKILLS[] = {900, 901, 902, 903}', collection_source)
+        self.assertIn('"card_subclasses.csv"', collection_source)
+
+    def test_core_patch_copies_all_packaged_runtimes_verbatim(self) -> None:
         source = inspect.getsource(core_patch.plan)
-        self.assertIn(
-            'payload_rel = "src/server/scripts/Custom/adventurer_core.cpp"',
-            source,
-        )
+        self.assertIn("for payload_rel in PAYLOAD_FILES", source)
         self.assertIn("payload = payload_root / payload_rel", source)
         self.assertIn("patched = payload.read_bytes()", source)
         self.assertIn("PlannedFile(payload_rel, original, patched)", source)
+        self.assertEqual(
+            core_patch.PAYLOAD_FILES,
+            (
+                "src/server/scripts/Custom/adventurer_core.cpp",
+                "src/server/scripts/Custom/adventurer_collections.cpp",
+            ),
+        )
 
     def test_apply_path_uses_the_same_payload_root(self) -> None:
         source = inspect.getsource(adventurer.cmd_apply)
