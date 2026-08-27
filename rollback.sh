@@ -30,6 +30,8 @@ python3 "$ROOT/tools/adventurer.py" verify "$@"
 python3 "$ROOT/tools/playerbots_source_patch.py" verify --core-dir "$core_dir"
 python3 "$ROOT/tools/playerbots_runtime.py" verify --core-dir "$core_dir"
 python3 "$ROOT/tools/dungeon_master_source_patch.py" verify --core-dir "$core_dir"
+python3 "$ROOT/tools/dungeon_master_source_fixup.py" verify --core-dir "$core_dir"
+python3 "$ROOT/tools/dungeon_master_experience_patch.py" verify --core-dir "$core_dir"
 python3 "$ROOT/tools/dungeon_master_runtime.py" verify --core-dir "$core_dir"
 
 # Restore class-10 world rows first while the original snapshot is still
@@ -51,8 +53,9 @@ python3 "$ROOT/tools/spelldraft_runtime.py" remove "$@"
 python3 "$ROOT/tools/dungeon_master_runtime.py" rollback --core-dir "$core_dir"
 python3 "$ROOT/tools/playerbots_runtime.py" rollback --core-dir "$core_dir"
 
-# Restore exact external-module source snapshots captured before compatibility
-# patches were first applied.
+# The UX/access layer backs up the already-native-patched Dungeon Master source,
+# so restore it first; then the native source rollback returns to pristine upstream.
+python3 "$ROOT/tools/dungeon_master_experience_patch.py" rollback --core-dir "$core_dir"
 python3 "$ROOT/tools/dungeon_master_source_patch.py" rollback --core-dir "$core_dir"
 python3 "$ROOT/tools/playerbots_source_patch.py" rollback --core-dir "$core_dir"
 
