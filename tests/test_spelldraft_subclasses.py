@@ -83,7 +83,7 @@ class SpellDraftSubclassTests(unittest.TestCase):
         for card_id, subclass in expected.items():
             self.assertEqual(self.mapping[card_id], subclass, card_id)
 
-    def test_subclass_metadata_owns_four_unique_native_skill_lines(self) -> None:
+    def test_subclass_metadata_owns_four_unique_native_skill_lines_and_icons(self) -> None:
         skill_lines = [int(item["skill_line_id"]) for item in self.spec["subclasses"]]
         self.assertEqual(skill_lines, [900, 901, 902, 903])
         self.assertEqual(len(skill_lines), len(set(skill_lines)))
@@ -91,13 +91,25 @@ class SpellDraftSubclassTests(unittest.TestCase):
             [item["esMX"] for item in self.spec["subclasses"]],
             ["Mercenario", "Explorador", "Hechicero", "Iluminado"],
         )
+        self.assertEqual(
+            [item["icon"] for item in self.spec["subclasses"]],
+            [
+                "Spell_nature_shamanrage",
+                "Spell_nature_shamanrage",
+                "Ability_mage_coldasice",
+                "Spell_holy_holyguidance",
+            ],
+        )
 
     def test_spellbook_dbc_patch_is_native_and_adventurer_only(self) -> None:
         for token in (
             '"SkillLine.dbc"',
             '"SkillLineAbility.dbc"',
             '"SkillRaceClassInfo.dbc"',
+            '"SpellIcon.dbc"',
             "ADVENTURER_CLASS_MASK",
+            "SKILLLINE_SPELL_ICON = 37",
+            "resolve_subclass_icon_ids",
             "patch_skill_lines",
             "patch_skill_line_abilities",
             "SLA_EXCLUDE_CLASS",
@@ -108,6 +120,7 @@ class SpellDraftSubclassTests(unittest.TestCase):
         self.assertIn("changed.update(patch_subclass_directory(work))", self.client_builder)
         self.assertIn('"SkillLine.dbc"', self.client_builder)
         self.assertIn('"SkillLineAbility.dbc"', self.client_builder)
+        self.assertIn('TALENT_SOURCE_ONLY_DBCS = ("SpellIcon.dbc",)', self.client_builder)
 
     def test_runtime_keeps_cards_csv_parser_contract_and_separate_class_map(self) -> None:
         header = self.cards_text.splitlines()[0]
@@ -156,10 +169,9 @@ class SpellDraftSubclassTests(unittest.TestCase):
             '"Interface\\\\Buttons\\\\UI-SpellbookIcon-NextPage-Up"',
             '"Interface\\\\SpellBook\\\\SpellBook-SkillLineTab"',
             'local subclassIcons = {',
-            'Ability_Warrior_OffensiveStance',
-            'Ability_Hunter_BeastTaming',
-            'Spell_Frost_FrostBolt02',
-            'Spell_Holy_HolyBolt',
+            'Spell_nature_shamanrage',
+            'Ability_mage_coldasice',
+            'Spell_holy_holyguidance',
             'CreateFrame("CheckButton", "AdventurerTalentCollectionTab" .. index, frame)',
             'tab:SetPoint("TOPLEFT", frame, "TOPRIGHT", -32, -65 - (index - 1) * 46)',
             'entry.name:SetWidth(103)',
@@ -178,6 +190,9 @@ class SpellDraftSubclassTests(unittest.TestCase):
             'CreateFrame(\n        "Button",\n        "AdventurerTalentCollectionTab" .. index,\n        frame,\n        "SpellBookFrameTabButtonTemplate")',
             self.client,
         )
+        self.assertNotIn("Todavía no obtuviste talentos", self.client)
+        self.assertNotIn("You have not acquired talents", self.client)
+        self.assertNotIn("elseif #items == 0 then", self.client)
 
         for forbidden in (
             "SetMaxLines",
