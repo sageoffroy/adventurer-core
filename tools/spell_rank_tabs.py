@@ -3,7 +3,11 @@
 
 from __future__ import annotations
 
+import argparse
+import json
 import re
+import shutil
+import tempfile
 from pathlib import Path
 
 from dbc import ADVENTURER_CLASS_MASK, DBC, set_u32, u32
@@ -195,3 +199,153 @@ def patch_server_rank_tabs(
     if after != before:
         path.write_bytes(after)
     return after != before
+
+
+def install_rank_tabs(
+    core_dir: Path,
+    client_dir: Path,
+    server_data_dir: Path | None,
+    locale: str,
+) -> bool:
+    """Transactionally refresh installed server/client DBCs with server rank tabs."""
+    # Imported lazily so the pure DBC helpers above stay easy to unit test and
+    # do not create a client/adventurer import cycle.
+    from adventurer import load_state, save_state, sha256_file, verify_state
+    from client import DBC_NAMES, OWNER_MANIFEST, build_archive_files
+    from mpq import write_mpq
+
+    core = core_dir.expanduser().resolve()
+    client = client_dir.expanduser().resolve()
+    data_dir = (
+        server_data_dir.expanduser().resolve()
+        if server_data_dir
+        else core / "env" / "dist" / "data"
+    )
+    server_dbc = data_dir / "dbc"
+    spell_ranks = core / "data" / "sql" / "base" / "db_world" / "spell_ranks.sql"
+
+    if not server_dbc.is_dir():
+        raise SpellRankTabError(f"Server DBC directory not found: {server_dbc}")
+    missing = [name for name in DBC_NAMES if not (server_dbc / name).is_file()]
+    if missing:
+        raise SpellRankTabError("Installed server DBC bundle is incomplete: " + ", ".join(missing))
+
+    state = load_state(core)
+    client_state = state.get("client") or {}
+    installed = client_state.get("installed") or {}
+    root_relative = installed.get("root_patch")
+    locale_relative = installed.get("locale_patch")
+    if not root_relative or not locale_relative:
+        raise SpellRankTabError("Adventurer client ownership state is incomplete")
+
+    root_target = client / root_relative
+    locale_target = client / locale_relative
+    owner_path = client / OWNER_MANIFEST
+    state_path = core / ".adventurer-core" / "state.json"
+    for target, label in (
+        (root_target, "root client patch"),
+        (locale_target, "locale client patch"),
+        (owner_path, "client ownership manifest"),
+        (state_path, "Adventurer state"),
+    ):
+        if not target.is_file():
+            raise SpellRankTabError(f"Missing {label}: {target}")
+
+    with tempfile.TemporaryDirectory(prefix="adventurer-rank-tabs-") as td:
+        temp = Path(td)
+        work = temp / "dbc"
+        work.mkdir(parents=True)
+        for name in DBC_NAMES:
+            shutil.copy2(server_dbc / name, work / name)
+
+        changed = patch_server_rank_tabs(work / "SkillLineAbility.dbc", spell_ranks)
+        if not changed:
+            return False
+
+        root_files, locale_files = build_archive_files(work)
+        built_root = temp / "root.mpq"
+        built_locale = temp / "locale.mpq"
+        write_mpq(built_root, root_files)
+        write_mpq(built_locale, locale_files)
+
+        backups = temp / "previous"
+        backups.mkdir()
+        previous = {
+            server_dbc / "SkillLineAbility.dbc": backups / "SkillLineAbility.dbc",
+            root_target: backups / "root.mpq",
+            locale_target: backups / "locale.mpq",
+            owner_path: backups / "owner.json",
+            state_path: backups / "state.json",
+        }
+        for source, backup in previous.items():
+            shutil.copy2(source, backup)
+
+        try:
+            shutil.copy2(work / "SkillLineAbility.dbc", server_dbc / "SkillLineAbility.dbc")
+            shutil.copy2(built_root, root_target)
+            shutil.copy2(built_locale, locale_target)
+
+            root_hash = sha256_file(root_target)
+            locale_hash = sha256_file(locale_target)
+            sla_hash = sha256_file(server_dbc / "SkillLineAbility.dbc")
+
+            owner = json.loads(owner_path.read_text(encoding="utf-8"))
+            owner["root_sha256"] = root_hash
+            owner["locale_sha256"] = locale_hash
+            owner_path.write_text(
+                json.dumps(owner, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+
+            state.setdefault("dbc", {}).setdefault("files", {})[
+                "SkillLineAbility.dbc"
+            ] = sla_hash
+            installed["root_sha256"] = root_hash
+            installed["locale_sha256"] = locale_hash
+            client_state["installed"] = installed
+            state["client"] = client_state
+            save_state(core, state)
+
+            problems = verify_state(core, state)
+            if problems:
+                raise SpellRankTabError(
+                    "Rank-tab post-install verification failed:\n  " + "\n  ".join(problems)
+                )
+        except Exception:
+            for target, backup in previous.items():
+                shutil.copy2(backup, target)
+            raise
+
+    return True
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(prog="spell_rank_tabs.py")
+    parser.add_argument("command", choices=("install",))
+    parser.add_argument("--core-dir", required=True, type=Path)
+    parser.add_argument("--client-dir", required=True, type=Path)
+    parser.add_argument("--server-data-dir", type=Path)
+    parser.add_argument("--locale", default="esMX")
+    args, _unknown = parser.parse_known_args()
+
+    try:
+        changed = install_rank_tabs(
+            args.core_dir,
+            args.client_dir,
+            args.server_data_dir,
+            args.locale,
+        )
+    except (SpellRankTabError, OSError, ValueError) as exc:
+        parser.error(str(exc))
+        return 2
+
+    print(
+        "Adventurer spellbook rank tabs refreshed from AzerothCore spell_ranks.sql."
+        if changed
+        else "Adventurer spellbook rank tabs already match AzerothCore spell_ranks.sql."
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
