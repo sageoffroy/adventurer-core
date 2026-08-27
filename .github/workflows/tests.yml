@@ -20,6 +20,34 @@ jobs:
         run: bash -n apply.sh preflight.sh verify.sh rollback.sh update.sh
       - name: Require executable shell entry points
         run: test -x apply.sh && test -x preflight.sh && test -x verify.sh && test -x rollback.sh && test -x update.sh
+      - name: Checkout supported Dungeon Master module
+        uses: actions/checkout@v4
+        with:
+          repository: InstanceForge/mod-dungeon-master
+          ref: 8a561da4391e974f93eeb135b61a63d7ac44ccaf
+          path: _dm-core/modules/mod-dungeon-master
+          fetch-depth: 1
+      - name: Smoke-test Dungeon Master Adventurer compatibility
+        run: |
+          mkdir -p _dm-core/env/dist/etc/modules
+          cp _dm-core/modules/mod-dungeon-master/conf/mod_dungeon_master.conf.dist \
+             _dm-core/env/dist/etc/modules/mod_dungeon_master.conf
+
+          python tools/dungeon_master_source_patch.py install --core-dir _dm-core
+          python tools/dungeon_master_source_patch.py verify --core-dir _dm-core
+          python tools/dungeon_master_runtime.py install --core-dir _dm-core
+          python tools/dungeon_master_runtime.py verify --core-dir _dm-core
+
+          grep -F 'DungeonMaster.Difficulty.1 = "Novice,1,19,0.6,0.6,1.0,0.5"' \
+             _dm-core/env/dist/etc/modules/mod_dungeon_master.conf
+          grep -F 'Aventureros normal mode: keep the original dungeon.' \
+             _dm-core/modules/mod-dungeon-master/src/DungeonMasterMgr.cpp
+          grep -F 'Original inhabitants|r' \
+             _dm-core/modules/mod-dungeon-master/src/scripts/npc_dungeon_master.cpp
+
+          python tools/dungeon_master_runtime.py rollback --core-dir _dm-core
+          python tools/dungeon_master_source_patch.py rollback --core-dir _dm-core
+          git -C _dm-core/modules/mod-dungeon-master diff --exit-code
       - name: Checkout supported Playerbots core baseline
         uses: actions/checkout@v4
         with:
