@@ -1,0 +1,11 @@
+# Rare Overhaul
+# Portable rare-creature difficulty layer for AzerothCore.
+
+RareOverhaul.Enable = 1
+
+# Applies to creatures whose template rank is Rare or Rare Elite.
+RareOverhaul.Difficulty.Enable = 1
+
+# Multipliers are applied at runtime and do not modify creature_template.
+RareOverhaul.HealthMultiplier = 2.0
+RareOverhaul.DamageMultiplier = 2.0
