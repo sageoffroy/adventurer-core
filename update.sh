@@ -39,6 +39,9 @@ python3 "$ROOT/tools/dungeon_master_source_patch.py" install --core-dir "$core_d
 # Repair the first native-mode patch version in-place when upgrading an already
 # patched development tree. New installs pass through this idempotently too.
 python3 "$ROOT/tools/dungeon_master_source_fixup.py" install --core-dir "$core_dir"
+# Dungeon Master is a level-1-to-80 game mode in Aventureros: bypass stock map
+# entry requirements for its scripted teleport and expose its UI in Spanish.
+python3 "$ROOT/tools/dungeon_master_experience_patch.py" install --core-dir "$core_dir"
 
 # Install editable SpellDraft runtime data beside DataDir. Existing live files
 # are deliberately preserved; fresh package defaults are refreshed as *.dist.
@@ -49,8 +52,8 @@ python3 "$ROOT/tools/spelldraft_runtime.py" install "$@"
 # are changed; every other Playerbots option remains untouched.
 python3 "$ROOT/tools/playerbots_runtime.py" install --core-dir "$core_dir"
 
-# Own only the Dungeon Master values that define the Adventurer experience.
-# In particular, Novice starts at level 1; unrelated module settings stay local.
+# Own only the Dungeon Master values that define the Adventurer experience:
+# level-1 Novice, localized tier/theme names and no cooldown between runs.
 python3 "$ROOT/tools/dungeon_master_runtime.py" install --core-dir "$core_dir"
 
 # Maintenance migrations are versioned and copied into AzerothCore's normal
