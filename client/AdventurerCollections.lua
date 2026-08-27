@@ -17,7 +17,7 @@ local isSpanish = locale == "esES" or locale == "esMX"
 local text
 if isSpanish then
     text = {
-        title = "Talentos",
+        title = "Libro de talentos",
         mercenary = "Mercenario",
         explorer = "Explorador",
         spellcaster = "Hechicero",
@@ -31,7 +31,7 @@ if isSpanish then
     }
 else
     text = {
-        title = "Talents",
+        title = "Talent Book",
         mercenary = "Mercenary",
         explorer = "Explorer",
         spellcaster = "Spellcaster",
@@ -269,7 +269,7 @@ local function CreateTalentEntry(index)
 
     entry.name = entry:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     entry.name:SetWidth(103)
-    entry.name:SetPoint("LEFT", entry.icon, "RIGHT", 4, 0)
+    entry.name:SetPoint("LEFT", entry.icon, "RIGHT", 4, 4)
     entry.name:SetJustifyH("LEFT")
     entry.name:Hide()
 
