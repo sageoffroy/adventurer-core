@@ -3,7 +3,7 @@
 -- Adventurers receive talents through SpellDraft instead of spending native
 -- talent points. Present those acquired talents with the native 3.3.5
 -- SpellBook visual language: parchment, two columns, page controls and four
--- bottom tabs for Mercenary, Explorer, Spellcaster and Illuminated.
+-- vertical subclass tabs on the book rail.
 
 local ADVENTURER_CLASS_ID = 10
 local DRAFT_PREFIX = "AdventurerDraft"
@@ -53,6 +53,12 @@ local subclassLabels = {
     explorer = text.explorer,
     spellcaster = text.spellcaster,
     illuminated = text.illuminated,
+}
+local subclassIcons = {
+    mercenary = "Interface\\Icons\\Ability_Warrior_OffensiveStance",
+    explorer = "Interface\\Icons\\Ability_Hunter_BeastTaming",
+    spellcaster = "Interface\\Icons\\Spell_Frost_FrostBolt02",
+    illuminated = "Interface\\Icons\\Spell_Holy_HolyBolt",
 }
 
 local function IsAdventurer()
@@ -331,31 +337,39 @@ local RefreshPage
 local function CreateSubclassTab(index, key)
     -- AdventurerCollections.lua is loaded before SpellBookFrame.xml in the
     -- stock FrameXML order, so SpellBookFrameTabButtonTemplate does not exist
-    -- yet. Recreate that template's visuals directly from Blizzard textures.
-    local tab = CreateFrame("Button", "AdventurerTalentCollectionTab" .. index, frame)
-    tab:SetWidth(98)
-    tab:SetHeight(64)
-    tab:SetPoint("CENTER", frame, "BOTTOMLEFT", 50 + (index - 1) * 94, 61)
+    -- yet. Build the native skill-line rail directly from Blizzard textures.
+    -- Legacy bottom-tab art intentionally not instantiated:
+    -- Interface\\SpellBook\\UI-SpellBook-Tab-Unselected
+    -- Interface\\SpellBook\\UI-SpellBook-Tab1-Selected
+    -- Interface\\SpellBook\\UI-SpellbookPanel-Tab-Highlight
+    local tab = CreateFrame("CheckButton", "AdventurerTalentCollectionTab" .. index, frame)
+    tab:SetWidth(32)
+    tab:SetHeight(32)
+    tab:SetPoint("TOPLEFT", frame, "TOPRIGHT", -32, -65 - (index - 1) * 46)
     tab:SetFrameLevel(frame:GetFrameLevel() + 5)
     tab.subclassKey = key
 
-    tab.normal = tab:CreateTexture(nil, "BACKGROUND")
-    tab.normal:SetTexture("Interface\\SpellBook\\UI-SpellBook-Tab-Unselected")
-    tab.normal:SetAllPoints(tab)
+    tab.rail = tab:CreateTexture(nil, "BACKGROUND")
+    tab.rail:SetTexture("Interface\\SpellBook\\SpellBook-SkillLineTab")
+    tab.rail:SetWidth(64)
+    tab.rail:SetHeight(64)
+    tab.rail:SetPoint("TOPLEFT", tab, "TOPLEFT", -3, 11)
 
-    tab.selected = tab:CreateTexture(nil, "ARTWORK")
-    tab.selected:SetTexture("Interface\\SpellBook\\UI-SpellBook-Tab1-Selected")
-    tab.selected:SetAllPoints(tab)
-    tab.selected:Hide()
+    tab.icon = tab:CreateTexture(nil, "ARTWORK")
+    tab.icon:SetTexture(subclassIcons[key])
+    tab.icon:SetAllPoints(tab)
+    tab.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     tab.highlight = tab:CreateTexture(nil, "HIGHLIGHT")
-    tab.highlight:SetTexture("Interface\\SpellBook\\UI-SpellbookPanel-Tab-Highlight")
+    tab.highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
     tab.highlight:SetBlendMode("ADD")
     tab.highlight:SetAllPoints(tab)
 
-    tab.label = tab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    tab.label:SetPoint("CENTER", tab, "CENTER", 0, 3)
-    tab.label:SetText(subclassLabels[key])
+    tab.checked = tab:CreateTexture(nil, "OVERLAY")
+    tab.checked:SetTexture("Interface\\Buttons\\CheckButtonHilight")
+    tab.checked:SetBlendMode("ADD")
+    tab.checked:SetAllPoints(tab)
+    tab.checked:Hide()
 
     tab:SetScript("OnClick", function(self)
         state.selected = self.subclassKey
@@ -383,13 +397,9 @@ local function RefreshTabs()
         local tab = frame.tabs[key]
         if tab then
             if key == state.selected then
-                tab.normal:Hide()
-                tab.selected:Show()
-                tab.label:SetTextColor(1.0, 0.82, 0.0)
+                tab.checked:Show()
             else
-                tab.selected:Hide()
-                tab.normal:Show()
-                tab.label:SetTextColor(1.0, 0.82, 0.0)
+                tab.checked:Hide()
             end
         end
     end
