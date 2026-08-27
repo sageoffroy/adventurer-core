@@ -2,19 +2,22 @@
 
 ## Goal
 
-Build a new AzerothCore server from a clean, pinned upstream commit and layer Aventureros-specific gameplay on top without turning the core into an untraceable patch pile.
+Build the new Aventureros server on the existing clean AzerothCore tree at `~/aventurerosdeazeroth`, pinned to a known upstream commit, and layer Aventureros-specific gameplay on top without turning the core into an untraceable patch pile.
 
 ## Build policy
 
+- Use `~/aventurerosdeazeroth` as the clean AzerothCore source tree.
 - Keep the upstream AzerothCore source clean whenever a module/hook can express the change.
 - Pin every external input by commit SHA.
+- Refuse foundation bootstrap if the core or a managed module has uncommitted changes.
+- Use an isolated build directory (`build-foundation-v1`) so older build trees are not overwritten.
 - Absorb small third-party gameplay scripts/data into `adventurer-core` after audit instead of depending on abandoned or WIP repositories.
 - Keep client/DBC modifications in the existing reproducible Adventurer client pipeline.
 - Add one gameplay layer at a time and smoke-test before the next layer.
 
 ## Foundation pass 1
 
-1. AzerothCore clean upstream.
+1. Existing clean AzerothCore tree pinned to the selected upstream commit.
 2. `mod-TimeIsTime` for accelerated/controlled realm time.
 3. `mod-ale` as the supported Lua gameplay engine.
 4. `mod-aoe-loot` as low-risk quality of life.
@@ -103,7 +106,7 @@ Possible future scope:
 
 ## Integration order
 
-1. Clean foundation compile.
+1. Clean foundation compile in `~/aventurerosdeazeroth` using `build-foundation-v1`.
 2. Empty-server boot and DB smoke test.
 3. TimeIsTime functional test.
 4. AoE Loot functional test.
