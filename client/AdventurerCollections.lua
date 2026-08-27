@@ -54,7 +54,7 @@ local subclassLabels = {
 }
 local subclassIcons = {
     mercenary = "Interface\\Icons\\Spell_nature_shamanrage",
-    explorer = "Interface\\Icons\\Spell_nature_shamanrage",
+    explorer = "Interface\\Icons\\Ability_hunter_zenarchery",
     spellcaster = "Interface\\Icons\\Ability_mage_coldasice",
     illuminated = "Interface\\Icons\\Spell_holy_holyguidance",
 }
