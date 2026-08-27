@@ -22,13 +22,20 @@ if [[ -z "$core_dir" ]]; then
     exit 2
 fi
 
+has_playerbots=0
+if [[ -d "$core_dir/modules/mod-playerbots" ]]; then
+    has_playerbots=1
+fi
+
 # Refuse before touching anything if the snapshot is damaged, the configured
 # databases changed, recoverable class-10 characters still exist, or an owned
 # file was edited outside Adventurer Core.
 python3 "$ROOT/tools/database.py" can-rollback "$@"
 python3 "$ROOT/tools/adventurer.py" verify "$@"
-python3 "$ROOT/tools/playerbots_source_patch.py" verify --core-dir "$core_dir"
-python3 "$ROOT/tools/playerbots_runtime.py" verify --core-dir "$core_dir"
+if (( has_playerbots == 1 )); then
+    python3 "$ROOT/tools/playerbots_source_patch.py" verify --core-dir "$core_dir"
+    python3 "$ROOT/tools/playerbots_runtime.py" verify --core-dir "$core_dir"
+fi
 
 # Restore class-10 world rows first while the original snapshot is still
 # attached to .adventurer-core.
@@ -44,15 +51,21 @@ python3 "$ROOT/tools/world.py" remove --core-dir "$core_dir"
 # with a warning instead of being destroyed during rollback.
 python3 "$ROOT/tools/spelldraft_runtime.py" remove "$@"
 
-# Restore the exact playerbots.conf captured before Adventurer Core first took
-# ownership of its small managed key set.
-python3 "$ROOT/tools/playerbots_runtime.py" rollback --core-dir "$core_dir"
+if (( has_playerbots == 1 )); then
+    # Restore the exact playerbots.conf captured before Adventurer Core first
+    # took ownership of its small managed key set.
+    python3 "$ROOT/tools/playerbots_runtime.py" rollback --core-dir "$core_dir"
 
-# Restore the two exact Playerbots source anchors owned by Adventurer Core.
-python3 "$ROOT/tools/playerbots_source_patch.py" rollback --core-dir "$core_dir"
+    # Restore the exact Playerbots source anchors owned by Adventurer Core.
+    python3 "$ROOT/tools/playerbots_source_patch.py" rollback --core-dir "$core_dir"
+fi
 
 # Restore original source, DBCs and client patches. This understands both the
 # original .adventurer-backup DBC suffix and the current package state.
 python3 "$ROOT/tools/package_rollback.py" "$@"
 
-printf '%s\n' "Adventurer Core fully rolled back: source, DBC, client patch, Playerbots source/profile, world updates, and world DB restored."
+if (( has_playerbots == 1 )); then
+    printf '%s\n' "Adventurer Core fully rolled back: source, DBC, client patch, Playerbots integration, world updates, and world DB restored."
+else
+    printf '%s\n' "Adventurer Core fully rolled back: source, DBC, client patch, world updates, and world DB restored."
+fi
