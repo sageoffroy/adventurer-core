@@ -36,6 +36,9 @@ python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir"
 # selected instance's native creatures/scripts/mechanics and scale them instead
 # of clearing the instance and replacing it with a themed population.
 python3 "$ROOT/tools/dungeon_master_source_patch.py" install --core-dir "$core_dir"
+# Repair the first native-mode patch version in-place when upgrading an already
+# patched development tree. New installs pass through this idempotently too.
+python3 "$ROOT/tools/dungeon_master_source_fixup.py" install --core-dir "$core_dir"
 
 # Install editable SpellDraft runtime data beside DataDir. Existing live files
 # are deliberately preserved; fresh package defaults are refreshed as *.dist.
