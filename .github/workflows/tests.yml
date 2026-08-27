@@ -20,6 +20,20 @@ jobs:
         run: python tests/test_core_patch.py
       - name: Test clean install contract
         run: python tests/test_clean_install_contract.py
+      - name: Test client patch
+        run: python tests/test_client.py
+      - name: Test SpellDraft runtime installer
+        run: python tests/test_spelldraft_runtime.py
+      - name: Test SpellDraft design catalog
+        run: python tests/test_spelldraft_design_catalog.py
+      - name: Test SpellDraft v1 contract
+        run: python tests/test_spelldraft_v1.py
+      - name: Test talent generator
+        run: python tests/test_talents.py
+      - name: Test talent layout
+        run: python tests/test_talent_layout.py
+      - name: Test upgrade contract
+        run: python tests/test_upgrade.py
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
       - name: Check shell entry points
