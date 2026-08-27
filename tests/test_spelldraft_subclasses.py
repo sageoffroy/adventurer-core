@@ -104,7 +104,6 @@ class SpellDraftSubclassTests(unittest.TestCase):
             "ADVENTURER_CLASS_MASK",
             "patch_skill_lines",
             "patch_skill_line_abilities",
-            "patch_skill_race_class",
             "SLA_EXCLUDE_CLASS",
             "rank_chain_closure",
         ):
@@ -147,13 +146,19 @@ class SpellDraftSubclassTests(unittest.TestCase):
         ):
             self.assertIn(token, self.collection_server)
 
-    def test_adventurer_talent_window_replaces_only_adventurer_toggle(self) -> None:
+    def test_adventurer_talent_window_mirrors_spellbook_and_routes_live_button(self) -> None:
         for token in (
             'TALENT_COLLECTION_REQUEST = "ADRAFT_TALENTS"',
             'CreateFrame("Frame", "AdventurerTalentCollectionFrame"',
             '"mercenary", "explorer", "spellcaster", "illuminated"',
-            'CreateFrame("ScrollFrame", "AdventurerTalentCollectionScrollFrame"',
-            '"FauxScrollFrameTemplate"',
+            "TALENTS_PER_PAGE = 12",
+            '"Interface\\\\Spellbook\\\\UI-SpellbookPanel-TopLeft"',
+            '"Interface\\\\Spellbook\\\\UI-SpellbookPanel-BotRight"',
+            '"Interface\\\\Spellbook\\\\UI-Spellbook-SpellBackground"',
+            '"Interface\\\\Buttons\\\\UI-SpellbookIcon-PrevPage-Up"',
+            '"Interface\\\\Buttons\\\\UI-SpellbookIcon-NextPage-Up"',
+            '"Interface\\\\SpellBook\\\\SpellBook-SkillLineTab"',
+            "entry.name:SetMaxLines(2)",
             'GameTooltip:SetHyperlink("spell:" .. self.spellId)',
             "local NativeToggleTalentFrame = ToggleTalentFrame",
             "function ToggleTalentFrame()",
