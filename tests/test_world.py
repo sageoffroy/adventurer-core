@@ -17,25 +17,18 @@ class WorldUpdateTests(unittest.TestCase):
         (root / "src" / "server" / "game").mkdir(parents=True)
         return root
 
-    def test_installs_all_adventurer_world_updates_idempotently(self):
+    def test_installs_only_adventurer_chassis_update_idempotently(self):
         with tempfile.TemporaryDirectory() as td:
             core = self.make_core(Path(td) / "core")
             results = world.install(core)
 
-            self.assertEqual(len(results), 3)
-            self.assertTrue(all(changed for _target, changed in results))
+            self.assertEqual(len(results), 1)
+            self.assertTrue(results[0][1])
 
-            bastion = core / world.WORLD_UPDATES[0].relative
-            chassis = core / world.WORLD_UPDATES[1].relative
-            bindings = core / world.WORLD_UPDATES[2].relative
-            self.assertTrue(bastion.is_file())
+            chassis = core / world.WORLD_UPDATES[0].relative
             self.assertTrue(chassis.is_file())
-            self.assertTrue(bindings.is_file())
-
-            bastion_sql = bastion.read_text(encoding="utf-8")
-            self.assertIn("290050", bastion_sql)
-            self.assertIn("spell_warr_last_stand", bastion_sql)
-            self.assertIn("spell_script_names", bastion_sql)
+            self.assertEqual(world.WORLD_UPDATES[0].source.name, "003_adventurer_chassis.sql")
+            self.assertNotIn("guardian", world.WORLD_UPDATES[0].source.name.lower())
 
             chassis_sql = chassis.read_text(encoding="utf-8")
             self.assertIn("@ADVENTURER_SCALE := 0.95", chassis_sql)
@@ -44,35 +37,32 @@ class WorldUpdateTests(unittest.TestCase):
             self.assertIn("gtoctclasscombatratingscalar_dbc", chassis_sql)
             self.assertIn("gtregenmpperspt_dbc", chassis_sql)
 
-            bindings_sql = bindings.read_text(encoding="utf-8")
-            self.assertIn("BETWEEN 290000 AND 299999", bindings_sql)
-            self.assertIn("BETWEEN -299999 AND -290000", bindings_sql)
-            self.assertIn("VALUES (290050, 'spell_warr_last_stand')", bindings_sql)
-            for stale_id in (290090, 290150, 290151, 290152, 290180):
-                self.assertNotIn(f"VALUES ({stale_id},", bindings_sql)
-
             results_again = world.install(core)
-            self.assertEqual(len(results_again), 3)
-            self.assertTrue(all(not changed for _target, changed in results_again))
+            self.assertEqual(len(results_again), 1)
+            self.assertFalse(results_again[0][1])
 
-            verified = world.verify(core)
-            self.assertEqual(verified, [bastion, chassis, bindings])
+            self.assertEqual(world.verify(core), [chassis])
 
             removed = world.remove(core)
-            self.assertEqual(len(removed), 3)
-            self.assertTrue(all(was_removed for _target, was_removed in removed))
-            self.assertFalse(bastion.exists())
+            self.assertEqual(len(removed), 1)
+            self.assertTrue(removed[0][1])
             self.assertFalse(chassis.exists())
-            self.assertFalse(bindings.exists())
 
-    def test_guardian_script_binding_range_is_owned_and_explicit(self):
-        sql = (ROOT / "sql" / "world" / "004_guardian_script_bindings.sql").read_text(encoding="utf-8")
-        self.assertEqual(world.GUARDIAN_SPELL_MIN, 290000)
-        self.assertEqual(world.GUARDIAN_SPELL_MAX, 299999)
-        self.assertIn("DELETE FROM `spell_script_names`", sql)
-        self.assertEqual(sql.count("spell_warr_last_stand"), 2)
-        self.assertNotIn("spell_pal_ardent_defender", sql)
-        self.assertNotIn("spell_warr_sweeping_strikes", sql)
+    def test_fixed_talent_updates_are_cleanup_only(self):
+        self.assertEqual(
+            world.LEGACY_FIXED_TALENT_UPDATE_NAMES,
+            (
+                "rev_1787446800000000000.sql",
+                "rev_1787779800000000000.sql",
+            ),
+        )
+        self.assertEqual(world.LEGACY_FIXED_TALENT_SPELL_MIN, 290000)
+        self.assertEqual(world.LEGACY_FIXED_TALENT_SPELL_MAX, 299999)
+
+        active_sources = {update.source.name for update in world.WORLD_UPDATES}
+        self.assertNotIn("002_guardian_last_bastion.sql", active_sources)
+        self.assertNotIn("004_guardian_script_bindings.sql", active_sources)
+        self.assertTrue(all("guardian" not in name.lower() for name in active_sources))
 
     def test_refuses_to_overwrite_or_remove_different_pending_update(self):
         with tempfile.TemporaryDirectory() as td:
