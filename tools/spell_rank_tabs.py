@@ -72,14 +72,10 @@ def load_server_rank_chains(path: Path) -> dict[int, tuple[int, ...]]:
     by_spell: dict[int, tuple[int, ...]] = {}
     for first, ranks in by_first.items():
         ordered_ranks = sorted(ranks)
-        if ordered_ranks[0] != 1 or ordered_ranks != list(range(1, ordered_ranks[-1] + 1)):
-            raise SpellRankTabError(
-                f"rank chain {first} is not contiguous: {ordered_ranks}"
-            )
         chain = tuple(ranks[rank] for rank in ordered_ranks)
-        if chain[0] != first:
+        if ordered_ranks[0] != 1 or chain[0] != first:
             raise SpellRankTabError(
-                f"rank chain {first} starts with spell {chain[0]} instead of its first_spell_id"
+                f"rank chain {first} does not start at rank 1 with its first_spell_id"
             )
         for spell in chain:
             by_spell[spell] = chain
