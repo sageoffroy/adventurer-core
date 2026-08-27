@@ -58,9 +58,9 @@ class RareOverhaulCreatureScript : public AllCreatureScript
 public:
     RareOverhaulCreatureScript() : AllCreatureScript("RareOverhaulCreatureScript") { }
 
-    void OnCreatureSelectLevel(CreatureTemplate const* creatureTemplate, Creature* creature) override
+    void OnCreatureAddWorld(Creature* creature) override
     {
-        if (!RareOverhaulEnabled || !RareDifficultyEnabled || !creature || !IsRareRank(creatureTemplate))
+        if (!RareOverhaulEnabled || !RareDifficultyEnabled || !IsRareCreature(creature))
             return;
 
         uint32 const oldMaxHealth = creature->GetMaxHealth();
