@@ -16,6 +16,13 @@ class DungeonMasterSourceFixupTests(unittest.TestCase):
         mgr = root / fixup.MGR_REL
         mgr.parent.mkdir(parents=True, exist_ok=True)
         mgr.write_text(
+            "// Aventureros: preserve and scale the dungeon's original inhabitants.\n"
+            "bool PrepareOriginalCreature(Creature* c, Session* session)\n"
+            "{\n"
+            "    if (!c || !session || !c->IsInWorld() || !c->IsAlive())\n"
+            "        return false;\n"
+            "    return true;\n"
+            "}\n"
             "void x()\n{\n"
             "                    // ---- Original dungeon grid activation / roguelike stray cleanup ----\n"
             "                    if (true)\n"
@@ -43,7 +50,7 @@ class DungeonMasterSourceFixupTests(unittest.TestCase):
         )
         return mgr, unit
 
-    def test_repairs_both_missing_braces_idempotently(self) -> None:
+    def test_repairs_all_native_mode_fixups_idempotently(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             core = Path(td) / "core"
             mgr, unit = self.make_core(core)
@@ -55,13 +62,15 @@ class DungeonMasterSourceFixupTests(unittest.TestCase):
             self.assertIn(fixup.MGR_FIX_MARKER, mgr_text)
             self.assertIn("                    }\n                }\n\n", mgr_text)
             self.assertNotIn(fixup.MGR_LEGACY, mgr_text)
+            self.assertIn(fixup.CORPSE_FIX_MARKER, mgr_text)
+            self.assertIn("c->GetStandState() == UNIT_STAND_STATE_DEAD", mgr_text)
 
             unit_text = unit.read_text(encoding="utf-8")
             self.assertIn(fixup.UNIT_FIX_MARKER, unit_text)
             self.assertIn("            }\n        }\n\n", unit_text)
             self.assertNotIn(fixup.UNIT_LEGACY, unit_text)
 
-    def test_upgrades_tree_with_manager_already_fixed(self) -> None:
+    def test_upgrades_tree_with_manager_brace_already_fixed(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             core = Path(td) / "core"
             mgr, unit = self.make_core(core)
@@ -71,7 +80,25 @@ class DungeonMasterSourceFixupTests(unittest.TestCase):
             )
             self.assertTrue(fixup.install(core))
             fixup.verify(core)
+            mgr_text = mgr.read_text(encoding="utf-8")
+            self.assertIn(fixup.CORPSE_FIX_MARKER, mgr_text)
             self.assertIn(fixup.UNIT_FIX_MARKER, unit.read_text(encoding="utf-8"))
+
+    def test_upgrades_tree_with_both_braces_already_fixed(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            core = Path(td) / "core"
+            mgr, unit = self.make_core(core)
+            mgr.write_text(
+                mgr.read_text(encoding="utf-8").replace(fixup.MGR_LEGACY, fixup.MGR_FIXED, 1),
+                encoding="utf-8",
+            )
+            unit.write_text(
+                unit.read_text(encoding="utf-8").replace(fixup.UNIT_LEGACY, fixup.UNIT_FIXED, 1),
+                encoding="utf-8",
+            )
+            self.assertTrue(fixup.install(core))
+            fixup.verify(core)
+            self.assertIn(fixup.CORPSE_FIX_MARKER, mgr.read_text(encoding="utf-8"))
 
     def test_refuses_unpatched_source(self) -> None:
         with tempfile.TemporaryDirectory() as td:
