@@ -2,10 +2,11 @@
 """Transactional in-place upgrades for an already-installed Adventurer Core.
 
 Unlike the clean installer, this command deliberately allows existing class-10
-characters. It only upgrades files already owned by Adventurer Core, preserves
-the original pre-install rollback backups, stages every generated client/DBC
-artifact before mutation, and restores the immediately previous installed state
-if any upgrade step fails.
+characters. It upgrades already-owned files and may add new package-owned files
+when the target path did not previously exist. It preserves the original
+pre-install rollback backups, stages every generated client/DBC artifact before
+mutation, and restores the immediately previous installed state if any upgrade
+step fails.
 """
 
 from __future__ import annotations
@@ -94,15 +95,25 @@ def validate_installed_state(core: Path, state: dict) -> None:
 def plan_owned_upgrade(core: Path, state: dict):
     planned = plan_core(core, PAYLOAD_ROOT, allow_payload_replace=True)
     owned = state_file_map(state)
-    missing = [item.relative_path for item in planned if item.relative_path not in owned]
-    if missing:
+
+    # New files introduced by a package revision are safe only when the target
+    # path does not exist. An existing unowned path is never adopted silently.
+    unowned_existing = [
+        item.relative_path
+        for item in planned
+        if item.relative_path not in owned and item.original is not None
+    ]
+    if unowned_existing:
         raise UpgradeError(
-            "Upgrade wants to modify files that are not present in the original ownership manifest: "
-            + ", ".join(missing)
+            "Upgrade wants to modify files that are not present in the ownership manifest: "
+            + ", ".join(unowned_existing)
         )
 
     for item in planned:
-        expected = owned[item.relative_path].get("after_sha256")
+        entry = owned.get(item.relative_path)
+        if entry is None:
+            continue
+        expected = entry.get("after_sha256")
         actual = sha256_bytes(item.original) if item.original is not None else None
         if expected != actual:
             raise UpgradeError(
@@ -185,8 +196,27 @@ def restore_sources(core: Path, snapshot: dict) -> None:
 def update_source_manifest(state: dict, planned) -> None:
     owned = state_file_map(state)
     for item in planned:
-        entry = owned[item.relative_path]
-        entry["after_sha256"] = sha256_bytes(item.patched)
+        entry = owned.get(item.relative_path)
+        if entry is None:
+            entry = {
+                "path": item.relative_path,
+                "existed_before": False,
+                "before_sha256": None,
+                "after_sha256": sha256_bytes(item.patched),
+            }
+            state.setdefault("files", []).append(entry)
+            owned[item.relative_path] = entry
+        else:
+            entry["after_sha256"] = sha256_bytes(item.patched)
+
+
+def remove_new_sources(core: Path, planned) -> None:
+    for item in planned:
+        if item.original is not None:
+            continue
+        target = core / item.relative_path
+        if target.is_file() and target.read_bytes() == item.patched:
+            target.unlink()
 
 
 def apply_upgrade(args) -> None:
@@ -218,6 +248,7 @@ def apply_upgrade(args) -> None:
                 if item.original == item.patched:
                     continue
                 target = core / item.relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(item.patched)
 
             dbc_hashes = install_server_dbcs(staged, server_dbc)
@@ -243,6 +274,7 @@ def apply_upgrade(args) -> None:
                 )
         except Exception:
             restore_sources(core, snapshot)
+            remove_new_sources(core, planned)
             for raw, saved in snapshot.get("dbc", {}).items():
                 target = Path(raw)
                 target.parent.mkdir(parents=True, exist_ok=True)
