@@ -339,14 +339,20 @@ def build_adventurer_collections_lua() -> bytes:
     required = (
         b'ADRAFT_TALENTS',
         b'AdventurerTalentCollectionFrame',
-        b'AdventurerTalentCollectionBranch',
-        b'BRANCH_PAGE_SIZE = 24',
-        b'GRID_COLUMNS = 4',
-        b'CreateTalentIcon',
-        b'UI-Quickslot2',
+        b'AdventurerTalentCollectionEntry',
+        b'TALENTS_PER_PAGE = 12',
+        b'ROWS_PER_COLUMN = 6',
+        b'UI-SpellbookPanel-TopLeft',
+        b'UI-SpellbookPanel-BotRight',
+        b'UI-Spellbook-SpellBackground',
+        b'UI-SpellbookIcon-PrevPage-Up',
+        b'UI-SpellbookIcon-NextPage-Up',
+        b'SpellBookFrameTabButtonTemplate',
+        b'entry.name:SetWidth(103)',
         b'GameTooltip:SetHyperlink("spell:" .. self.spellId)',
         b'NativeToggleTalentFrame',
         b'AdventurerToggleTalentFrame',
+        b'RebindTalentEntryPoints',
         b'TalentMicroButton:SetScript("OnClick"',
         b'ADDON_LOADED',
         b'mercenary',
@@ -358,7 +364,9 @@ def build_adventurer_collections_lua() -> bytes:
     forbidden = (
         b'SetMaxLines',
         b'FauxScrollFrame',
-        b'UI-SpellbookPanel-TopLeft',
+        b'BRANCH_PAGE_SIZE',
+        b'AdventurerTalentCollectionBranch',
+        b'GRID_COLUMNS',
     )
     missing = [token.decode("ascii") for token in required if token not in payload]
     present = [token.decode("ascii") for token in forbidden if token in payload]
