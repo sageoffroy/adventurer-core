@@ -69,7 +69,8 @@ class SpellDraftSubclassTests(unittest.TestCase):
             14: "mercenary",  # Sinister Strike
             40: "mercenary",  # Raptor Strike
             128: "mercenary",  # Cleave
-            # Physical ranged
+            # Physical ranged / hunter utility
+            42: "explorer",  # Aspect of the Monkey
             46: "explorer",  # Concussive Shot
             152: "explorer",  # Multi-Shot
             # Magical schools
@@ -157,6 +158,7 @@ class SpellDraftSubclassTests(unittest.TestCase):
             "local NativeToggleTalentFrame = ToggleTalentFrame",
             "function ToggleTalentFrame()",
             "return NativeToggleTalentFrame()",
+            'TalentMicroButton:SetScript("OnClick"',
         ):
             self.assertIn(token, self.client)
 
