@@ -1,11 +1,8 @@
 # Architecture
 
-Adventurer Core is a patch layer, not an AzerothCore module.
-
-Its only responsibility is making the unused WotLK class slot 10 a native,
-playable, classless **Adventurer**. It must remain usable without ALE,
-SpellDraft, progression, Dungeon Master, or any future Aventureros gameplay
-module.
+Adventurer Core is a patch layer for AzerothCore WotLK 3.3.5a. It combines the
+native class-10 chassis with the SpellDraft v1 gameplay runtime used by this
+project.
 
 ## Ownership boundaries
 
@@ -13,47 +10,51 @@ Adventurer Core owns:
 
 - `CLASS_ADVENTURER = 10` and the playable class mask;
 - EnumUtils support for class 10;
-- safe class-10 avoidance/stat constants;
-- neutral level/stat rows in the world DB;
+- class-10 stats, resources, equipment compatibility, languages and racials;
 - all playable race/class-10 creation rows;
-- universal weapon/armor baseline, dodge/parry/block, languages and racials;
-- classless item-use compatibility where stock `AllowableClass` masks would
-  otherwise reject class 10;
-- class-10 DBC rows used by both worldserver and the WotLK client;
-- enUS `Adventurer` and esMX `Aventurero` player-visible class naming;
-- the client creation patch needed to expose exactly one class per playable race.
+- class-10 DBC rows used by worldserver and the WotLK client;
+- the four SpellDraft presentation subclasses (Mercenario, Explorador,
+  Hechicero and Iluminado) and their custom SkillLines;
+- SpellDraft active/talent card progression, persistence and meta actions;
+- the `Libro de talentos`, which displays talents actually owned through
+  SpellDraft;
+- client patches required for the class, resource HUD and SpellDraft UI;
+- optional Playerbots compatibility when `modules/mod-playerbots` is present.
 
-Adventurer Core does **not** own:
+Adventurer Core does **not** own or use a fixed native talent tree. In
+particular, the historical Guardian/Champion/Scholar trees, custom TalentTab
+rows and 290000-series cloned talent spells are obsolete. Current DBC tooling
+contains only a compatibility purge for those old Adventurer-owned ranges so an
+upgrade cannot leave ghost fixed talents behind.
 
-- draft rules or random abilities;
-- custom spells or spell scaling;
-- talents/metaprogression;
-- dungeon rewards;
-- ALE or Lua integration;
-- Playerbots behavior beyond remaining compatible with a Playerbots core.
+## Talent model
+
+`config/spelldraft/cards.csv` is the runtime catalog. Entries with
+`type=talent` define the talent cards available through SpellDraft and their
+rank spell IDs. The server persists the owned rank and `Libro de talentos`
+requests that collection over the Adventurer addon protocol.
+
+No talent is granted by a fixed tree, talent-point spending UI or Guardian
+branch. The stock Talent/TalentTab/Spell DBC files are never populated with a
+new Adventurer tree.
 
 ## Installation model
 
-`apply.sh` will be the only normal entry point. The final installer must:
+`apply.sh` is the normal clean-install entry point. It:
 
-1. identify and validate the target core;
-2. refuse unsupported core revisions by default;
-3. preflight every source transformation before changing files;
-4. back up only files it owns;
-5. patch the core and stage the world DB migration;
-6. patch the server DBC payload from clean WotLK 3.3.5a data;
-7. build and install the client patch, prioritizing esMX;
-8. record hashes and ownership in a state manifest;
-9. run `verify.sh` automatically;
-10. never use `git reset --hard`, `git clean`, or overwrite unrelated user work.
+1. validates the target as an AzerothCore source tree;
+2. preflights every required source transformation by exact anchors/APIs;
+3. validates DBC/client inputs and database rollback capability;
+4. stages generated runtime/client data before mutation;
+5. patches the native class-10 source and world rows;
+6. builds subclass/SpellDraft client data and purges legacy fixed-talent rows if present;
+7. installs editable SpellDraft runtime data;
+8. applies Playerbots integration only when that module exists;
+9. records hashes and ownership for verification/rollback.
 
-`rollback.sh` may reverse only files whose current hashes still match the files
-written by Adventurer Core. It must stop rather than destroy subsequent edits.
+Compatibility is based on the actual source shapes/APIs required by the patch,
+not on a whitelist of Git commit SHAs. A source change fails only when a real
+required anchor or API is incompatible.
 
-## Compatibility gate
-
-During bootstrap, `compatibility.json` intentionally contains no supported
-commit. This prevents the package from being presented as apply-ready before the
-new clean Playerbots installation supplies its exact base commit. Once that SHA
-is known, the complete transformation will be tested against that tree and the
-compatibility gate will be frozen.
+`rollback.sh` reverses only package-owned state whose hashes still match. It
+must stop rather than destroy subsequent unrelated edits.
