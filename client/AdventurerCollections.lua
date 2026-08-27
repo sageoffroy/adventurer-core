@@ -326,22 +326,40 @@ frame.nextLabel = frame.next:CreateFontString(nil, "BACKGROUND", "GameFontNormal
 frame.nextLabel:SetText(text.next)
 frame.nextLabel:SetPoint("RIGHT", frame.next, "LEFT", 0, 0)
 
+local RefreshPage
+
 local function CreateSubclassTab(index, key)
-    local tab = CreateFrame(
-        "Button",
-        "AdventurerTalentCollectionTab" .. index,
-        frame,
-        "SpellBookFrameTabButtonTemplate")
+    -- AdventurerCollections.lua is loaded before SpellBookFrame.xml in the
+    -- stock FrameXML order, so SpellBookFrameTabButtonTemplate does not exist
+    -- yet. Recreate that template's visuals directly from Blizzard textures.
+    local tab = CreateFrame("Button", "AdventurerTalentCollectionTab" .. index, frame)
     tab:SetWidth(98)
     tab:SetHeight(64)
     tab:SetPoint("CENTER", frame, "BOTTOMLEFT", 50 + (index - 1) * 94, 61)
-    tab:SetText(subclassLabels[key])
-    tab:SetDisabledTexture("Interface\\SpellBook\\UI-SpellBook-Tab1-Selected")
+    tab:SetFrameLevel(frame:GetFrameLevel() + 5)
     tab.subclassKey = key
-    tab:Show()
+
+    tab.normal = tab:CreateTexture(nil, "BACKGROUND")
+    tab.normal:SetTexture("Interface\\SpellBook\\UI-SpellBook-Tab-Unselected")
+    tab.normal:SetAllPoints(tab)
+
+    tab.selected = tab:CreateTexture(nil, "ARTWORK")
+    tab.selected:SetTexture("Interface\\SpellBook\\UI-SpellBook-Tab1-Selected")
+    tab.selected:SetAllPoints(tab)
+    tab.selected:Hide()
+
+    tab.highlight = tab:CreateTexture(nil, "HIGHLIGHT")
+    tab.highlight:SetTexture("Interface\\SpellBook\\UI-SpellbookPanel-Tab-Highlight")
+    tab.highlight:SetBlendMode("ADD")
+    tab.highlight:SetAllPoints(tab)
+
+    tab.label = tab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    tab.label:SetPoint("CENTER", tab, "CENTER", 0, 3)
+    tab.label:SetText(subclassLabels[key])
 
     tab:SetScript("OnClick", function(self)
         state.selected = self.subclassKey
+        state.pages[self.subclassKey] = 1
         RefreshPage()
         PlaySound("igCharacterInfoTab")
     end)
@@ -354,6 +372,7 @@ local function CreateSubclassTab(index, key)
         GameTooltip:Hide()
     end)
 
+    tab:Show()
     return tab
 end
 
@@ -364,15 +383,19 @@ local function RefreshTabs()
         local tab = frame.tabs[key]
         if tab then
             if key == state.selected then
-                tab:Disable()
+                tab.normal:Hide()
+                tab.selected:Show()
+                tab.label:SetTextColor(1.0, 0.82, 0.0)
             else
-                tab:Enable()
+                tab.selected:Hide()
+                tab.normal:Show()
+                tab.label:SetTextColor(1.0, 0.82, 0.0)
             end
         end
     end
 end
 
-function RefreshPage()
+RefreshPage = function()
     RefreshTabs()
 
     local items = state.items[state.selected] or {}
