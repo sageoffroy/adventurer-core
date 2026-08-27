@@ -12,6 +12,7 @@ from pathlib import Path
 
 from dbc import DBCError, patch_directory
 from mpq import write_mpq
+from subclasses import patch_subclass_directory
 from talents import patch_talent_directory
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -33,6 +34,8 @@ CLASS_DBCS = (
     "ChrClasses.dbc",
     "CharBaseInfo.dbc",
     "CharStartOutfit.dbc",
+    "SkillLine.dbc",
+    "SkillLineAbility.dbc",
     "SkillRaceClassInfo.dbc",
 )
 TALENT_DBCS = (
@@ -344,6 +347,7 @@ def patch_dbc_copy(source: Path, work: Path) -> dict[str, bool]:
     for name in DBC_SOURCE_NAMES:
         shutil.copy2(source / name, work / name)
     changed = patch_directory(work)
+    changed.update(patch_subclass_directory(work))
     changed.update(patch_talent_directory(work))
     return changed
 
