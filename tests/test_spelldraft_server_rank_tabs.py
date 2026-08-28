@@ -10,7 +10,9 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from dbc import ADVENTURER_CLASS_MASK, DBC, set_u32, u32  # noqa: E402
 from spell_rank_tabs import (  # noqa: E402
+    SPELL_COMPONENT_FIELDS,
     load_server_rank_chains,
+    patch_component_free_drafted_spells,
     patch_server_rank_tabs,
 )
 from subclasses import (  # noqa: E402
@@ -52,6 +54,14 @@ def make_row(row_id: int, skill_line: int, spell_id: int) -> bytearray:
     set_u32(row, 0, row_id)
     set_u32(row, SLA_SKILL_LINE, skill_line)
     set_u32(row, SLA_SPELL, spell_id)
+    return row
+
+
+def make_spell(spell_id: int, component_value: int) -> bytearray:
+    row = bytearray(234 * 4)
+    set_u32(row, 0, spell_id)
+    for field in SPELL_COMPONENT_FIELDS:
+        set_u32(row, field, component_value)
     return row
 
 
@@ -102,14 +112,52 @@ class ServerRankTabTests(unittest.TestCase):
                 self.assertEqual(len(custom), 1, spell_id)
                 self.assertEqual(u32(custom[0], SLA_CLASS_MASK), ADVENTURER_CLASS_MASK)
 
-            rank_two_stock = next(
-                row
-                for row in dbc.records
-                if u32(row, 0) == 2
-            )
+            rank_two_stock = next(row for row in dbc.records if u32(row, 0) == 2)
             self.assertEqual(
                 u32(rank_two_stock, SLA_EXCLUDE_CLASS) & ADVENTURER_CLASS_MASK,
                 ADVENTURER_CLASS_MASK,
+            )
+
+    def test_all_drafted_active_ranks_are_component_free(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            spell_path = root / "Spell.dbc"
+            ranks_path = root / "spell_ranks.sql"
+            ranks_path.write_text(SPELL_RANKS, encoding="utf-8")
+
+            DBC(
+                fields=234,
+                record_size=936,
+                records=[
+                    make_spell(100, 11),
+                    make_spell(101, 12),
+                    make_spell(102, 13),
+                    make_spell(999, 99),
+                ],
+                strings=bytearray(b"\0"),
+            ).write(spell_path)
+
+            self.assertTrue(
+                patch_component_free_drafted_spells(
+                    spell_path, ranks_path, CARDS, SPEC
+                )
+            )
+            dbc = DBC.read(spell_path)
+            rows = {u32(row, 0): row for row in dbc.records}
+
+            for spell_id in (100, 101, 102):
+                for field in SPELL_COMPONENT_FIELDS:
+                    self.assertEqual(u32(rows[spell_id], field), 0, (spell_id, field))
+
+            # The rule is scoped to SpellDraft abilities: unrelated native spells
+            # retain their original component/tool metadata.
+            for field in SPELL_COMPONENT_FIELDS:
+                self.assertEqual(u32(rows[999], field), 99, field)
+
+            self.assertFalse(
+                patch_component_free_drafted_spells(
+                    spell_path, ranks_path, CARDS, SPEC
+                )
             )
 
 
