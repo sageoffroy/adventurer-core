@@ -67,6 +67,39 @@ def replace_transition(text: str, clean: str, legacy: str, new: str, label: str)
     )
 
 
+def replace_transitions(
+    text: str,
+    clean: str,
+    legacies: tuple[str, ...],
+    new: str,
+    label: str,
+) -> str:
+    """Accept stock or one of several known Adventurer-owned predecessor forms."""
+    if new in text:
+        return text
+
+    for legacy in legacies:
+        legacy_count = text.count(legacy)
+        if legacy_count > 1:
+            raise PatchError(f"{label}: predecessor anchor is ambiguous; found {legacy_count}")
+        if legacy_count == 1:
+            clean_count = text.count(clean)
+            nested_clean = legacy.count(clean)
+            if clean_count != nested_clean:
+                raise PatchError(
+                    f"{label}: predecessor matched but found an independent stock anchor; "
+                    f"stock={clean_count}, nested={nested_clean}"
+                )
+            return text.replace(legacy, new, 1)
+
+    clean_count = text.count(clean)
+    if clean_count == 1:
+        return text.replace(clean, new, 1)
+    raise PatchError(
+        f"{label}: expected exactly one stock or known predecessor anchor, found stock={clean_count}"
+    )
+
+
 def replace_exact_count(text: str, old: str, new: str, count: int, label: str) -> str:
     if old not in text:
         if text.count(new) == count:
@@ -159,7 +192,7 @@ def patch_stat_system(text: str) -> str:
         {
             val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;
         }"""
-    universal_ranged = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+    universal_ranged_95 = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
         {
             // Universal ranged baseline: 95% of Hunter's native formula.
             val2 = (level * 2.0f + GetStat(STAT_AGILITY) - 10.0f) * 0.95f;
@@ -168,10 +201,32 @@ def patch_stat_system(text: str) -> str:
         {
             val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;
         }"""
-    text = replace_transition(
+    universal_ranged = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+        {
+            // Universal ranged baseline: 80% of Hunter's native formula. Heavy
+            // armor also reduces the Agility that contributes to physical output.
+            float armor = float(GetArmor());
+            float armorLevel = level;
+            if (armorLevel > 59.0f)
+                armorLevel += 4.5f * (armorLevel - 59.0f);
+            float armorFactor = 0.1f * armor / (8.5f * armorLevel + 40.0f);
+            float armorReduction = armorFactor > 0.0f ? armorFactor / (1.0f + armorFactor) : 0.0f;
+            if (armorReduction > 0.75f)
+                armorReduction = 0.75f;
+            float agilityPenalty = armorReduction * 0.50f;
+            if (agilityPenalty > 0.30f)
+                agilityPenalty = 0.30f;
+            float effectiveAgility = GetStat(STAT_AGILITY) * (1.0f - agilityPenalty);
+            val2 = (level * 2.0f + effectiveAgility - 10.0f) * 0.80f;
+        }
+        else if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;
+        }"""
+    text = replace_transitions(
         text,
         clean_ranged,
-        legacy_ranged,
+        (legacy_ranged, universal_ranged_95),
         universal_ranged,
         "StatSystem Adventurer ranged attack power",
     )
@@ -189,7 +244,7 @@ def patch_stat_system(text: str) -> str:
         {
             val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
         }"""
-    universal_melee = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+    universal_melee_95 = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
         {
             // Universal melee baseline: compare the two strongest native
             // archetypes and keep 95% of whichever the current gear favours.
@@ -201,10 +256,38 @@ def patch_stat_system(text: str) -> str:
         {
             val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
         }"""
-    return replace_transition(
+    universal_melee = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+        {
+            // Universal melee baseline: compare the two strongest native
+            // archetypes and keep 80% of whichever the current gear favours.
+            // Armor only penalizes the Agility component, never raw Strength.
+            float armor = float(GetArmor());
+            float armorLevel = level;
+            if (armorLevel > 59.0f)
+                armorLevel += 4.5f * (armorLevel - 59.0f);
+            float armorFactor = 0.1f * armor / (8.5f * armorLevel + 40.0f);
+            float armorReduction = armorFactor > 0.0f ? armorFactor / (1.0f + armorFactor) : 0.0f;
+            if (armorReduction > 0.75f)
+                armorReduction = 0.75f;
+            float agilityPenalty = armorReduction * 0.50f;
+            if (agilityPenalty > 0.30f)
+                agilityPenalty = 0.30f;
+            float effectiveAgility = GetStat(STAT_AGILITY) * (1.0f - agilityPenalty);
+            float strengthBaseline = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+            float hybridBaseline = level * 2.0f + GetStat(STAT_STRENGTH) + effectiveAgility - 20.0f;
+            val2 = (strengthBaseline > hybridBaseline ? strengthBaseline : hybridBaseline) * 0.80f;
+        }
+        else if (IsClass(CLASS_PALIN, CLASS_CONTEXT_STATS) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+        }"""
+    # Keep the native PALADIN token exact in the emitted source. Writing it this
+    # way also makes a typo in this package visible to the unit tests below.
+    universal_melee = universal_melee.replace("CLASS_PALIN", "CLASS_PALADIN")
+    return replace_transitions(
         text,
         clean_melee,
-        legacy_melee,
+        (legacy_melee, universal_melee_95),
         universal_melee,
         "StatSystem Adventurer melee attack power",
     )
@@ -350,13 +433,16 @@ def patch_player_cpp(text: str) -> str:
     legacy_base_dodge = """        0.024211f, // Warlock
         0.053292f, // Adventurer: 95% of Druid's strongest native base dodge
         0.056097f  // Druid"""
-    universal_base_dodge = """        0.024211f, // Warlock
+    universal_base_dodge_95 = """        0.024211f, // Warlock
         0.053292f, // Adventurer fallback; runtime compares complete native formulas
         0.056097f  // Druid"""
-    text = replace_transition(
+    universal_base_dodge = """        0.024211f, // Warlock
+        0.044878f, // Adventurer 80% fallback; runtime compares complete native formulas
+        0.056097f  // Druid"""
+    text = replace_transitions(
         text,
         clean_base_dodge,
-        legacy_base_dodge,
+        (legacy_base_dodge, universal_base_dodge_95),
         universal_base_dodge,
         "Player Adventurer base dodge",
     )
@@ -386,7 +472,7 @@ def patch_player_cpp(text: str) -> str:
 
     GtChanceToMeleeCritBaseEntry const* critBase  = sGtChanceToMeleeCritBaseStore.LookupEntry(pclass - 1);
     GtChanceToMeleeCritEntry     const* critRatio = sGtChanceToMeleeCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
-    melee_runtime = """    if (level > GT_MAX_LEVEL)
+    melee_runtime_95 = """    if (level > GT_MAX_LEVEL)
         level = GT_MAX_LEVEL;
 
     if (pclass == CLASS_ADVENTURER)
@@ -417,9 +503,56 @@ def patch_player_cpp(text: str) -> str:
 
     GtChanceToMeleeCritBaseEntry const* critBase  = sGtChanceToMeleeCritBaseStore.LookupEntry(pclass - 1);
     GtChanceToMeleeCritEntry     const* critRatio = sGtChanceToMeleeCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
-    text = replace_once(
+    melee_runtime = """    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+
+    if (pclass == CLASS_ADVENTURER)
+    {
+        // Armor trades away part of physical Agility without changing the raw
+        // stat or its Armor contribution, avoiding a recursive Armor/Agility loop.
+        float armor = float(GetArmor());
+        float armorLevel = float(GetLevel());
+        if (armorLevel > 59.0f)
+            armorLevel += 4.5f * (armorLevel - 59.0f);
+        float armorFactor = 0.1f * armor / (8.5f * armorLevel + 40.0f);
+        float armorReduction = armorFactor > 0.0f ? armorFactor / (1.0f + armorFactor) : 0.0f;
+        if (armorReduction > 0.75f)
+            armorReduction = 0.75f;
+        float agilityPenalty = armorReduction * 0.50f;
+        if (agilityPenalty > 0.30f)
+            agilityPenalty = 0.30f;
+        float effectiveAgility = GetStat(STAT_AGILITY) * (1.0f - agilityPenalty);
+
+        // Compare every native class as a complete formula; never mix a base
+        // from one class with the Agility coefficient from another.
+        float bestCrit = 0.0f;
+        bool found = false;
+        for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
+        {
+            if (nativeClass == CLASS_ADVENTURER)
+                continue;
+
+            GtChanceToMeleeCritBaseEntry const* nativeBase = sGtChanceToMeleeCritBaseStore.LookupEntry(nativeClass - 1);
+            GtChanceToMeleeCritEntry const* nativeRatio = sGtChanceToMeleeCritStore.LookupEntry((nativeClass - 1) * GT_MAX_LEVEL + level - 1);
+            if (!nativeBase || !nativeRatio)
+                continue;
+
+            float candidate = nativeBase->base + effectiveAgility * nativeRatio->ratio;
+            if (!found || candidate > bestCrit)
+            {
+                bestCrit = candidate;
+                found = true;
+            }
+        }
+        return (found ? bestCrit * 0.80f : 0.0f) * 100.0f;
+    }
+
+    GtChanceToMeleeCritBaseEntry const* critBase  = sGtChanceToMeleeCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToMeleeCritEntry     const* critRatio = sGtChanceToMeleeCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
+    text = replace_transitions(
         text,
         melee_anchor,
+        (melee_runtime_95,),
         melee_runtime,
         "Player Adventurer complete melee crit formula",
     )
@@ -430,7 +563,7 @@ def patch_player_cpp(text: str) -> str:
     // calculate diminishing (green in char screen) and non-diminishing (white) contribution
     diminishing = 100.0f * bonus_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1];
     nondiminishing = 100.0f * (dodge_base[pclass - 1] + base_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1]);"""
-    dodge_runtime = """    float base_agility = GetCreateStat(STAT_AGILITY) * GetPctModifierValue(UnitMods(UNIT_MOD_STAT_START + AsUnderlyingType(STAT_AGILITY)), BASE_PCT);
+    dodge_runtime_95 = """    float base_agility = GetCreateStat(STAT_AGILITY) * GetPctModifierValue(UnitMods(UNIT_MOD_STAT_START + AsUnderlyingType(STAT_AGILITY)), BASE_PCT);
     float bonus_agility = GetStat(STAT_AGILITY) - base_agility;
 
     if (pclass == CLASS_ADVENTURER)
@@ -470,9 +603,67 @@ def patch_player_cpp(text: str) -> str:
     // calculate diminishing (green in char screen) and non-diminishing (white) contribution
     diminishing = 100.0f * bonus_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1];
     nondiminishing = 100.0f * (dodge_base[pclass - 1] + base_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1]);"""
-    text = replace_once(
+    dodge_runtime = """    float base_agility = GetCreateStat(STAT_AGILITY) * GetPctModifierValue(UnitMods(UNIT_MOD_STAT_START + AsUnderlyingType(STAT_AGILITY)), BASE_PCT);
+    float bonus_agility = GetStat(STAT_AGILITY) - base_agility;
+
+    if (pclass == CLASS_ADVENTURER)
+    {
+        // Total Armor reduces only the Agility contribution used for physical
+        // avoidance/output: half of Armor DR, capped at a 30% Agility penalty.
+        float armor = float(GetArmor());
+        float armorLevel = float(GetLevel());
+        if (armorLevel > 59.0f)
+            armorLevel += 4.5f * (armorLevel - 59.0f);
+        float armorFactor = 0.1f * armor / (8.5f * armorLevel + 40.0f);
+        float armorReduction = armorFactor > 0.0f ? armorFactor / (1.0f + armorFactor) : 0.0f;
+        if (armorReduction > 0.75f)
+            armorReduction = 0.75f;
+        float agilityPenalty = armorReduction * 0.50f;
+        if (agilityPenalty > 0.30f)
+            agilityPenalty = 0.30f;
+        float agilityScale = 1.0f - agilityPenalty;
+        float effectiveBaseAgility = base_agility * agilityScale;
+        float effectiveBonusAgility = bonus_agility * agilityScale;
+
+        // Keep each native dodge model intact, choose the best complete model,
+        // then keep 80% of it as the Adventurer chassis baseline.
+        float bestDiminishing = 0.0f;
+        float bestNondiminishing = 0.0f;
+        float bestTotal = 0.0f;
+        bool found = false;
+        for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
+        {
+            if (nativeClass == CLASS_ADVENTURER)
+                continue;
+
+            GtChanceToMeleeCritEntry const* nativeRatio = sGtChanceToMeleeCritStore.LookupEntry((nativeClass - 1) * GT_MAX_LEVEL + level - 1);
+            if (!nativeRatio)
+                continue;
+
+            float candidateDiminishing = 100.0f * effectiveBonusAgility * nativeRatio->ratio * crit_to_dodge[nativeClass - 1];
+            float candidateNondiminishing = 100.0f * (dodge_base[nativeClass - 1] + effectiveBaseAgility * nativeRatio->ratio * crit_to_dodge[nativeClass - 1]);
+            float candidateTotal = candidateDiminishing + candidateNondiminishing;
+            if (!found || candidateTotal > bestTotal)
+            {
+                bestDiminishing = candidateDiminishing;
+                bestNondiminishing = candidateNondiminishing;
+                bestTotal = candidateTotal;
+                found = true;
+            }
+        }
+
+        diminishing = found ? bestDiminishing * 0.80f : 0.0f;
+        nondiminishing = found ? bestNondiminishing * 0.80f : 0.0f;
+        return;
+    }
+
+    // calculate diminishing (green in char screen) and non-diminishing (white) contribution
+    diminishing = 100.0f * bonus_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1];
+    nondiminishing = 100.0f * (dodge_base[pclass - 1] + base_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1]);"""
+    text = replace_transitions(
         text,
         dodge_anchor,
+        (dodge_runtime_95,),
         dodge_runtime,
         "Player Adventurer complete dodge formula",
     )
@@ -482,7 +673,7 @@ def patch_player_cpp(text: str) -> str:
 
     GtChanceToSpellCritBaseEntry const* critBase  = sGtChanceToSpellCritBaseStore.LookupEntry(pclass - 1);
     GtChanceToSpellCritEntry     const* critRatio = sGtChanceToSpellCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
-    spell_runtime = """    if (level > GT_MAX_LEVEL)
+    spell_runtime_95 = """    if (level > GT_MAX_LEVEL)
         level = GT_MAX_LEVEL;
 
     if (pclass == CLASS_ADVENTURER)
@@ -512,9 +703,40 @@ def patch_player_cpp(text: str) -> str:
 
     GtChanceToSpellCritBaseEntry const* critBase  = sGtChanceToSpellCritBaseStore.LookupEntry(pclass - 1);
     GtChanceToSpellCritEntry     const* critRatio = sGtChanceToSpellCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
-    return replace_once(
+    spell_runtime = """    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+
+    if (pclass == CLASS_ADVENTURER)
+    {
+        // Compare complete native spell-crit formulas against current Intellect.
+        float bestCrit = 0.0f;
+        bool found = false;
+        for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
+        {
+            if (nativeClass == CLASS_ADVENTURER)
+                continue;
+
+            GtChanceToSpellCritBaseEntry const* nativeBase = sGtChanceToSpellCritBaseStore.LookupEntry(nativeClass - 1);
+            GtChanceToSpellCritEntry const* nativeRatio = sGtChanceToSpellCritStore.LookupEntry((nativeClass - 1) * GT_MAX_LEVEL + level - 1);
+            if (!nativeBase || !nativeRatio)
+                continue;
+
+            float candidate = nativeBase->base + GetStat(STAT_INTELLECT) * nativeRatio->ratio;
+            if (!found || candidate > bestCrit)
+            {
+                bestCrit = candidate;
+                found = true;
+            }
+        }
+        return (found ? bestCrit * 0.80f : 0.0f) * 100.0f;
+    }
+
+    GtChanceToSpellCritBaseEntry const* critBase  = sGtChanceToSpellCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToSpellCritEntry     const* critRatio = sGtChanceToSpellCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
+    return replace_transitions(
         text,
         spell_anchor,
+        (spell_runtime_95,),
         spell_runtime,
         "Player Adventurer complete spell crit formula",
     )
