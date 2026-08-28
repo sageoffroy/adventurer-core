@@ -38,10 +38,16 @@ class WorldUpdate:
 
 # Only native Adventurer chassis data remains. Talents are exclusively
 # SpellDraft cards and therefore have no fixed-tree world migrations.
+# 003 is immutable installation history; 005 rebases the chassis from 95% to
+# 80% without rewriting an update that an existing server already recorded.
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
         "rev_1787446800000000001.sql",
+    ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "005_adventurer_chassis_80.sql",
+        "rev_1787446800000000002.sql",
     ),
 )
 
