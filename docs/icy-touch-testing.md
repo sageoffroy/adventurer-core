@@ -37,6 +37,16 @@ custom base-point overrides are preserved. `CalcPowerCost` changes only the
 rounding of their percentage cost. Both patches use the existing exact-anchor
 source installer, including backup, verification and rollback.
 
+Upgrading from stable explicitly adds `src/server/game/Spells/SpellInfo.cpp`
+to source ownership. Before accepting it, the updater requires its exact native
+contents from the recorded core Git commit, no staged/local edits, and no
+existing rollback backup or symlink. It saves the native file under
+`.adventurer-core/backups/` and records `existed_before: true` and both hashes.
+Other existing unowned files remain blocked. Repeating the update preserves
+that original backup; a failed update restores the previous files and manifest,
+and a full source rollback restores `SpellInfo.cpp` instead of deleting it.
+Do not bypass an ownership error by editing `state.json` or resetting source.
+
 The DBC staging pass modifies existing records and fails before writing if a
 rank, disease trigger or required talent family is missing. It never clones a
 spell. Names, visuals, effects, family masks, higher-rank levels and auxiliaries
@@ -59,7 +69,7 @@ do not change branches or import modules in the server repository.
 ```bash
 cd ~/adventurer-core
 git fetch origin
-git switch --track origin/feature/spelldraft-v1-with-dk
+git switch feature/spelldraft-v1-with-dk
 git pull --ff-only
 
 ./update.sh \
@@ -106,6 +116,8 @@ eligibility; a GM `.learn` does **not** create owned SpellDraft card state.
 Automated checks cover the 80 approved values, compiled C++ curve/cost helper,
 native row preservation, idempotence, failure before writes, catalog/talent
 generation, client/server data agreement and Lua 5.1 tooltip execution. CI also
+tests the stable-to-DK source ownership migration, repeat upgrades, rejection of
+local/staged/hidden edits, and restoration after injected upgrade failures. It
 compile-checks the real patched SpellInfo translation unit and existing runtime
 against actual core headers. **These checks are not an in-game test.** Real DBC
 inputs, worldserver startup, rendering and combat still require the game test.

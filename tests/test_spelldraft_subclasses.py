@@ -17,6 +17,8 @@ from subclasses import (  # noqa: E402
     validate_card_coverage,
 )
 from spelldraft_runtime import build_runtime_subclasses  # noqa: E402
+from core_patch import PlannedFile  # noqa: E402
+from upgrade import update_source_manifest  # noqa: E402
 
 CARDS = ROOT / "config" / "spelldraft" / "cards.csv"
 SUBCLASSES = ROOT / "config" / "spelldraft" / "subclasses.json"
@@ -222,7 +224,13 @@ class SpellDraftSubclassTests(unittest.TestCase):
         self.assertIn("AddAdventurerCollectionScripts();", self.core_patch)
         self.assertIn('"src/server/scripts/Custom/adventurer_collections.cpp"', self.core_patch)
         self.assertIn("if item.relative_path not in owned and item.original is not None", self.upgrade)
-        self.assertIn('"existed_before": False', self.upgrade)
+        state = {"files": []}
+        update_source_manifest(state, [PlannedFile(
+            "src/server/scripts/Custom/adventurer_collections.cpp", None,
+            self.collection_server.encode("utf-8"),
+        )])
+        self.assertFalse(state["files"][0]["existed_before"])
+        self.assertIsNone(state["files"][0]["before_sha256"])
         self.assertIn("remove_new_sources(core, planned)", self.upgrade)
 
 

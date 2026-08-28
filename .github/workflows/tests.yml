@@ -79,6 +79,10 @@ jobs:
           ref: 9fb906bb7296212ff42fc95ff73a92aaf8554f0d
           path: _supported-core
           fetch-depth: 1
+      - name: Test stable ownership migration with native core sources
+        env:
+          ADVENTURER_TEST_CORE: ${{ github.workspace }}/_supported-core
+        run: python tests/test_upgrade.py
       - name: Smoke-test clean core source patch
         run: |
           python - <<'PY'

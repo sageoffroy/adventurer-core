@@ -3,10 +3,11 @@
 
 Unlike the clean installer, this command deliberately allows existing class-10
 characters. It upgrades already-owned files and may add new package-owned files
-when the target path did not previously exist. It preserves the original
-pre-install rollback backups, stages every generated client/DBC artifact before
-mutation, and restores the immediately previous installed state if any upgrade
-step fails.
+when the target path did not previously exist. Explicit source migrations may
+also adopt pristine native files, verified against the installed core commit
+and backed up before mutation. Original pre-install rollback backups are never
+replaced. Every generated client/DBC artifact is staged before mutation, and
+any failed upgrade restores the immediately previous installed state.
 """
 
 from __future__ import annotations
@@ -22,6 +23,8 @@ import tempfile
 from adventurer import (
     InstallError,
     PAYLOAD_ROOT,
+    STATE_DIR_NAME,
+    ensure_target_files_clean,
     load_state,
     save_state,
     sha256_bytes,
@@ -38,12 +41,19 @@ from client import (
     install_patch,
     install_server_dbcs,
 )
-from core_patch import PatchError, plan as plan_core
+from core_patch import PatchError, PlannedFile, plan as plan_core
 from dbc import DBCError
 
 
 class UpgradeError(RuntimeError):
     pass
+
+
+# Stable SpellDraft did not own this native file. Icy Touch's level scaling
+# introduces it explicitly; this is not permission to adopt arbitrary paths.
+SOURCE_OWNERSHIP_MIGRATIONS = frozenset({
+    "src/server/game/Spells/SpellInfo.cpp",
+})
 
 
 def state_file_map(state: dict) -> dict[str, dict]:
@@ -92,16 +102,56 @@ def validate_installed_state(core: Path, state: dict) -> None:
         )
 
 
-def plan_owned_upgrade(core: Path, state: dict):
-    planned = plan_core(core, PAYLOAD_ROOT, allow_payload_replace=True)
+def source_migrations(state: dict, planned: list[PlannedFile]) -> list[PlannedFile]:
+    owned = state_file_map(state)
+    return [
+        item for item in planned
+        if item.relative_path not in owned and item.original is not None
+    ]
+
+
+def reject_symlink_path(core: Path, relative: str) -> None:
+    path = core
+    for part in Path(relative).parts:
+        path = path / part
+        if path.is_symlink():
+            raise UpgradeError(f"Refusing source ownership migration through a symlink: {path}")
+
+
+def validate_source_migration(core: Path, state: dict, item: PlannedFile) -> None:
+    relative = item.relative_path
+    reject_symlink_path(core, relative)
+    backup_relative = f"{STATE_DIR_NAME}/backups/{relative}"
+    reject_symlink_path(core, backup_relative)
+    backup = core / backup_relative
+    if backup.exists():
+        raise UpgradeError(f"Refusing to replace an existing rollback backup: {backup}")
+
+    commit = state.get("source_core_commit")
+    if not commit:
+        raise UpgradeError(f"Missing installed core commit for source ownership migration: {relative}")
+    baseline = subprocess.run(
+        ["git", "-C", str(core), "cat-file", "blob", f"{commit}:{relative}"],
+        check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    if baseline.returncode != 0:
+        raise UpgradeError(f"Cannot read the installed core baseline for source ownership migration: {relative}")
+    if baseline.stdout != item.original:
+        raise UpgradeError(
+            f"Refusing source ownership migration: {relative} differs from the installed "
+            "core baseline. Preserve local changes; do not edit the ownership manifest manually."
+        )
+    # The byte comparison also catches edits hidden by assume-unchanged; Git's
+    # status additionally catches staged edits even if the worktree is pristine.
+    ensure_target_files_clean(core, [relative])
+
+
+def validate_planned_sources(core: Path, state: dict, planned: list[PlannedFile]) -> None:
     owned = state_file_map(state)
 
-    # New files introduced by a package revision are safe only when the target
-    # path does not exist. An existing unowned path is never adopted silently.
     unowned_existing = [
-        item.relative_path
-        for item in planned
-        if item.relative_path not in owned and item.original is not None
+        item.relative_path for item in source_migrations(state, planned)
+        if item.relative_path not in SOURCE_OWNERSHIP_MIGRATIONS
     ]
     if unowned_existing:
         raise UpgradeError(
@@ -110,8 +160,16 @@ def plan_owned_upgrade(core: Path, state: dict):
         )
 
     for item in planned:
+        target = core / item.relative_path
+        actual_bytes = target.read_bytes() if target.is_file() else None
+        if actual_bytes != item.original or (
+            item.original is None and (target.exists() or target.is_symlink())
+        ):
+            raise UpgradeError(f"Source changed while preparing upgrade: {item.relative_path}")
         entry = owned.get(item.relative_path)
         if entry is None:
+            if item.original is not None:
+                validate_source_migration(core, state, item)
             continue
         expected = entry.get("after_sha256")
         actual = sha256_bytes(item.original) if item.original is not None else None
@@ -120,19 +178,28 @@ def plan_owned_upgrade(core: Path, state: dict):
                 f"Owned source changed before upgrade: {item.relative_path} "
                 f"(expected {expected}, got {actual})"
             )
+
+
+def plan_owned_upgrade(core: Path, state: dict) -> list[PlannedFile]:
+    planned = plan_core(core, PAYLOAD_ROOT, allow_payload_replace=True)
+    validate_planned_sources(core, state, planned)
     return planned
 
 
-def snapshot_runtime(core: Path, state: dict, directory: Path) -> dict:
+def snapshot_runtime(core: Path, state: dict, directory: Path, planned=()) -> dict:
     snapshot: dict = {"source": {}, "dbc": {}, "client": {}}
 
-    for entry in state.get("files", []):
-        path = core / entry["path"]
+    source_paths = dict.fromkeys(entry["path"] for entry in state.get("files", []))
+    source_paths.update(dict.fromkeys(
+        item.relative_path for item in planned if item.original is not None
+    ))
+    for relative in source_paths:
+        path = core / relative
         if path.is_file():
-            target = directory / "source" / entry["path"]
+            target = directory / "source" / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, target)
-            snapshot["source"][entry["path"]] = target
+            snapshot["source"][relative] = target
 
     dbc_state = state.get("dbc")
     if dbc_state:
@@ -200,8 +267,8 @@ def update_source_manifest(state: dict, planned) -> None:
         if entry is None:
             entry = {
                 "path": item.relative_path,
-                "existed_before": False,
-                "before_sha256": None,
+                "existed_before": item.original is not None,
+                "before_sha256": sha256_bytes(item.original) if item.original is not None else None,
                 "after_sha256": sha256_bytes(item.patched),
             }
             state.setdefault("files", []).append(entry)
@@ -240,10 +307,24 @@ def apply_upgrade(args) -> None:
         # Generate the entire client/server data bundle before touching the
         # installed source tree.
         build_patch(dbc_source, staged, args.locale)
+        # DBC generation can take time. Recheck before any write or rollback
+        # snapshot so a concurrent source edit is not overwritten on failure.
+        validate_installed_state(core, state)
+        validate_planned_sources(core, state, planned)
         previous_state = copy.deepcopy(state)
-        snapshot = snapshot_runtime(core, state, temp / "previous")
+        snapshot = snapshot_runtime(core, state, temp / "previous", planned)
+        created_backups: list[Path] = []
 
         try:
+            for item in source_migrations(state, planned):
+                backup = core / STATE_DIR_NAME / "backups" / item.relative_path
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                # Exclusive creation cannot overwrite an original rollback
+                # backup, even if one appeared since preflight.
+                with backup.open("xb") as handle:
+                    created_backups.append(backup)
+                    handle.write(item.original)
+
             for item in planned:
                 if item.original == item.patched:
                     continue
@@ -284,6 +365,8 @@ def apply_upgrade(args) -> None:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(saved, target)
             save_state(core, previous_state)
+            for backup in created_backups:
+                backup.unlink()
             raise
 
     changed = sum(1 for item in planned if item.original != item.patched)
