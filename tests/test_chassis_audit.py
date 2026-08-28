@@ -84,7 +84,7 @@ class ChassisAuditTests(unittest.TestCase):
     def test_crit_formula_matches_core_percent_conversion(self):
         self.assertAlmostEqual(audit.crit_percent(0.05, 0.001, 20), 7.0)
 
-    def test_adventurer_runtime_crit_uses_best_complete_native_formula_then_95_percent(self):
+    def test_adventurer_runtime_crit_uses_best_complete_native_formula_then_80_percent(self):
         natives = []
         for player_class in audit.NATIVE_CLASSES:
             natives.append(
@@ -126,13 +126,13 @@ class ChassisAuditTests(unittest.TestCase):
             audit.crit_percent(row.spell_crit_base, row.spell_crit_ratio, adventurer.intellect)
             for row in natives
         )
-        self.assertAlmostEqual(melee, native_melee * 0.95)
-        self.assertAlmostEqual(spell, native_spell * 0.95)
+        self.assertAlmostEqual(melee, native_melee * 0.80)
+        self.assertAlmostEqual(spell, native_spell * 0.80)
 
         mixed_melee = (
             max(row.melee_crit_base for row in natives)
             + adventurer.agility * max(row.melee_crit_ratio for row in natives)
-        ) * 100.0 * 0.95
+        ) * 100.0 * 0.80
         self.assertLess(melee, mixed_melee)
 
     def test_level_one_runtime_does_not_require_death_knight_player_stats(self):
