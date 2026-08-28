@@ -17,25 +17,28 @@ class WorldUpdateTests(unittest.TestCase):
         (root / "src" / "server" / "game").mkdir(parents=True)
         return root
 
-    def test_installs_chassis_history_and_80_percent_rebalance_idempotently(self):
+    def test_installs_chassis_rebalance_and_totem_fallbacks_idempotently(self):
         with tempfile.TemporaryDirectory() as td:
             core = self.make_core(Path(td) / "core")
             results = world.install(core)
 
-            self.assertEqual(len(results), 2)
+            self.assertEqual(len(results), 3)
             self.assertTrue(all(changed for _target, changed in results))
 
             original = core / world.WORLD_UPDATES[0].relative
             rebalance = core / world.WORLD_UPDATES[1].relative
+            totems = core / world.WORLD_UPDATES[2].relative
             self.assertTrue(original.is_file())
             self.assertTrue(rebalance.is_file())
+            self.assertTrue(totems.is_file())
             self.assertEqual(world.WORLD_UPDATES[0].source.name, "003_adventurer_chassis.sql")
             self.assertEqual(world.WORLD_UPDATES[1].source.name, "005_adventurer_chassis_80.sql")
-            self.assertNotIn("guardian", world.WORLD_UPDATES[0].source.name.lower())
-            self.assertNotIn("guardian", world.WORLD_UPDATES[1].source.name.lower())
+            self.assertEqual(world.WORLD_UPDATES[2].source.name, "006_adventurer_totem_models.sql")
+            self.assertTrue(all("guardian" not in update.source.name.lower() for update in world.WORLD_UPDATES))
 
             original_sql = original.read_text(encoding="utf-8")
             rebalance_sql = rebalance.read_text(encoding="utf-8")
+            totem_sql = totems.read_text(encoding="utf-8")
             self.assertIn("@ADVENTURER_SCALE := 0.95", original_sql)
             self.assertIn("@ADVENTURER_SCALE := 0.80", rebalance_sql)
             self.assertIn("MAX(`BaseHP`)", rebalance_sql)
@@ -43,17 +46,24 @@ class WorldUpdateTests(unittest.TestCase):
             self.assertIn("gtoctclasscombatratingscalar_dbc", rebalance_sql)
             self.assertIn("gtregenmpperspt_dbc", rebalance_sql)
 
+            self.assertIn("INSERT IGNORE INTO `player_totem_model`", totem_sql)
+            self.assertIn("SELECT `TotemID`, 7, `ModelID`", totem_sql)
+            self.assertIn("WHERE `RaceID` = 3", totem_sql)
+            for race_id in (1, 4, 5, 7, 10):
+                self.assertIn(f"SELECT `TotemID`, {race_id}, `ModelID`", totem_sql)
+
             results_again = world.install(core)
-            self.assertEqual(len(results_again), 2)
+            self.assertEqual(len(results_again), 3)
             self.assertTrue(all(not changed for _target, changed in results_again))
 
-            self.assertEqual(world.verify(core), [original, rebalance])
+            self.assertEqual(world.verify(core), [original, rebalance, totems])
 
             removed = world.remove(core)
-            self.assertEqual(len(removed), 2)
+            self.assertEqual(len(removed), 3)
             self.assertTrue(all(changed for _target, changed in removed))
             self.assertFalse(original.exists())
             self.assertFalse(rebalance.exists())
+            self.assertFalse(totems.exists())
 
     def test_fixed_talent_updates_are_cleanup_only(self):
         self.assertEqual(
