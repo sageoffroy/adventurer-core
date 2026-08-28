@@ -3,15 +3,20 @@
 
 The report reads the same World-DB mirror tables AzerothCore uses for base class
 stats and crit/regen curves. It also shows naked HP/mana using the exact WotLK
-stamina/intellect rules and, for Adventurer, the runtime crit result used by the
-class-10 core patch: 95% of the best complete native formula for the
-Adventurer's current base Agility/Intellect.
+stamina/intellect rules and, for Adventurer, the zero-armor runtime crit
+baseline used by the class-10 core patch: 80% of the best complete native
+formula for the Adventurer's current base Agility/Intellect.
+
+Live physical Agility is additionally reduced by the Adventurer armor tradeoff
+(half of physical Armor reduction, capped at 30%). This DB-only report does not
+know the character's equipped Armor, so its M.Crit value is the zero-armor
+baseline rather than the final geared value.
 
 Death Knight has no player_class_stats rows below level 55, but its DBC crit
 curves still exist and the runtime class-10 formula evaluates every native DBC
 slot. Therefore crit curves are queried independently from player_class_stats so
-level-1 audits exactly mirror the core instead of failing on the missing DK stat
-row.
+level-1 audits exactly mirror the base curves instead of failing on the missing
+DK stat row.
 
 No database rows are modified.
 """
@@ -32,7 +37,7 @@ class AuditError(RuntimeError):
 
 
 ADVENTURER_CLASS = 10
-ADVENTURER_SCALE = 0.95
+ADVENTURER_SCALE = 0.80
 NATIVE_CLASSES = (1, 2, 3, 4, 5, 6, 7, 8, 9, 11)
 ALL_CLASSES = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
 CLASS_NAMES = {
@@ -329,8 +334,8 @@ def main() -> int:
         print("Adventurer chassis audit (read-only)")
         print(f"config: {conf}")
         print(f"world DB: {world.database}")
-        print("M.Crit/S.Crit = runtime formula; M.DBC/S.DBC = this class's DB slot formula.")
-        print("For native classes those pairs are equal. For Adventurer they intentionally differ after the full-formula fix.")
+        print("M.Crit/S.Crit = zero-armor runtime baseline; M.DBC/S.DBC = this class's DB slot formula.")
+        print("For native classes those pairs are equal. Adventurer physical crit is further reduced by equipped Armor at runtime.")
         print("Death Knight has no stat row below 55; its DBC crit curve is still included in Adventurer runtime comparisons.")
         print()
         for index, level in enumerate(levels):
