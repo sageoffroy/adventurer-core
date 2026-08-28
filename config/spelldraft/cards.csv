@@ -192,6 +192,7 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 208;summon_succubus;active;20;epic;100;712;90:1;;;0;Invocar súcubo
 209;rain_of_fire;active;20;rare;100;5740;;;;0;Lluvia de Fuego
 210;felsteed;active;20;rare;100;5784;;;;0;Corcel nefasto
+211;icy_touch;active;1;common;100;45477;;;;0;Toque helado
 101;cruelty;talent;10;common;120;12320/12852/12853/12855/12856;;;;1;Crueldad
 102;deflection;talent;10;common;100;16462/16463/16464/16465/16466;;;;1;Desvío
 103;anticipation;talent;10;common;90;12297/12750/12751/12752/12753;;;;1;Anticipación

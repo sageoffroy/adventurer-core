@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 from dbc import DBCError, patch_directory
+from dk_adaptations import patch_dk_directory, render_lua_data
 from mpq import write_mpq
 from subclasses import patch_subclass_directory
 from talents import patch_talent_directory
@@ -22,6 +23,7 @@ ADVENTURER_PLAYER_FRAME = ROOT / "client" / "AdventurerPlayerFrame.xml"
 ADVENTURER_RESOURCES = ROOT / "client" / "AdventurerResources.lua"
 ADVENTURER_DRAFT_META = ROOT / "client" / "AdventurerDraftMeta.lua"
 ADVENTURER_COLLECTIONS = ROOT / "client" / "AdventurerCollections.lua"
+ADVENTURER_SPELL_TOOLTIPS = ROOT / "client" / "AdventurerSpellTooltips.lua"
 ADVENTURER_FRAME_ART = ROOT / "client" / "art" / "UI-AdventurerFrame.blp"
 ADVENTURER_PLAYER_FRAME_INTERNAL = "Interface\\FrameXML\\AdventurerPlayerFrame.xml"
 ADVENTURER_DRAFT_META_INTERNAL = "Interface\\FrameXML\\AdventurerDraftMeta.lua"
@@ -203,7 +205,11 @@ def build_frame_xml_toc() -> bytes:
             f"PlayerFrame/PartyFrame anchor count={text.count(marker)}"
         )
 
-    return text.replace(marker, replacement, 1).encode("utf-8")
+    text = text.replace(marker, replacement, 1)
+    # ItemRefTooltip is created later than PlayerFrame. Hook it only afterwards.
+    if text.count("ItemRef.xml\n") != 1:
+        raise ClientError("FrameXML baseline has no unique ItemRef tooltip anchor")
+    return text.replace("ItemRef.xml\n", "ItemRef.xml\nAdventurerSpellTooltips.lua\n").encode("utf-8")
 
 
 def build_adventurer_player_frame_xml() -> bytes:
@@ -410,6 +416,7 @@ def patch_dbc_copy(source: Path, work: Path) -> dict[str, bool]:
     changed = patch_directory(work)
     changed.update(patch_subclass_directory(work))
     changed.update(patch_talent_directory(work))
+    changed.update(patch_dk_directory(work))
     return changed
 
 
@@ -421,6 +428,7 @@ def build_archive_files(work: Path) -> tuple[dict[str, bytes], dict[str, bytes]]
         "Interface\\FrameXML\\AdventurerResources.lua": build_adventurer_resources_lua(),
         ADVENTURER_DRAFT_META_INTERNAL: build_adventurer_draft_meta_lua(),
         ADVENTURER_COLLECTIONS_INTERNAL: build_adventurer_collections_lua(),
+        "Interface\\FrameXML\\AdventurerSpellTooltips.lua": render_lua_data() + ADVENTURER_SPELL_TOOLTIPS.read_bytes(),
         ADVENTURER_FRAME_INTERNAL: build_adventurer_frame_art(),
         **{
             f"DBFilesClient\\{name}": (work / name).read_bytes()

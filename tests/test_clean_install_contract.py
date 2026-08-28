@@ -59,6 +59,7 @@ class CleanInstallContractTests(unittest.TestCase):
             (
                 "src/server/scripts/Custom/adventurer_core.cpp",
                 "src/server/scripts/Custom/adventurer_collections.cpp",
+                "src/server/game/Spells/AdventurerSpellScaling.h",
             ),
         )
 

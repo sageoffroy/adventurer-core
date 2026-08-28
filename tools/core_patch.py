@@ -742,22 +742,67 @@ def patch_player_cpp(text: str) -> str:
     )
 
 
+def patch_spell_info(text: str) -> str:
+    text = replace_once(
+        text, '#include "SpellInfo.h"',
+        '#include "SpellInfo.h"\n#include "AdventurerSpellScaling.h"',
+        "SpellInfo native Adventurer scaling include",
+    )
+    anchor = """    int32 randomPoints = int32(DieSides);
+
+    // base amount modification based on spell lvl vs caster lvl"""
+    replacement = """    int32 randomPoints = int32(DieSides);
+
+    // Preserve native rolls, effect modifiers, AP coefficients and disease
+    // triggers. Only replace this Adventurer spell's unmodified base range.
+    // Explicit CastCustomSpell base-point overrides remain authoritative.
+    if (caster && caster->IsPlayer() && caster->getClass() == CLASS_ADVENTURER &&
+        EffectIndex == EFFECT_0 && AdventurerSpells::IsIcyTouch(_spellInfo->Id) &&
+        (!bp || *bp == BasePoints))
+    {
+        auto const range = AdventurerSpells::IcyTouchRange(caster->GetLevel());
+        basePointsPerLevel = 0.0f;
+        basePoints = range.minimum - 1;
+        randomPoints = range.maximum - range.minimum + 1;
+    }
+
+    // base amount modification based on spell lvl vs caster lvl"""
+    text = replace_once(text, anchor, replacement, "SpellInfo native Icy Touch base range")
+    anchor = """            case POWER_MANA:
+                powerCost += int32(CalculatePct(caster->GetCreateMana(), ManaCostPercentage));
+                break;"""
+    replacement = """            case POWER_MANA:
+                if (caster->IsPlayer() && caster->getClass() == CLASS_ADVENTURER &&
+                    AdventurerSpells::IsIcyTouch(Id) && ManaCostPercentage == 8)
+                    powerCost += AdventurerSpells::IcyTouchManaCost(caster->GetCreateMana());
+                else
+                    powerCost += int32(CalculatePct(caster->GetCreateMana(), ManaCostPercentage));
+                break;"""
+    return replace_once(text, anchor, replacement, "SpellInfo native Icy Touch rounded mana cost")
+
+
 TRANSFORMS = {
     "src/server/shared/SharedDefines.h": patch_shared_defines,
     "src/server/shared/enuminfo_SharedDefines.cpp": patch_enuminfo,
     "src/server/game/Entities/Unit/StatSystem.cpp": patch_stat_system,
     "src/server/game/Entities/Player/PlayerStorage.cpp": patch_player_storage,
     "src/server/game/Entities/Player/Player.cpp": patch_player_cpp,
+    "src/server/game/Spells/SpellInfo.cpp": patch_spell_info,
     "src/server/scripts/Custom/custom_script_loader.cpp": patch_custom_loader,
 }
 
 PAYLOAD_FILES = (
     "src/server/scripts/Custom/adventurer_core.cpp",
     "src/server/scripts/Custom/adventurer_collections.cpp",
+    "src/server/game/Spells/AdventurerSpellScaling.h",
 )
 
 
 def plan(core: Path, payload_root: Path, *, allow_payload_replace: bool = False) -> list[PlannedFile]:
+    from dk_adaptations import HEADER_RELATIVE, render_header
+    header = payload_root / HEADER_RELATIVE
+    if not header.is_file() or header.read_bytes() != render_header():
+        raise PatchError("Icy Touch generated header is stale; run python3 tools/dk_adaptations.py")
     planned: list[PlannedFile] = []
     for relative, transform in TRANSFORMS.items():
         path = core / relative

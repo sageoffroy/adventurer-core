@@ -207,6 +207,14 @@ void AddCustomScripts()
 """
 
 FILES = {
+    "src/server/game/Spells/SpellInfo.cpp": '''#include "SpellInfo.h"
+    int32 randomPoints = int32(DieSides);
+
+    // base amount modification based on spell lvl vs caster lvl
+            case POWER_MANA:
+                powerCost += int32(CalculatePct(caster->GetCreateMana(), ManaCostPercentage));
+                break;
+''',
     "src/server/shared/SharedDefines.h": SHARED,
     "src/server/shared/enuminfo_SharedDefines.cpp": ENUMINFO,
     "src/server/game/Entities/Unit/StatSystem.cpp": STAT,
@@ -228,6 +236,9 @@ class CorePatchTests(unittest.TestCase):
         runtime.write_text("void AddAdventurerCoreScripts() {}\n", encoding="utf-8")
         collection = payload_root / "src/server/scripts/Custom/adventurer_collections.cpp"
         collection.write_text("void AddAdventurerCollectionScripts() {}\n", encoding="utf-8")
+        header = payload_root / "src/server/game/Spells/AdventurerSpellScaling.h"
+        header.parent.mkdir(parents=True)
+        header.write_bytes((ROOT / "payload/core/src/server/game/Spells/AdventurerSpellScaling.h").read_bytes())
         return payload_root
 
     def test_known_predecessor_transition_is_exact_and_idempotent(self):
@@ -242,7 +253,7 @@ class CorePatchTests(unittest.TestCase):
             core = Path(td)
             payload = self.make_tree(core)
             first = plan(core, payload)
-            self.assertEqual(len(first), 8)
+            self.assertEqual(len(first), 10)
             storage = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("PlayerStorage.cpp"))
             self.assertEqual(storage.count("getClass() != CLASS_ADVENTURER) ||"), 2)
             self.assertIn("getClass() != CLASS_ADVENTURER && proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD", storage)

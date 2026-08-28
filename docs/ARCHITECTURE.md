@@ -29,6 +29,10 @@ upgrade cannot leave ghost fixed talents behind.
 
 ## Talent model
 
+The `feature/spelldraft-v1-with-dk` branch adds native Icy Touch through the same
+DBC, catalog and source-patch pipeline. Its reviewed 1–80 base-damage curve is
+shared with the client tooltip. See [test contract](icy-touch-testing.md).
+
 `config/spelldraft/cards.csv` is the runtime catalog. Entries with
 `type=talent` define the talent cards available through SpellDraft and their
 rank spell IDs. The server persists the owned rank and `Libro de talentos`
