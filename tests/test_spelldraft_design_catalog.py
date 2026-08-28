@@ -19,7 +19,7 @@ METADATA = ROOT / "config" / "spelldraft" / "catalog_metadata.csv"
 class SpellDraftDesignCatalogTests(unittest.TestCase):
     def test_design_snapshot_contains_level_20_rarities_and_associations(self) -> None:
         metadata = spelldraft_runtime.parse_catalog_metadata(METADATA.read_text(encoding="utf-8"))
-        self.assertEqual(len(metadata), 211)
+        self.assertEqual(len(metadata), 223)
         self.assertEqual(metadata[8092]["rarity"], "uncommon")  # Explosión mental
         self.assertEqual(metadata[122]["rarity"], "epic")       # Nova de Escarcha
         self.assertEqual(metadata[5277]["rarity"], "epic")      # Evasión

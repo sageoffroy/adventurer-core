@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 from dbc import DBCError, patch_directory
+from dk_adaptations import patch_dk_directory
 from mpq import write_mpq
 from subclasses import patch_subclass_directory
 from talents import patch_talent_directory
@@ -47,7 +48,7 @@ TALENT_DBCS = (
 )
 # SpellIcon.dbc is read only to resolve existing Blizzard icon IDs by name. It is
 # never modified or packaged by Adventurer Core.
-TALENT_SOURCE_ONLY_DBCS = ("SpellIcon.dbc",)
+TALENT_SOURCE_ONLY_DBCS = ("SpellIcon.dbc", "SpellDuration.dbc")
 DBC_NAMES = CLASS_DBCS + TALENT_DBCS
 DBC_SOURCE_NAMES = DBC_NAMES + TALENT_SOURCE_ONLY_DBCS
 
@@ -410,6 +411,7 @@ def patch_dbc_copy(source: Path, work: Path) -> dict[str, bool]:
     changed = patch_directory(work)
     changed.update(patch_subclass_directory(work))
     changed.update(patch_talent_directory(work))
+    changed.update(patch_dk_directory(work))
     return changed
 
 

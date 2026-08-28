@@ -228,6 +228,7 @@ class CorePatchTests(unittest.TestCase):
         runtime.write_text("void AddAdventurerCoreScripts() {}\n", encoding="utf-8")
         collection = payload_root / "src/server/scripts/Custom/adventurer_collections.cpp"
         collection.write_text("void AddAdventurerCollectionScripts() {}\n", encoding="utf-8")
+        (collection.parent / "adventurer_dk.cpp").write_text("void AddAdventurerDKScripts() {}\n")
         return payload_root
 
     def test_known_predecessor_transition_is_exact_and_idempotent(self):
@@ -242,7 +243,7 @@ class CorePatchTests(unittest.TestCase):
             core = Path(td)
             payload = self.make_tree(core)
             first = plan(core, payload)
-            self.assertEqual(len(first), 8)
+            self.assertEqual(len(first), 9)
             storage = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("PlayerStorage.cpp"))
             self.assertEqual(storage.count("getClass() != CLASS_ADVENTURER) ||"), 2)
             self.assertIn("getClass() != CLASS_ADVENTURER && proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD", storage)

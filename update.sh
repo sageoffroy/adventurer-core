@@ -30,6 +30,7 @@ fi
 # Upgrade only Adventurer-owned source/runtime/client state. The original clean
 # installation backups remain untouched, so rollback still returns all the way
 # to the pre-Adventurer server rather than merely to the previous package build.
+python3 "$ROOT/tools/world.py" preflight-dk --core-dir "$core_dir"
 python3 "$ROOT/tools/upgrade.py" "$@"
 
 # Active spell ranks are upgraded by AzerothCore from db_world.spell_ranks.

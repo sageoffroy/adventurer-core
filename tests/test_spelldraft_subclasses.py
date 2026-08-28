@@ -120,7 +120,7 @@ class SpellDraftSubclassTests(unittest.TestCase):
         self.assertIn("changed.update(patch_subclass_directory(work))", self.client_builder)
         self.assertIn('"SkillLine.dbc"', self.client_builder)
         self.assertIn('"SkillLineAbility.dbc"', self.client_builder)
-        self.assertIn('TALENT_SOURCE_ONLY_DBCS = ("SpellIcon.dbc",)', self.client_builder)
+        self.assertIn('TALENT_SOURCE_ONLY_DBCS = ("SpellIcon.dbc", "SpellDuration.dbc")', self.client_builder)
 
     def test_runtime_keeps_cards_csv_parser_contract_and_separate_class_map(self) -> None:
         header = self.cards_text.splitlines()[0]

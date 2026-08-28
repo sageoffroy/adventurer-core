@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +13,21 @@ import world  # noqa: E402
 
 
 class WorldUpdateTests(unittest.TestCase):
+    def test_dk_reservation_rejects_foreign_rows_before_installation(self):
+        with patch.object(world, "read_database_info", return_value=object()), \
+                patch.object(world, "query_scalar", side_effect=["0", "0", "1"]):
+            with self.assertRaisesRegex(world.WorldUpdateError, "spell_ranks"):
+                world.preflight_dk_database(Path("/unused"))
+
+    def test_dk_reservation_allows_empty_or_previously_installed_ranges(self):
+        with patch.object(world, "read_database_info", return_value=object()), \
+                patch.object(world, "query_scalar", side_effect=["0", "0", "0", "0", "0"]):
+            world.preflight_dk_database(Path("/unused"))
+        with patch.object(world, "read_database_info", return_value=object()), \
+                patch.object(world, "query_scalar", return_value="1") as query:
+            world.preflight_dk_database(Path("/unused"))
+            self.assertEqual(query.call_count, 1)
+
     def make_core(self, root: Path) -> Path:
         (root / "data" / "sql" / "updates" / "pending_db_world").mkdir(parents=True)
         (root / "src" / "server" / "game").mkdir(parents=True)
@@ -22,7 +38,7 @@ class WorldUpdateTests(unittest.TestCase):
             core = self.make_core(Path(td) / "core")
             results = world.install(core)
 
-            self.assertEqual(len(results), 2)
+            self.assertEqual(len(results), 3)
             self.assertTrue(all(changed for _target, changed in results))
 
             original = core / world.WORLD_UPDATES[0].relative
@@ -44,13 +60,13 @@ class WorldUpdateTests(unittest.TestCase):
             self.assertIn("gtregenmpperspt_dbc", rebalance_sql)
 
             results_again = world.install(core)
-            self.assertEqual(len(results_again), 2)
+            self.assertEqual(len(results_again), 3)
             self.assertTrue(all(not changed for _target, changed in results_again))
 
-            self.assertEqual(world.verify(core), [original, rebalance])
+            self.assertEqual(world.verify(core), [core / update.relative for update in world.WORLD_UPDATES])
 
             removed = world.remove(core)
-            self.assertEqual(len(removed), 2)
+            self.assertEqual(len(removed), 3)
             self.assertTrue(all(changed for _target, changed in removed))
             self.assertFalse(original.exists())
             self.assertFalse(rebalance.exists())

@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 from dbc import ADVENTURER_CLASS_MASK, DBC, set_u32, u32
+from dk_adaptations import ABILITIES
 from subclasses import (
     CARDS_PATH,
     SKILLLINEABILITY_FIELDS,
@@ -91,6 +92,14 @@ def load_server_rank_chains(path: Path) -> dict[int, tuple[int, ...]]:
             )
         for spell in chain:
             by_spell[spell] = chain
+    # Owned adaptations use the same native server rank machinery. Their
+    # pending migration is package-owned, not part of the upstream base dump.
+    for ability in ABILITIES:
+        if ability.scaled:
+            for spell in ability.spell_ids:
+                if spell in by_spell:
+                    raise SpellRankTabError(f"owned DK rank {spell} collides with a native rank")
+                by_spell[spell] = ability.spell_ids
     return by_spell
 
 

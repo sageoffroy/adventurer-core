@@ -91,7 +91,7 @@ jobs:
           runtime = next(item for item in planned if item.relative_path == runtime_rel)
           collection = next(item for item in planned if item.relative_path == collection_rel)
 
-          assert len(planned) == 8
+          assert len(planned) == 9
           assert runtime.original is None
           assert runtime.patched == (payload / runtime_rel).read_bytes()
           assert collection.original is None
@@ -139,3 +139,34 @@ jobs:
 
           print("Supported clean-core no-DK + SpellDraft API smoke test OK")
           PY
+      - name: Install C++ syntax-check dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build libboost-all-dev libmysqlclient-dev libssl-dev zlib1g-dev libreadline-dev libbz2-dev
+      - name: Checkout the project's server repository
+        uses: actions/checkout@v4
+        with:
+          repository: sageoffroy/aventurerosdeazeroth
+          ref: main
+          path: _user-core
+          fetch-depth: 1
+      - name: Stage the normal installer payload for compilation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, "tools")
+          from core_patch import plan
+          core = Path("_user-core").resolve()
+          for item in plan(core, Path("payload/core").resolve()):
+              target = core / item.relative_path
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(item.patched)
+          PY
+      - name: Configure real core headers without precompiled headers
+        run: >-
+          cmake -S _user-core -B _syntax-build -G Ninja
+          -DAPPS_BUILD=world-only -DSCRIPTS=static -DMODULES=none -DTOOLS_BUILD=none
+          -DUSE_COREPCH=OFF -DUSE_SCRIPTPCH=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: Compile-check all owned C++ payloads
+        run: python tools/check_cpp_syntax.py --build-dir _syntax-build

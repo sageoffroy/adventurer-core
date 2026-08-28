@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 
 from database import _run_mysql, query_scalar, read_database_info
+from dk_adaptations import owned_spell_ids
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -49,7 +50,29 @@ WORLD_UPDATES: tuple[WorldUpdate, ...] = (
         ROOT / "sql" / "world" / "005_adventurer_chassis_80.sql",
         "rev_1787446800000000002.sql",
     ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "006_adventurer_dk_first_batch.sql",
+        "rev_1787875200000000000.sql",
+    ),
 )
+
+
+def preflight_dk_database(core: Path, conf: Path | None = None) -> None:
+    """New ranges must be empty on first install; never overwrite foreign rows.
+
+    This makes explicit owned-row cleanup safe even for older installations
+    whose original chassis rollback snapshot predates this feature.
+    """
+    conf = conf or (core / DEFAULT_CONF_RELATIVE)
+    db = read_database_info(conf, "WorldDatabaseInfo")
+    ids = ",".join(map(str, owned_spell_ids()))
+    applied = int(query_scalar(db, "SELECT COUNT(*) FROM `updates` WHERE `name` = 'rev_1787875200000000000.sql'"))
+    if applied:
+        return
+    for table, column in (("spell_dbc", "ID"), ("spell_ranks", "spell_id"),
+                          ("spell_script_names", "spell_id"), ("spell_bonus_data", "entry")):
+        if int(query_scalar(db, f"SELECT COUNT(*) FROM `{table}` WHERE `{column}` IN ({ids})")):
+            raise WorldUpdateError(f"DK owned IDs already exist in {table}; refusing to overwrite them")
 
 # Kept as aliases for older callers/tests that referenced the single-update API.
 WORLD_UPDATE_SOURCE = WORLD_UPDATES[0].source
@@ -152,7 +175,18 @@ def cleanup_database(core: Path, conf: Path | None = None) -> None:
 
     update_names = tuple(update.name for update in WORLD_UPDATES) + LEGACY_FIXED_TALENT_UPDATE_NAMES
     names = ", ".join("'" + name.replace("'", "''") + "'" for name in update_names)
+    dk_ids = ",".join(map(str, owned_spell_ids()))
+    dk_applied = int(query_scalar(db, "SELECT COUNT(*) FROM `updates` WHERE `name` = 'rev_1787875200000000000.sql'"))
+    dk_cleanup = ""
+    if dk_applied:
+        dk_cleanup = f"""
+DELETE FROM `spell_ranks` WHERE `spell_id` IN ({dk_ids});
+DELETE FROM `spell_script_names` WHERE `spell_id` IN ({dk_ids});
+DELETE FROM `spell_bonus_data` WHERE `entry` IN ({dk_ids});
+"""
     sql = f"""
+{dk_cleanup}
+
 DELETE FROM `spell_script_names`
 WHERE (`spell_id` BETWEEN {LEGACY_FIXED_TALENT_SPELL_MIN} AND {LEGACY_FIXED_TALENT_SPELL_MAX})
    OR (`spell_id` BETWEEN {-LEGACY_FIXED_TALENT_SPELL_MAX} AND {-LEGACY_FIXED_TALENT_SPELL_MIN});
@@ -191,13 +225,20 @@ def parser() -> argparse.ArgumentParser:
     cleanup.add_argument("--core-dir", required=True, type=Path)
     cleanup.add_argument("--worldserver-conf", type=Path)
 
+    preflight = sub.add_parser("preflight-dk")
+    preflight.add_argument("--core-dir", required=True, type=Path)
+    preflight.add_argument("--worldserver-conf", type=Path)
+
     return result
 
 
 def main() -> int:
     args = parser().parse_args()
     try:
-        if args.command == "install":
+        if args.command == "preflight-dk":
+            preflight_dk_database(args.core_dir.expanduser().resolve(), args.worldserver_conf)
+            print("DK spell database reservation is available or already installed.")
+        elif args.command == "install":
             results = install(args.core_dir)
             changed = sum(1 for _target, was_changed in results if was_changed)
             print(

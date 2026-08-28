@@ -22,6 +22,8 @@
 #include <unordered_map>
 #include <vector>
 
+void AddAdventurerDKScripts();
+
 namespace
 {
 constexpr uint32 SKILL_RIDING = 762;
@@ -819,6 +821,14 @@ bool IsCardEligible(Player const* player, DraftState const& state, DraftCard con
         return false;
 
     uint32 playerLevel = player ? player->GetLevel() : 1;
+    // Adapted DK roots have actual low-level cast requirements. Do not offer
+    // them early through the normal source-level lookahead used by stock cards.
+    if (type == DraftCardType::Active)
+        for (uint32 spellId : card.rankGrants.front())
+            if (spellId >= 280001 && spellId <= 281180)
+                if (SpellInfo const* info = sSpellMgr->GetSpellInfo(spellId))
+                    if (std::max(info->BaseLevel, info->SpellLevel) > playerLevel)
+                        return false;
     uint32 sourceCap = playerLevel;
     if (type == DraftCardType::Active)
     {
@@ -1802,5 +1812,6 @@ public:
 
 void AddAdventurerCoreScripts()
 {
+    AddAdventurerDKScripts();
     new AdventurerCorePlayerScript();
 }

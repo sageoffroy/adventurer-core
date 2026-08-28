@@ -754,6 +754,7 @@ TRANSFORMS = {
 PAYLOAD_FILES = (
     "src/server/scripts/Custom/adventurer_core.cpp",
     "src/server/scripts/Custom/adventurer_collections.cpp",
+    "src/server/scripts/Custom/adventurer_dk.cpp",
 )
 
 

@@ -47,11 +47,11 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 47;aspect_of_the_hawk;active;10;common;100;13165;;;;0;Aspecto del halcón
 48;track_humanoids;active;10;common;90;19883;;;;0;Rastrear humanoides
 49;tame_beast;active;10;epic;100;1515+883+2641+6991+982;;;;0;Domesticar bestia
-50;eviscerate;active;1;common;100;2098;;14:1|51:1|53:1;;0;Eviscerar
+50;eviscerate;active;1;common;100;2098;;14:1|51:1|53:1|220:1;;0;Eviscerar
 51;backstab;active;4;common;100;53;;;50,55;0;Puñalada
 53;gouge;active;6;common;100;1776;;;50,55;0;Gubia
 54;evasion;active;8;common;100;5277;;;;0;Evasión
-55;slice_and_dice;active;10;common;100;5171;;14:1|51:1|53:1;;0;Hacer picadillo
+55;slice_and_dice;active;10;common;100;5171;;14:1|51:1|53:1|220:1;;0;Hacer picadillo
 56;sprint;active;10;common;100;2983;;;;0;Sprint
 57;lesser_heal;active;1;common;100;2050;;;;0;Sanación inferior
 58;power_word_fortitude;active;1;common;100;1243;;;;0;Palabra de poder: entereza
@@ -199,3 +199,15 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 105;improved_frostbolt;talent;10;uncommon;180;11070/12473/16763/16765/16766;3:1;;;1;Descarga de Escarcha mejorada
 106;tactical_mastery;talent;10;uncommon;250;12295/12676/12677;1:1;;;1;Maestría táctica
 107;improved_heroic_strike;talent;10;uncommon;180;12282/12663/12664;8:1;;;1;Golpe heroico mejorado
+211;blood_presence;active;1;common;100;280001;;;;0;Presencia de sangre
+212;blood_strike;active;1;rare;100;280101;;;;0;Golpe sangriento
+213;blood_tap;active;10;common;100;280201;;;;0;Transfusión de sangre
+214;dark_command;active;10;common;100;280301;;;;0;Orden oscura
+215;icy_touch;active;1;common;100;280401;;;;0;Toque helado
+216;frost_presence;active;1;common;100;280501;;;;0;Presencia de escarcha
+217;mind_freeze;active;12;common;100;280601;;;;0;Helada mental
+218;chains_of_ice;active;8;common;100;280701;;;;0;Cadenas de hielo
+219;death_grip;active;1;rare;100;280801;;;;0;Atracción letal
+220;plague_strike;active;1;common;100;280901;;;;0;Golpe de peste
+221;death_strike;active;1;rare;100;281001;;14:1|51:1|53:1|220:1;;0;Golpe letal
+222;raise_dead;active;10;rare;100;281101;;;;0;Levantar muerto

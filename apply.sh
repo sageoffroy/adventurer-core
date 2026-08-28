@@ -28,6 +28,7 @@ if [[ -d "$core_dir/modules/mod-playerbots" ]]; then
 fi
 
 # Prepare the DB rollback snapshot before any source/client/runtime mutation.
+python3 "$ROOT/tools/world.py" preflight-dk --core-dir "$core_dir"
 python3 "$ROOT/tools/database.py" prepare "$@"
 
 # Core compatibility is determined by exact source anchors/APIs, not a frozen
