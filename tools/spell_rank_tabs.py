@@ -209,13 +209,14 @@ def patch_component_free_drafted_spells(
     cards_text: str | None = None,
     spec: dict | None = None,
 ) -> bool:
-    """Remove inventory component/tool requirements from all drafted active ranks.
+    """Remove inventory component/tool requirements from drafted active DBC rows.
 
-    SpellDraft abilities are self-contained for Adventurers.  We preserve weapon
+    SpellDraft abilities are self-contained for Adventurers. We preserve weapon
     and armor requirements because they are combat mechanics, but remove WotLK's
-    Totem, Reagent/ReagentCount and TotemCategory fields.  Expansion through the
+    Totem, Reagent/ReagentCount and TotemCategory fields. Expansion through the
     server spell_ranks table makes the rule apply to automatically learned ranks
-    too, not just the rank originally listed in cards.csv.
+    too. Some runtime-valid SpellDraft IDs have no client Spell.dbc row; those
+    IDs have no component metadata to rewrite here and are intentionally skipped.
     """
     spec = spec or load_spec()
     cards_text = cards_text if cards_text is not None else CARDS_PATH.read_text(encoding="utf-8")
@@ -227,19 +228,15 @@ def patch_component_free_drafted_spells(
         raise SpellRankTabError(f"{path}: unexpected Spell layout {dbc.fields}/{dbc.record_size}")
 
     rows_by_id = {u32(row, 0): row for row in dbc.records}
-    missing = sorted(set(drafted) - set(rows_by_id))
-    if missing:
-        raise SpellRankTabError(
-            "Spell.dbc is missing drafted spell ranks: " + ", ".join(map(str, missing))
-        )
+    present_drafted = sorted(set(drafted) & set(rows_by_id))
 
     before = dbc.to_bytes()
-    for spell_id in sorted(drafted):
+    for spell_id in present_drafted:
         row = rows_by_id[spell_id]
         for field in SPELL_COMPONENT_FIELDS:
             set_u32(row, field, 0)
 
-    for spell_id in drafted:
+    for spell_id in present_drafted:
         row = rows_by_id[spell_id]
         if any(u32(row, field) != 0 for field in SPELL_COMPONENT_FIELDS):
             raise SpellRankTabError(
