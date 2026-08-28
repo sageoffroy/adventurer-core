@@ -1,5 +1,5 @@
 # Client patch
 
-Adventurer Core owns the generated WotLK 3.3.5a `Z` patch family used to expose class ID 10 and its native talent trees to the client.
+Client-side Adventurer files in this directory are installed through the repository's existing client pipeline.
 
-The build/install pipeline is transactional and must keep the server and client DBC payload byte-identical.
+For the role of each client file and the server/client/DBC flow, see [`../docs/PROJECT_GUIDE.md`](../docs/PROJECT_GUIDE.md).
