@@ -17,36 +17,43 @@ class WorldUpdateTests(unittest.TestCase):
         (root / "src" / "server" / "game").mkdir(parents=True)
         return root
 
-    def test_installs_only_adventurer_chassis_update_idempotently(self):
+    def test_installs_chassis_history_and_80_percent_rebalance_idempotently(self):
         with tempfile.TemporaryDirectory() as td:
             core = self.make_core(Path(td) / "core")
             results = world.install(core)
 
-            self.assertEqual(len(results), 1)
-            self.assertTrue(results[0][1])
+            self.assertEqual(len(results), 2)
+            self.assertTrue(all(changed for _target, changed in results))
 
-            chassis = core / world.WORLD_UPDATES[0].relative
-            self.assertTrue(chassis.is_file())
+            original = core / world.WORLD_UPDATES[0].relative
+            rebalance = core / world.WORLD_UPDATES[1].relative
+            self.assertTrue(original.is_file())
+            self.assertTrue(rebalance.is_file())
             self.assertEqual(world.WORLD_UPDATES[0].source.name, "003_adventurer_chassis.sql")
+            self.assertEqual(world.WORLD_UPDATES[1].source.name, "005_adventurer_chassis_80.sql")
             self.assertNotIn("guardian", world.WORLD_UPDATES[0].source.name.lower())
+            self.assertNotIn("guardian", world.WORLD_UPDATES[1].source.name.lower())
 
-            chassis_sql = chassis.read_text(encoding="utf-8")
-            self.assertIn("@ADVENTURER_SCALE := 0.95", chassis_sql)
-            self.assertIn("MAX(`BaseHP`)", chassis_sql)
-            self.assertIn("MAX(`BaseMana`)", chassis_sql)
-            self.assertIn("gtoctclasscombatratingscalar_dbc", chassis_sql)
-            self.assertIn("gtregenmpperspt_dbc", chassis_sql)
+            original_sql = original.read_text(encoding="utf-8")
+            rebalance_sql = rebalance.read_text(encoding="utf-8")
+            self.assertIn("@ADVENTURER_SCALE := 0.95", original_sql)
+            self.assertIn("@ADVENTURER_SCALE := 0.80", rebalance_sql)
+            self.assertIn("MAX(`BaseHP`)", rebalance_sql)
+            self.assertIn("MAX(`BaseMana`)", rebalance_sql)
+            self.assertIn("gtoctclasscombatratingscalar_dbc", rebalance_sql)
+            self.assertIn("gtregenmpperspt_dbc", rebalance_sql)
 
             results_again = world.install(core)
-            self.assertEqual(len(results_again), 1)
-            self.assertFalse(results_again[0][1])
+            self.assertEqual(len(results_again), 2)
+            self.assertTrue(all(not changed for _target, changed in results_again))
 
-            self.assertEqual(world.verify(core), [chassis])
+            self.assertEqual(world.verify(core), [original, rebalance])
 
             removed = world.remove(core)
-            self.assertEqual(len(removed), 1)
-            self.assertTrue(removed[0][1])
-            self.assertFalse(chassis.exists())
+            self.assertEqual(len(removed), 2)
+            self.assertTrue(all(changed for _target, changed in removed))
+            self.assertFalse(original.exists())
+            self.assertFalse(rebalance.exists())
 
     def test_fixed_talent_updates_are_cleanup_only(self):
         self.assertEqual(
