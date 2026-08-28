@@ -25,12 +25,13 @@ from subclasses import (  # noqa: E402
 
 CARDS = """id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unlocks;replaces_previous;name
 1;test_spell;active;1;common;100;100;;;;0;Test Spell
+2;runtime_only_spell;active;1;common;100;704;;;;0;Runtime-only Spell
 """
 
 SPEC = {
     "schema": 1,
     "subclasses": [
-        {"key": "mercenary", "skill_line_id": 900, "card_ids": [1]},
+        {"key": "mercenary", "skill_line_id": 900, "card_ids": [1, 2]},
         {"key": "explorer", "skill_line_id": 901, "card_ids": []},
         {"key": "spellcaster", "skill_line_id": 902, "card_ids": []},
         {"key": "illuminated", "skill_line_id": 903, "card_ids": []},
@@ -118,13 +119,16 @@ class ServerRankTabTests(unittest.TestCase):
                 ADVENTURER_CLASS_MASK,
             )
 
-    def test_all_drafted_active_ranks_are_component_free(self) -> None:
+    def test_all_present_drafted_active_ranks_are_component_free(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             spell_path = root / "Spell.dbc"
             ranks_path = root / "spell_ranks.sql"
             ranks_path.write_text(SPELL_RANKS, encoding="utf-8")
 
+            # 704 is intentionally absent: runtime-valid SpellDraft IDs without
+            # a client Spell.dbc row must not block component cleanup for the
+            # drafted spells that do have client/server DBC metadata.
             DBC(
                 fields=234,
                 record_size=936,
