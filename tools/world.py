@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import sys
 
-from database import _run_mysql, query_scalar, read_database_info
+from database import DatabaseError, _run_mysql, query_scalar, read_database_info
 from dk_adaptations import owned_spell_ids
 
 
@@ -233,7 +233,10 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    args = parser().parse_args()
+    command_parser = parser()
+    args, unknown = command_parser.parse_known_args()
+    if unknown and args.command != "preflight-dk":
+        command_parser.error("unrecognized arguments: " + " ".join(unknown))
     try:
         if args.command == "preflight-dk":
             preflight_dk_database(args.core_dir.expanduser().resolve(), args.worldserver_conf)
@@ -268,7 +271,7 @@ def main() -> int:
             cleanup_database(args.core_dir, args.worldserver_conf)
             print("Adventurer maintenance DB rows and legacy fixed-talent residue cleaned.")
         return 0
-    except (WorldUpdateError, OSError) as exc:
+    except (DatabaseError, WorldUpdateError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 

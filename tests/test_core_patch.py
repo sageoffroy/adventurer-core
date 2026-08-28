@@ -213,6 +213,17 @@ FILES = {
     "src/server/game/Entities/Player/PlayerStorage.cpp": ALLOWABLE,
     "src/server/game/Entities/Player/Player.cpp": PLAYER,
     "src/server/scripts/Custom/custom_script_loader.cpp": LOADER,
+    "src/server/game/Spells/Spell.cpp": """void Spell::TakePower()
+{
+    Powers PowerType = Powers(m_spellInfo->PowerType);
+    bool hit = true;
+    if (m_caster->IsPlayer())
+    {
+        // unchanged native refund handling
+    }
+    // unchanged native power payment
+}
+""",
 }
 
 
@@ -243,7 +254,7 @@ class CorePatchTests(unittest.TestCase):
             core = Path(td)
             payload = self.make_tree(core)
             first = plan(core, payload)
-            self.assertEqual(len(first), 9)
+            self.assertEqual(len(first), 10)
             storage = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("PlayerStorage.cpp"))
             self.assertEqual(storage.count("getClass() != CLASS_ADVENTURER) ||"), 2)
             self.assertIn("getClass() != CLASS_ADVENTURER && proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD", storage)

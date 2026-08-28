@@ -16,6 +16,8 @@ Adventurer Core owns:
 - the four SpellDraft presentation subclasses (Mercenario, Explorador,
   Hechicero and Iluminado) and their custom SkillLines;
 - SpellDraft active/talent card progression, persistence and meta actions;
+- the first DK adaptation batch, installed through the same DBC, catalog,
+  source-patch and world-update paths (see `dk-first-batch-testing.md`);
 - the `Libro de talentos`, which displays talents actually owned through
   SpellDraft;
 - client patches required for the class, resource HUD and SpellDraft UI;

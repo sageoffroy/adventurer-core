@@ -1,5 +1,9 @@
 # Death Knight adaptation integration audit
 
+Historical audit checkpoint (`8a54a37`). Its implementation-status statements
+describe that checkpoint only. The first twelve spells are now implemented in
+the test branch; see [current integration and test guide](dk-first-batch-testing.md).
+
 ## Status and provenance
 
 Date: 2026-08-28. Branch: `feature/spelldraft-dk-adaptations-v1`.

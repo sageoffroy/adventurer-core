@@ -278,6 +278,8 @@ def patch_dk_directory(directory: Path) -> dict[str, bool]:
                 _text(dbc, row, "Consumes all current rage, granting 1 energy per displayed rage point. Overflow and fractional rage are lost. Requires positive rage.",
                       "Consume toda la ira actual y otorga 1 de energía por cada punto de ira. El exceso y las fracciones se pierden. Requiere tener ira.")
             elif key in ("blood_presence", "frost_presence"):
+                set_u32(row, 1, u32(templates[ability.native_id], 1))
+                set_u32(row, 30, 1000)  # retain the native shared presence category
                 _clear_effects(row)
                 if key == "blood_presence":
                     _effect(row, 0, 6, 5, target=1, aura=79, misc=127)

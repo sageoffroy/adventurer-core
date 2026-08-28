@@ -20,6 +20,7 @@ def main() -> None:
     args = parser.parse_args()
     commands = json.loads((args.build_dir / "compile_commands.json").read_text())
     wanted = {Path(path).name for path in PAYLOAD_FILES if path.endswith(".cpp")}
+    wanted.add("Spell.cpp")  # narrowly patched native resource-payment path
     checked = set()
     for entry in commands:
         name = Path(entry["file"]).name

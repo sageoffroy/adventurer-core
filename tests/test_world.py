@@ -106,6 +106,8 @@ class WorldUpdateTests(unittest.TestCase):
 
         self.assertIn('tools/world.py" install', apply_text)
         self.assertIn('tools/world.py" install', update_text)
+        self.assertIn('tools/world.py" preflight-dk "$@"', apply_text)
+        self.assertIn('tools/world.py" preflight-dk "$@"', update_text)
         self.assertIn('tools/world.py" verify', verify_text)
         self.assertIn('tools/world.py" cleanup-db', rollback_text)
         self.assertIn('tools/world.py" remove', rollback_text)

@@ -93,19 +93,8 @@ class spell_adventurer_dk : public SpellScript
         if (family == BloodTap)
         {
             int32 rage = caster->GetPower(POWER_RAGE);
-            GetSpell()->m_powerCost = 0;
             caster->SetPower(POWER_RAGE, 0);
             caster->ModifyPower(POWER_ENERGY, rage / 10);
-        }
-        else if (family == PlagueStrike || family == DeathGrip)
-        {
-            // OnCast is after successful validation and before TakePower.
-            // Charge exactly once, with native cost modifiers, including misses.
-            // Clearing this cast's cost prevents native miss refunds/double pay.
-            int32 cost = GetSpell()->GetPowerCost();
-            GetSpell()->m_powerCost = 0;
-            if (!caster->ToPlayer()->GetCommandStatus(CHEAT_POWER))
-                caster->ModifyPower(POWER_ENERGY, -cost);
         }
     }
 

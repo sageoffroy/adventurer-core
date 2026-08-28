@@ -91,7 +91,7 @@ jobs:
           runtime = next(item for item in planned if item.relative_path == runtime_rel)
           collection = next(item for item in planned if item.relative_path == collection_rel)
 
-          assert len(planned) == 9
+          assert len(planned) == 10
           assert runtime.original is None
           assert runtime.patched == (payload / runtime_rel).read_bytes()
           assert collection.original is None

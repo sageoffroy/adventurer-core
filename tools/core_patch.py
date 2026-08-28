@@ -742,12 +742,33 @@ def patch_player_cpp(text: str) -> str:
     )
 
 
+def patch_spell_power(text: str) -> str:
+    clean = """    Powers PowerType = Powers(m_spellInfo->PowerType);
+    bool hit = true;
+    if (m_caster->IsPlayer())
+    {"""
+    patched = """    Powers PowerType = Powers(m_spellInfo->PowerType);
+    // Adventurer Blood Tap pays its dynamic rage conversion in OnCast.
+    if (m_caster->IsPlayer() && m_caster->getClass() == CLASS_ADVENTURER && m_spellInfo->Id == 280201)
+        return;
+
+    // Only the owned Plague Strike ranks and Death Grip spend full energy on
+    // failure. Keep native cost calculation/payment and all other miss refunds.
+    bool const adventurerFullEnergyCost = m_caster->IsPlayer() && m_caster->getClass() == CLASS_ADVENTURER &&
+        PowerType == POWER_ENERGY && ((m_spellInfo->Id >= 280901 && m_spellInfo->Id <= 280980) || m_spellInfo->Id == 280801);
+    bool hit = true;
+    if (m_caster->IsPlayer() && !adventurerFullEnergyCost)
+    {"""
+    return replace_once(text, clean, patched, "Adventurer DK energy payment")
+
+
 TRANSFORMS = {
     "src/server/shared/SharedDefines.h": patch_shared_defines,
     "src/server/shared/enuminfo_SharedDefines.cpp": patch_enuminfo,
     "src/server/game/Entities/Unit/StatSystem.cpp": patch_stat_system,
     "src/server/game/Entities/Player/PlayerStorage.cpp": patch_player_storage,
     "src/server/game/Entities/Player/Player.cpp": patch_player_cpp,
+    "src/server/game/Spells/Spell.cpp": patch_spell_power,
     "src/server/scripts/Custom/custom_script_loader.cpp": patch_custom_loader,
 }
 
