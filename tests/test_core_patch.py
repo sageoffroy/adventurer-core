@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from core_patch import PatchError, plan  # noqa: E402
+from core_patch import PatchError, plan, replace_transitions  # noqa: E402
 
 
 SHARED = """enum Classes
@@ -230,6 +230,13 @@ class CorePatchTests(unittest.TestCase):
         collection.write_text("void AddAdventurerCollectionScripts() {}\n", encoding="utf-8")
         return payload_root
 
+    def test_known_predecessor_transition_is_exact_and_idempotent(self):
+        clean = "alpha"
+        old = "prefix alpha suffix"
+        new = "current"
+        self.assertEqual(replace_transitions(old, clean, (old,), new, "test"), new)
+        self.assertEqual(replace_transitions(new, clean, (old,), new, "test"), new)
+
     def test_plan_is_idempotent_after_first_application(self):
         with tempfile.TemporaryDirectory() as td:
             core = Path(td)
@@ -245,16 +252,21 @@ class CorePatchTests(unittest.TestCase):
             player = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("Player.cpp"))
             self.assertIn("runtime compares complete native formulas", player)
             self.assertIn("for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)", player)
-            self.assertIn("nativeBase->base + GetStat(STAT_AGILITY) * nativeRatio->ratio", player)
+            self.assertIn("nativeBase->base + effectiveAgility * nativeRatio->ratio", player)
             self.assertIn("nativeBase->base + GetStat(STAT_INTELLECT) * nativeRatio->ratio", player)
             self.assertIn("candidateTotal = candidateDiminishing + candidateNondiminishing", player)
-            self.assertGreaterEqual(player.count("bestCrit * 0.95f"), 2)
-            self.assertIn("bestDiminishing * 0.95f", player)
-            self.assertIn("bestNondiminishing * 0.95f", player)
+            self.assertIn("armorReduction * 0.50f", player)
+            self.assertIn("agilityPenalty > 0.30f", player)
+            self.assertGreaterEqual(player.count("bestCrit * 0.80f"), 2)
+            self.assertIn("bestDiminishing * 0.80f", player)
+            self.assertIn("bestNondiminishing * 0.80f", player)
 
             stat = next(item.patched.decode("utf-8") for item in first if item.relative_path.endswith("StatSystem.cpp"))
-            self.assertIn("Universal ranged baseline: 95% of Hunter's native formula", stat)
+            self.assertIn("Universal ranged baseline: 80% of Hunter's native formula", stat)
             self.assertIn("Universal melee baseline", stat)
+            self.assertIn("effectiveAgility", stat)
+            self.assertIn("armorReduction * 0.50f", stat)
+            self.assertIn("* 0.80f", stat)
             self.assertIn("145.560408f,    // Adventurer", stat)
 
             collection = next(
@@ -291,7 +303,7 @@ class CorePatchTests(unittest.TestCase):
 
             planned = plan(core, payload)
             player = next(item.patched.decode("utf-8") for item in planned if item.relative_path.endswith("Player.cpp"))
-            self.assertIn("runtime compares complete native formulas", player)
+            self.assertIn("0.044878f, // Adventurer 80% fallback", player)
             self.assertIn("runtime branch keeps native formulas intact", player)
 
     def test_partial_allowable_class_patch_is_rejected(self):
