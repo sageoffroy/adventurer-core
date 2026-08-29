@@ -33,8 +33,8 @@ constexpr std::array<char const*, 12> CompanyPlaces = {
 
 std::string GenerateCompanyName()
 {
-    return std::string("Los ") + CompanyTitles[urand(0, CompanyTitles.size() - 1)] +
-        " de " + CompanyPlaces[urand(0, CompanyPlaces.size() - 1)];
+    return std::string("Los ") + CompanyTitles[urand(0, static_cast<uint32>(CompanyTitles.size() - 1))] +
+        " de " + CompanyPlaces[urand(0, static_cast<uint32>(CompanyPlaces.size() - 1))];
 }
 
 std::vector<Player*> GetPartyMembers(Player* leader)
@@ -117,9 +117,9 @@ public:
     void OnBeforeConfigLoad(bool /*reload*/) override
     {
         GauntletEnabled = sConfigMgr->GetOption<bool>("AdventurerGauntlet.Enable", true);
-        GauntletStartLevel = sConfigMgr->GetOption<uint8>("AdventurerGauntlet.StartLevel", 1);
-        GauntletMinPlayers = sConfigMgr->GetOption<uint8>("AdventurerGauntlet.MinPlayers", 1);
-        GauntletMaxPlayers = sConfigMgr->GetOption<uint8>("AdventurerGauntlet.MaxPlayers", 5);
+        GauntletStartLevel = static_cast<uint8>(sConfigMgr->GetOption<uint32>("AdventurerGauntlet.StartLevel", 1));
+        GauntletMinPlayers = static_cast<uint8>(sConfigMgr->GetOption<uint32>("AdventurerGauntlet.MinPlayers", 1));
+        GauntletMaxPlayers = static_cast<uint8>(sConfigMgr->GetOption<uint32>("AdventurerGauntlet.MaxPlayers", 5));
     }
 };
 
