@@ -204,7 +204,7 @@ bool InstanceStillHasLivingAdventurers(Map* map, Player* fallen)
         if (!player || player == fallen || !player->IsAlive())
             continue;
 
-        if (PendingRunNames.contains(player->GetGUID().GetCounter()))
+        if (PendingRunNames.find(player->GetGUID().GetCounter()) != PendingRunNames.end())
             return true;
     }
 
