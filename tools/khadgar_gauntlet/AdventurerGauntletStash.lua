@@ -1,9 +1,9 @@
 -- Adventurer Gauntlet account stash UI for WoW 3.3.5a.
--- Uses Blizzard's native BankFrame artwork while keeping account-level stash logic.
+-- A single account bank: drag equipment in, click stored items to withdraw.
 
 local STASH_ITEMS = {}
 local SLOTS = {}
-local MAX_SLOTS = 28
+local MAX_SLOTS = 49
 local COLUMNS = 7
 local PREFIX = "AGSTASH"
 
@@ -13,9 +13,9 @@ local function SendCommand(command)
 end
 
 local frame = CreateFrame("Frame", "AdventurerGauntletStashFrame", UIParent)
-frame:SetWidth(384)
-frame:SetHeight(302)
-frame:SetPoint("CENTER", UIParent, "CENTER", -150, 45)
+frame:SetWidth(356)
+frame:SetHeight(382)
+frame:SetPoint("CENTER", UIParent, "CENTER", 0, 35)
 frame:SetFrameStrata("DIALOG")
 frame:SetMovable(true)
 frame:EnableMouse(true)
@@ -24,66 +24,47 @@ frame:SetScript("OnDragStart", function(self)
     if not CursorHasItem() then self:StartMoving() end
 end)
 frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-frame:Hide()
-
-tinsert(UISpecialFrames, "AdventurerGauntletStashFrame")
-
--- The upper half of Blizzard's bank artwork already contains the 7x4 item-slot grid.
-local topLeft = frame:CreateTexture(nil, "BORDER")
-topLeft:SetTexture("Interface\\BankFrame\\UI-BankFrame-TopLeft")
-topLeft:SetWidth(256)
-topLeft:SetHeight(256)
-topLeft:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
-
-local topRight = frame:CreateTexture(nil, "BORDER")
-topRight:SetTexture("Interface\\BankFrame\\UI-BankFrame-TopRight")
-topRight:SetWidth(256)
-topRight:SetHeight(256)
-topRight:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
-
--- Cover the bank's bag-slot section with a neutral Blizzard panel and finish the
--- shortened account-bank window with a standard dialog border.
-local lower = CreateFrame("Frame", nil, frame)
-lower:SetPoint("TOPLEFT", frame, "TOPLEFT", 6, -248)
-lower:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 6)
-lower:SetBackdrop({
+frame:SetBackdrop({
     bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
     tile = true,
     tileSize = 32,
-    edgeSize = 18,
-    insets = { left = 5, right = 5, top = 5, bottom = 5 }
+    edgeSize = 32,
+    insets = { left = 11, right = 11, top = 11, bottom = 11 }
 })
-lower:SetFrameLevel(frame:GetFrameLevel())
+frame:Hide()
 
-local portrait = frame:CreateTexture(nil, "ARTWORK")
-portrait:SetWidth(60)
-portrait:SetHeight(60)
-portrait:SetPoint("TOPLEFT", frame, "TOPLEFT", 7, -6)
-portrait:SetTexture("Interface\\Icons\\INV_Misc_Bag_07")
-if SetPortraitToTexture then
-    SetPortraitToTexture(portrait, "Interface\\Icons\\INV_Misc_Bag_07")
-end
+tinsert(UISpecialFrames, "AdventurerGauntletStashFrame")
 
-local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-title:SetPoint("TOP", frame, "TOP", 12, -18)
+local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+title:SetPoint("TOP", frame, "TOP", 0, -17)
 title:SetText("Baúl de Expediciones")
 
 local subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-subtitle:SetPoint("TOPLEFT", frame, "TOPLEFT", 70, -44)
-subtitle:SetText("Lo guardado aquí sobrevive a la muerte")
+subtitle:SetPoint("TOP", title, "BOTTOM", 0, -6)
+subtitle:SetText("Todo lo que guardes aquí sobrevive a la muerte")
 
 local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -42, -8)
+close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -7, -7)
 
-local dropTarget = CreateFrame("Frame", nil, frame)
-dropTarget:SetPoint("TOPLEFT", frame, "TOPLEFT", 34, -78)
-dropTarget:SetWidth(308)
-dropTarget:SetHeight(174)
-dropTarget:EnableMouse(true)
+local panel = CreateFrame("Frame", nil, frame)
+panel:SetWidth(310)
+panel:SetHeight(310)
+panel:SetPoint("TOP", frame, "TOP", 0, -62)
+panel:SetBackdrop({
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true,
+    tileSize = 16,
+    edgeSize = 12,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 }
+})
+panel:SetBackdropColor(0.08, 0.06, 0.03, 0.96)
+panel:SetBackdropBorderColor(0.55, 0.43, 0.24, 1.0)
+panel:EnableMouse(true)
 
-local hint = lower:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-hint:SetPoint("CENTER", lower, "CENTER", 0, 0)
+local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+hint:SetPoint("BOTTOM", frame, "BOTTOM", 0, 13)
 hint:SetText("Arrastra equipo para guardar · Clic para retirar")
 
 local function CursorItemEntry()
@@ -98,52 +79,47 @@ local function TryDepositCursorItem()
     local entry = CursorItemEntry()
     if not entry then return false end
 
+    -- ClearCursor only cancels the client's pickup. The server validates that the
+    -- item is equipable and removes exactly one real item if the deposit succeeds.
     ClearCursor()
     SendCommand("DEPOSIT|" .. entry)
     return true
 end
 
-dropTarget:SetScript("OnReceiveDrag", TryDepositCursorItem)
-dropTarget:SetScript("OnMouseUp", function()
+panel:SetScript("OnReceiveDrag", TryDepositCursorItem)
+panel:SetScript("OnMouseUp", function()
     if CursorHasItem() then TryDepositCursorItem() end
 end)
 
 local function CreateSlot(index)
     local name = "AdventurerGauntletStashSlot" .. index
-    local button = CreateFrame("Button", name, frame, "ItemButtonTemplate")
-    button:SetWidth(46)
-    button:SetHeight(46)
+    local button = CreateFrame("Button", name, panel, "ItemButtonTemplate")
+    button:SetWidth(38)
+    button:SetHeight(38)
 
     local column = (index - 1) % COLUMNS
     local row = math.floor((index - 1) / COLUMNS)
-    button:SetPoint("TOPLEFT", frame, "TOPLEFT", 35 + column * 43, -78 - row * 43)
+    button:SetPoint("TOPLEFT", panel, "TOPLEFT", 10 + column * 42, -10 - row * 42)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
 
-    -- The BankFrame texture already paints the slot border. Hide ItemButtonTemplate's
-    -- own normal border so we only place the item icon on top of Blizzard's slot.
+    -- ItemButtonTemplate is the same native slot family used by bags/bank.
     local normal = button:GetNormalTexture()
     if normal then
-        normal:SetTexture(nil)
-        normal:Hide()
+        normal:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+        normal:SetAllPoints(button)
     end
 
     local highlight = button:GetHighlightTexture()
     if highlight then
         highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
         highlight:SetBlendMode("ADD")
-        highlight:SetPoint("TOPLEFT", button, "TOPLEFT", 4, -4)
-        highlight:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -4, 4)
+        highlight:SetAllPoints(button)
     end
 
     button.icon = _G[name .. "IconTexture"]
     button.count = _G[name .. "Count"]
-    if button.icon then
-        button.icon:ClearAllPoints()
-        button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 5, -5)
-        button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -5, 5)
-        button.icon:Hide()
-    end
+    if button.icon then button.icon:Hide() end
     if button.count then button.count:SetText("") end
 
     button.entry = nil
@@ -169,7 +145,10 @@ local function CreateSlot(index)
         end
     end)
 
-    button:SetScript("OnReceiveDrag", TryDepositCursorItem)
+    button:SetScript("OnReceiveDrag", function()
+        TryDepositCursorItem()
+    end)
+
     return button
 end
 
@@ -188,53 +167,36 @@ local function SortedItems()
     return items
 end
 
-local function GetTextureForItem(entry)
-    local _, _, _, _, _, _, _, _, _, texture = GetItemInfo(entry)
-    if texture then return texture end
-    if GetItemIcon then return GetItemIcon(entry) end
-    return "Interface\\Icons\\INV_Misc_QuestionMark"
-end
-
 local function PaintItem(button, item)
     button.entry = item and item.entry or nil
 
     if not item then
-        if SetItemButtonTexture then
-            SetItemButtonTexture(button, nil)
-        elseif button.icon then
+        if button.icon then
             button.icon:SetTexture(nil)
             button.icon:Hide()
         end
-        if SetItemButtonCount then
-            SetItemButtonCount(button, 0)
-        elseif button.count then
-            button.count:SetText("")
-        end
+        if button.count then button.count:SetText("") end
+        if SetItemButtonQuality then SetItemButtonQuality(button, nil) end
         return
     end
 
-    local texture = GetTextureForItem(item.entry)
-    if SetItemButtonTexture then
-        SetItemButtonTexture(button, texture)
-    elseif button.icon then
+    local texture = GetItemIcon(item.entry) or "Interface\\Icons\\INV_Misc_QuestionMark"
+    if button.icon then
         button.icon:SetTexture(texture)
         button.icon:Show()
+    elseif SetItemButtonTexture then
+        SetItemButtonTexture(button, texture)
     end
 
-    if button.icon then
-        button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 5, -5)
-        button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -5, 5)
-    end
-
-    if SetItemButtonCount then
-        SetItemButtonCount(button, item.count)
-    elseif button.count then
+    if button.count then
         button.count:SetText(item.count > 1 and item.count or "")
+    elseif SetItemButtonCount then
+        SetItemButtonCount(button, item.count)
     end
 
     if SetItemButtonQuality then
         local _, _, quality = GetItemInfo(item.entry)
-        if quality then SetItemButtonQuality(button, quality, item.entry) end
+        SetItemButtonQuality(button, quality, item.entry)
     end
 end
 
@@ -264,6 +226,8 @@ local function HandleState(message)
     end
 end
 
+-- Current server builds the snapshot through system messages. Consume them here so
+-- the transport stays invisible to the player.
 local function SystemMessageFilter(self, event, message, ...)
     if type(message) ~= "string" or string.sub(message, 1, 8) ~= "AGSTASH|" then
         return false, message, ...
@@ -284,6 +248,7 @@ end
 
 ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", SystemMessageFilter)
 
+-- Also understand hidden addon-channel snapshots if the server transport changes.
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("CHAT_MSG_ADDON")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
