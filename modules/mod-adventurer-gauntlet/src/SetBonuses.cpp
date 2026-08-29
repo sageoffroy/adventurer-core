@@ -20,6 +20,7 @@ enum GauntletSetBonusType
     GAUNTLET_SET_BONUS_DEFENSE_SKILL,
     GAUNTLET_SET_BONUS_EXPERTISE_RATING,
     GAUNTLET_SET_BONUS_SPELL,
+    GAUNTLET_SET_BONUS_MAINHAND_SWORD_SPELL,
 };
 
 struct GauntletSetPiece
@@ -69,6 +70,22 @@ std::unordered_map<std::string_view, uint32> CountEquippedSetPieces(Player* play
     return counts;
 }
 
+bool HasMainHandSword(Player* player)
+{
+    if (!player)
+        return false;
+
+    Item* weapon = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_MAINHAND);
+    if (!weapon)
+        return false;
+
+    ItemTemplate const* itemTemplate = weapon->GetTemplate();
+    return itemTemplate
+        && itemTemplate->Class == ITEM_CLASS_WEAPON
+        && (itemTemplate->SubClass == ITEM_SUBCLASS_WEAPON_SWORD
+            || itemTemplate->SubClass == ITEM_SUBCLASS_WEAPON_SWORD2);
+}
+
 void ApplyFlatStatBonus(Player* player, UnitMods unitMod, int32 value, bool apply)
 {
     float current = player->GetFlatModifierValue(unitMod, TOTAL_VALUE);
@@ -115,6 +132,7 @@ void ApplyGauntletSetBonus(Player* player, GauntletSetBonus const& bonus, bool a
             player->ApplyRatingMod(CR_EXPERTISE, bonus.Value, apply);
             break;
         case GAUNTLET_SET_BONUS_SPELL:
+        case GAUNTLET_SET_BONUS_MAINHAND_SWORD_SPELL:
             if (apply)
                 player->CastSpell(player, bonus.SpellId, true);
             else
@@ -137,8 +155,13 @@ void RefreshGauntletSetBonuses(Player* player)
         GauntletSetBonus const& bonus = GauntletSetBonuses[index];
         auto itr = counts.find(bonus.SetKey);
         uint32 count = itr == counts.end() ? 0 : itr->second;
-        if (count >= bonus.PiecesRequired)
-            desiredBonuses.insert(index);
+        if (count < bonus.PiecesRequired)
+            continue;
+
+        if (bonus.Type == GAUNTLET_SET_BONUS_MAINHAND_SWORD_SPELL && !HasMainHandSword(player))
+            continue;
+
+        desiredBonuses.insert(index);
     }
 
     auto& appliedBonuses = AppliedSetBonuses[guid];
