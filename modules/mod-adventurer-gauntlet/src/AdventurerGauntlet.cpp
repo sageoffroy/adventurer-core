@@ -21,6 +21,12 @@ uint8 GauntletMaxPlayers = 5;
 
 std::unordered_map<uint32, std::string> PendingRunNames;
 
+constexpr uint32 RagefireMapId = 389;
+constexpr float RagefireX = 3.81f;
+constexpr float RagefireY = -14.82f;
+constexpr float RagefireZ = -17.84f;
+constexpr float RagefireO = 4.39f;
+
 constexpr std::array<char const*, 12> CompanyTitles = {
     "Retirados", "Cuervos", "Exiliados", "Errantes", "Juramentados", "Centinelas",
     "Desventurados", "Veteranos", "Herederos", "Escudos", "Perdidos", "Caminantes"
@@ -33,8 +39,8 @@ constexpr std::array<char const*, 12> CompanyPlaces = {
 
 std::string GenerateCompanyName()
 {
-    return std::string("Los ") + CompanyTitles[urand(0, static_cast<uint32>(CompanyTitles.size() - 1))] +
-        " de " + CompanyPlaces[urand(0, static_cast<uint32>(CompanyPlaces.size() - 1))];
+    return std::string("Los ") + CompanyTitles[urand(0, CompanyTitles.size() - 1)] +
+        " de " + CompanyPlaces[urand(0, CompanyPlaces.size() - 1)];
 }
 
 std::vector<Player*> GetPartyMembers(Player* leader)
@@ -107,6 +113,49 @@ std::string const* GetPendingRunName(Player* player)
     auto itr = PendingRunNames.find(player->GetGUID().GetCounter());
     return itr == PendingRunNames.end() ? nullptr : &itr->second;
 }
+
+void ResetPartyInstances(Player* leader)
+{
+    if (Group* group = leader->GetGroup())
+        group->ResetInstances(INSTANCE_RESET_ALL, false, leader);
+    else
+        Player::ResetInstances(leader->GetGUID(), INSTANCE_RESET_ALL, false);
+}
+
+bool TeleportPartyToRagefire(std::vector<Player*> const& members)
+{
+    bool success = true;
+
+    for (Player* member : members)
+    {
+        if (!member->TeleportTo(
+                RagefireMapId,
+                RagefireX,
+                RagefireY,
+                RagefireZ,
+                RagefireO,
+                TELE_TO_GM_MODE))
+        {
+            success = false;
+            ChatHandler(member->GetSession()).SendSysMessage(
+                "Khadgar no pudo abrir el portal hacia Sima Ignea para este aventurero.");
+        }
+    }
+
+    return success;
+}
+
+void AnnounceRunStart(std::vector<Player*> const& members, std::string const& companyName)
+{
+    for (Player* member : members)
+    {
+        ChatHandler(member->GetSession()).PSendSysMessage(
+            "Khadgar acepta el desafio. Desde ahora seran conocidos como |cff00ff00%s|r.",
+            companyName.c_str());
+        ChatHandler(member->GetSession()).SendSysMessage(
+            "Primer destino: |cffffd100Sima Ignea|r.");
+    }
+}
 }
 
 class AdventurerGauntletConfigScript : public WorldScript
@@ -117,9 +166,9 @@ public:
     void OnBeforeConfigLoad(bool /*reload*/) override
     {
         GauntletEnabled = sConfigMgr->GetOption<bool>("AdventurerGauntlet.Enable", true);
-        GauntletStartLevel = static_cast<uint8>(sConfigMgr->GetOption<uint32>("AdventurerGauntlet.StartLevel", 1));
-        GauntletMinPlayers = static_cast<uint8>(sConfigMgr->GetOption<uint32>("AdventurerGauntlet.MinPlayers", 1));
-        GauntletMaxPlayers = static_cast<uint8>(sConfigMgr->GetOption<uint32>("AdventurerGauntlet.MaxPlayers", 5));
+        GauntletStartLevel = sConfigMgr->GetOption<uint8>("AdventurerGauntlet.StartLevel", 1);
+        GauntletMinPlayers = sConfigMgr->GetOption<uint8>("AdventurerGauntlet.MinPlayers", 1);
+        GauntletMaxPlayers = sConfigMgr->GetOption<uint8>("AdventurerGauntlet.MaxPlayers", 5);
     }
 };
 
@@ -154,7 +203,7 @@ public:
         return true;
     }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 action) override
     {
         ClearGossipMenuFor(player);
 
@@ -172,19 +221,22 @@ public:
                 }
 
                 std::string companyName = GenerateCompanyName();
+                ResetPartyInstances(player);
                 RegisterPendingRun(members, companyName);
+                AnnounceRunStart(members, companyName);
 
-                ChatHandler(player->GetSession()).PSendSysMessage(
-                    "Khadgar acepta el desafio. Desde ahora seran conocidos como |cff00ff00%s|r.",
-                    companyName.c_str());
-                ChatHandler(player->GetSession()).SendSysMessage(
-                    "La cadena de mazmorras se conectara en el siguiente incremento del modulo.");
+                if (!TeleportPartyToRagefire(members))
+                    ChatHandler(player->GetSession()).SendSysMessage(
+                        "El portal no pudo transportar a todos los integrantes del grupo.");
+
                 CloseGossipMenuFor(player);
                 return true;
             }
             case ACTION_EXPLAIN:
                 ChatHandler(player->GetSession()).SendSysMessage(
-                    "El desafio comenzara con personajes de nivel 1 y encadenara mazmorras hasta que no quede ningun aventurero vivo.");
+                    "El desafio comienza con personajes de nivel 1 y encadena mazmorras hasta que no quede ningun aventurero vivo.");
+                ChatHandler(player->GetSession()).SendSysMessage(
+                    "Por ahora, la primera prueba siempre comienza en Sima Ignea.");
                 CloseGossipMenuFor(player);
                 return true;
             case ACTION_STATUS:
