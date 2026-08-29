@@ -72,12 +72,13 @@ void ApplyGauntletSetBonus(Player* player, GauntletSetBonus const& bonus, bool a
     switch (bonus.Type)
     {
         case GAUNTLET_SET_BONUS_ARMOR:
-            player->ApplyStatFlatModifier(
-                UNIT_MOD_ARMOR,
-                TOTAL_VALUE,
-                apply ? float(bonus.Value) : -float(bonus.Value));
+        {
+            float currentArmorBonus = player->GetFlatModifierValue(UNIT_MOD_ARMOR, TOTAL_VALUE);
+            float delta = apply ? float(bonus.Value) : -float(bonus.Value);
+            player->SetStatFlatModifier(UNIT_MOD_ARMOR, TOTAL_VALUE, currentArmorBonus + delta);
             player->UpdateArmor();
             break;
+        }
         case GAUNTLET_SET_BONUS_DEFENSE_SKILL:
             player->ModifySkillBonus(SKILL_DEFENSE, apply ? bonus.Value : -bonus.Value, false);
             player->UpdateDefenseBonusesMod();
