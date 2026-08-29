@@ -1,1 +1,4 @@
-enabled;set_key;name;pieces_required;spell_id;description
+enabled;set_key;name;pieces_required;bonus_type;value;spell_id;description
+1;cuero_oso;Cuero de Oso;2;armor;5;;+5 armadura
+1;cuero_oso;Cuero de Oso;3;defense_skill;2;;+2 puntos de defensa
+1;cuero_oso;Cuero de Oso;4;expertise_rating;1;;+1 indice de pericia
