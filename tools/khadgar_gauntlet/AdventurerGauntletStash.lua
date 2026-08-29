@@ -202,6 +202,30 @@ local function HandleState(message)
     end
 end
 
+-- Current server builds the snapshot through system messages. Consume them here so
+-- the transport stays invisible to the player. B records are intentionally ignored:
+-- the final UI only represents the persistent account stash.
+local function SystemMessageFilter(self, event, message, ...)
+    if type(message) ~= "string" or string.sub(message, 1, 8) ~= "AGSTASH|" then
+        return false, message, ...
+    end
+
+    local payload = string.sub(message, 9)
+    if payload == "OPEN" or payload == "DONE" then
+        HandleState(payload)
+    else
+        local kind, entry, count = string.match(payload, "^([BS])|(%d+)|(%d+)$")
+        if kind == "S" and entry and count then
+            HandleState("S|" .. entry .. "|" .. count)
+        end
+    end
+
+    return true
+end
+
+ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", SystemMessageFilter)
+
+-- Future/clean transport: also understand hidden addon-channel snapshots.
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("CHAT_MSG_ADDON")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
