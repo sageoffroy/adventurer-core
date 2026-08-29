@@ -71,6 +71,9 @@ def parse_optional_number(value: str, field: str, line: int, *, integer=False):
 def generate_row(row, line: int) -> str:
     entry = parse_int(row["entry"].strip(), "entry", line, minimum=911000, maximum=911999)
     source = parse_int(row["source_entry"].strip(), "source_entry", line, minimum=1)
+    if 911000 <= source <= 911999:
+        raise ValueError(f"line {line}: source_entry must be a stock item, not another gauntlet item")
+
     name = row["name"].strip()
     if not name:
         raise ValueError(f"line {line}: name cannot be empty")
@@ -105,6 +108,10 @@ def generate_row(row, line: int) -> str:
         raise ValueError(f"line {line}: dmg_min1 and dmg_max1 must be supplied together")
     if dmg_min is not None and dmg_max < dmg_min:
         raise ValueError(f"line {line}: dmg_max1 cannot be lower than dmg_min1")
+    if armor is not None and armor < 0:
+        raise ValueError(f"line {line}: armor cannot be negative")
+    if delay is not None and delay <= 0:
+        raise ValueError(f"line {line}: delay must be positive")
 
     updates = [
         f"`entry` = {entry}",
@@ -138,7 +145,6 @@ def generate_row(row, line: int) -> str:
     temp = f"tmp_adventurer_gauntlet_item_{entry}"
     return "\n".join([
         f"-- {entry}: {name}",
-        f"DELETE FROM `item_template` WHERE `entry` = {entry};",
         f"DROP TEMPORARY TABLE IF EXISTS `{temp}`;",
         f"CREATE TEMPORARY TABLE `{temp}` AS SELECT * FROM `item_template` WHERE `entry` = {source};",
         f"UPDATE `{temp}` SET\n    " + ",\n    ".join(updates) + ";",
@@ -186,6 +192,8 @@ def main() -> int:
         "-- GENERATED FILE. Do not edit by hand.",
         f"-- Source: {args.input.name}",
         f"-- Enabled custom items: {enabled_count}",
+        "-- The CSV is authoritative for the reserved gauntlet item range.",
+        "DELETE FROM `item_template` WHERE `entry` BETWEEN 911000 AND 911999;",
         "",
     ]
     args.output.write_text("\n".join(header + blocks) + "\n", encoding="utf-8")
