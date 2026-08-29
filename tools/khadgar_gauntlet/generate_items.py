@@ -136,7 +136,6 @@ def generate_row(row, line: int) -> str:
         f"`Quality` = {quality}",
         f"`RequiredLevel` = {required_level}",
         f"`ItemLevel` = {item_level}",
-        f"`StatsCount` = {len(stats)}",
         "`itemset` = 0",
     ]
 
