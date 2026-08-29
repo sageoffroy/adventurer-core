@@ -20,3 +20,5 @@ enabled;set_key;name;pieces_required;bonus_type;value;spell_id;description
 1;lanasangre;Vestiduras Lanasangre;4;mainhand_sword_spell;;33488;+5 dano de arma al empunar una espada
 1;lanasangre;Vestiduras Lanasangre;5;agility;2;;+2 Agilidad
 1;lanasangre;Vestiduras Lanasangre;6;spell;;23990;+8% velocidad de movimiento
+1;brasanegra;Vestiduras de Brasanegra;2;intellect;2;;+2 Intelecto
+1;brasanegra;Vestiduras de Brasanegra;3;spell;;30288;+4% dano con Descarga de las Sombras e Incinerar
