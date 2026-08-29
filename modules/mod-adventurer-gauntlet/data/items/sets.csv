@@ -25,4 +25,4 @@ enabled;set_key;name;pieces_required;bonus_type;value;spell_id;description
 1;alba_serena;Vestiduras del Alba Serena;2;spirit;2;;+2 Espiritu
 1;alba_serena;Vestiduras del Alba Serena;3;intellect;2;;+2 Intelecto
 1;alba_serena;Vestiduras del Alba Serena;4;spell;;9395;+5 poder con hechizos
-1;alba_serena;Vestiduras del Alba Serena;5;spell;;7678;+5 poder con hechizos adicional
+1;alba_serena;Vestiduras del Alba Serena;5;spell;;26169;20% de probabilidad de sanar al taumaturgo un 10% de la sanacion aplicada a otros
