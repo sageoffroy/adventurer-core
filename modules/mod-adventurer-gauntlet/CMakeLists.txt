@@ -1,0 +1,4 @@
+AC_ADD_SCRIPT("${CMAKE_CURRENT_LIST_DIR}/src/AdventurerGauntlet.cpp")
+AC_ADD_SCRIPT_LOADER("AdventurerGauntlet" "${CMAKE_CURRENT_LIST_DIR}/src/loader.h")
+
+AC_ADD_CONFIG_FILE("${CMAKE_CURRENT_LIST_DIR}/conf/mod-adventurer-gauntlet.conf.dist")
