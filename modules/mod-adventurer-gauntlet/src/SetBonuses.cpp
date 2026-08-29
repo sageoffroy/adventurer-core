@@ -12,6 +12,11 @@ namespace
 enum GauntletSetBonusType
 {
     GAUNTLET_SET_BONUS_ARMOR,
+    GAUNTLET_SET_BONUS_STRENGTH,
+    GAUNTLET_SET_BONUS_AGILITY,
+    GAUNTLET_SET_BONUS_STAMINA,
+    GAUNTLET_SET_BONUS_INTELLECT,
+    GAUNTLET_SET_BONUS_SPIRIT,
     GAUNTLET_SET_BONUS_DEFENSE_SKILL,
     GAUNTLET_SET_BONUS_EXPERTISE_RATING,
     GAUNTLET_SET_BONUS_SPELL,
@@ -64,6 +69,14 @@ std::unordered_map<std::string_view, uint32> CountEquippedSetPieces(Player* play
     return counts;
 }
 
+void ApplyFlatStatBonus(Player* player, UnitMods unitMod, int32 value, bool apply)
+{
+    float current = player->GetFlatModifierValue(unitMod, TOTAL_VALUE);
+    float delta = apply ? float(value) : -float(value);
+    player->SetStatFlatModifier(unitMod, TOTAL_VALUE, current + delta);
+    player->UpdateUnitMod(unitMod);
+}
+
 void ApplyGauntletSetBonus(Player* player, GauntletSetBonus const& bonus, bool apply)
 {
     if (!player)
@@ -79,6 +92,21 @@ void ApplyGauntletSetBonus(Player* player, GauntletSetBonus const& bonus, bool a
             player->UpdateArmor();
             break;
         }
+        case GAUNTLET_SET_BONUS_STRENGTH:
+            ApplyFlatStatBonus(player, UNIT_MOD_STAT_STRENGTH, bonus.Value, apply);
+            break;
+        case GAUNTLET_SET_BONUS_AGILITY:
+            ApplyFlatStatBonus(player, UNIT_MOD_STAT_AGILITY, bonus.Value, apply);
+            break;
+        case GAUNTLET_SET_BONUS_STAMINA:
+            ApplyFlatStatBonus(player, UNIT_MOD_STAT_STAMINA, bonus.Value, apply);
+            break;
+        case GAUNTLET_SET_BONUS_INTELLECT:
+            ApplyFlatStatBonus(player, UNIT_MOD_STAT_INTELLECT, bonus.Value, apply);
+            break;
+        case GAUNTLET_SET_BONUS_SPIRIT:
+            ApplyFlatStatBonus(player, UNIT_MOD_STAT_SPIRIT, bonus.Value, apply);
+            break;
         case GAUNTLET_SET_BONUS_DEFENSE_SKILL:
             player->ModifySkillBonus(SKILL_DEFENSE, apply ? bonus.Value : -bonus.Value, false);
             player->UpdateDefenseBonusesMod();
