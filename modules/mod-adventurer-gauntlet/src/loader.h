@@ -1,1 +1,2 @@
 void AddAdventurerGauntletScripts();
+void AddAdventurerGauntletCelebrationScripts();
