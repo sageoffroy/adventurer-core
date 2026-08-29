@@ -8,6 +8,8 @@
 namespace
 {
 constexpr uint32 KhadgarEntry = 910000;
+constexpr uint32 ExpeditionChestEntry = 910001;
+constexpr uint32 KhadgarTeleportVisual = 41232;
 constexpr uint32 RagefireMapId = 389;
 
 constexpr std::array<char const*, 8> KhadgarVictoryLines = {
@@ -35,10 +37,26 @@ public:
         if (!creature || creature->GetEntry() != KhadgarEntry || creature->GetMapId() != RagefireMapId || !creature->IsSummon())
             return;
 
+        // Make his arrival visible instead of having him simply pop into existence.
+        creature->CastSpell(creature, KhadgarTeleportVisual, true);
         creature->HandleEmoteCommand(EMOTE_ONESHOT_APPLAUD);
         creature->Say(
             KhadgarVictoryLines[urand(0, KhadgarVictoryLines.size() - 1)],
             LANG_UNIVERSAL);
+
+        // The expedition chest uses a stock 3.3.5a chest model. For this milestone
+        // it is deliberately empty; the random equipment generator is connected next.
+        creature->SummonGameObject(
+            ExpeditionChestEntry,
+            creature->GetPositionX(),
+            creature->GetPositionY() - 2.5f,
+            creature->GetPositionZ(),
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f,
+            0);
     }
 };
 
