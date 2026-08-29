@@ -137,6 +137,8 @@ def generate_row(row, line: int) -> str:
         f"`RequiredLevel` = {required_level}",
         f"`ItemLevel` = {item_level}",
         "`itemset` = 0",
+        "`RandomProperty` = 0",
+        "`RandomSuffix` = 0",
     ]
 
     if display_id is not None:
