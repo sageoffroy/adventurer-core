@@ -13,8 +13,8 @@ local function SendCommand(command)
 end
 
 local frame = CreateFrame("Frame", "AdventurerGauntletStashFrame", UIParent)
-frame:SetWidth(364)
-frame:SetHeight(394)
+frame:SetWidth(356)
+frame:SetHeight(382)
 frame:SetPoint("CENTER", UIParent, "CENTER", 0, 35)
 frame:SetFrameStrata("DIALOG")
 frame:SetMovable(true)
@@ -48,8 +48,8 @@ local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -7, -7)
 
 local panel = CreateFrame("Frame", nil, frame)
-panel:SetWidth(318)
-panel:SetHeight(318)
+panel:SetWidth(310)
+panel:SetHeight(310)
 panel:SetPoint("TOP", frame, "TOP", 0, -62)
 panel:SetBackdrop({
     bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -94,23 +94,30 @@ end)
 local function CreateSlot(index)
     local name = "AdventurerGauntletStashSlot" .. index
     local button = CreateFrame("Button", name, panel, "ItemButtonTemplate")
-    button:SetWidth(44)
-    button:SetHeight(44)
+    button:SetWidth(38)
+    button:SetHeight(38)
 
     local column = (index - 1) % COLUMNS
     local row = math.floor((index - 1) / COLUMNS)
-    button:SetPoint("TOPLEFT", panel, "TOPLEFT", 5 + column * 44, -5 - row * 44)
+    button:SetPoint("TOPLEFT", panel, "TOPLEFT", 10 + column * 42, -10 - row * 42)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
 
     button.icon = _G[name .. "IconTexture"]
     button.count = _G[name .. "Count"]
 
-    -- Keep the empty slot and item icon on the same large rectangle.
+    -- The stock quickslot art has a small dark center. Add our own dark fill under
+    -- it so the EMPTY slot has exactly the same visible area as an item icon.
+    local slotFill = button:CreateTexture(nil, "BACKGROUND")
+    slotFill:SetTexture(0.015, 0.015, 0.015, 0.95)
+    slotFill:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+    slotFill:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
+    button.slotFill = slotFill
+
     if button.icon then
         button.icon:ClearAllPoints()
-        button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 1, -1)
-        button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -1, 1)
+        button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+        button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
         button.icon:Hide()
     end
 
@@ -118,8 +125,7 @@ local function CreateSlot(index)
     if normal then
         normal:SetTexture("Interface\\Buttons\\UI-Quickslot2")
         normal:ClearAllPoints()
-        normal:SetPoint("TOPLEFT", button, "TOPLEFT", 1, -1)
-        normal:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -1, 1)
+        normal:SetAllPoints(button)
     end
 
     local highlight = button:GetHighlightTexture()
@@ -127,8 +133,8 @@ local function CreateSlot(index)
         highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
         highlight:SetBlendMode("ADD")
         highlight:ClearAllPoints()
-        highlight:SetPoint("TOPLEFT", button, "TOPLEFT", 1, -1)
-        highlight:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -1, 1)
+        highlight:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+        highlight:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
     end
 
     if button.count then button.count:SetText("") end
