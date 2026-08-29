@@ -2,3 +2,8 @@ enabled;set_key;name;pieces_required;bonus_type;value;spell_id;description
 1;cuero_oso;Cuero de Oso;2;armor;5;;+5 armadura
 1;cuero_oso;Cuero de Oso;3;defense_skill;2;;+2 puntos de defensa
 1;cuero_oso;Cuero de Oso;4;expertise_rating;1;;+1 indice de pericia
+1;monje_errante;Monje Errante;2;spirit;2;;+2 Espiritu
+1;monje_errante;Monje Errante;3;agility;2;;+2 Agilidad
+1;monje_errante;Monje Errante;4;intellect;2;;+2 Intelecto
+1;monje_errante;Monje Errante;5;defense_skill;2;;+2 puntos de defensa
+1;monje_errante;Monje Errante;6;expertise_rating;1;;+1 indice de pericia
