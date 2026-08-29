@@ -17,6 +17,8 @@
 #include <unordered_map>
 #include <vector>
 
+bool IsAdventurerGauntletFallen(Player* player);
+
 namespace
 {
 bool GauntletEnabled = true;
@@ -38,15 +40,15 @@ std::unordered_map<uint32, RunReturnPoint> RunReturnPoints;
 std::unordered_map<uint32, uint8> ActiveRunInstanceLevels;
 
 constexpr uint32 KhadgarEntry = 910000;
-constexpr uint32 KhadgarCastVisual = 69659;      // Evocation visual
-constexpr uint32 KhadgarTeleportVisual = 41232;  // Teleport visual
+constexpr uint32 KhadgarCastVisual = 69659;
+constexpr uint32 KhadgarTeleportVisual = 41232;
 
 constexpr uint32 RagefireMapId = 389;
 constexpr float RagefireX = 3.81f;
 constexpr float RagefireY = -14.82f;
 constexpr float RagefireZ = -17.84f;
 constexpr float RagefireO = 4.39f;
-constexpr uint32 RagefireFinalBossEntry = 11520; // Taragaman the Hungerer
+constexpr uint32 RagefireFinalBossEntry = 11520;
 
 constexpr uint32 DeadminesMapId = 36;
 constexpr float DeadminesX = -16.4f;
@@ -164,6 +166,12 @@ bool ValidateParty(Player* player, std::vector<Player*>& members, std::string& e
 
     for (Player* member : members)
     {
+        if (IsAdventurerGauntletFallen(member))
+        {
+            error = "Un Aventurero CAIDO no puede volver a participar en el Desafio de Khadgar.";
+            return false;
+        }
+
         if (member->GetLevel() != GauntletStartLevel)
         {
             error = "Todos los integrantes deben comenzar el desafio en el nivel requerido.";
@@ -311,8 +319,8 @@ void ReturnFallenAdventurer(Player* player)
         returnPoint.O,
         TELE_TO_GM_MODE);
 
-    // Development behavior: keep the loop quick while the permanent Fallen
-    // state and leaderboard persistence are still being built.
+    // Keep the fallen character inspectable as a memorial. AccountProgress
+    // persists the permanent CAIDO state and prevents any future expedition.
     player->ResurrectPlayer(1.0f);
     player->SpawnCorpseBones();
 
@@ -320,7 +328,7 @@ void ReturnFallenAdventurer(Player* player)
         "|cffff2020{} ha caido.|r El desafio termina aqui para este aventurero.",
         companyName);
     ChatHandler(player->GetSession()).SendSysMessage(
-        "Khadgar te ha devuelto. Durante el desarrollo puedes volver a intentar el desafio.");
+        "Khadgar te ha devuelto, pero este Aventurero no puede volver a participar.");
 }
 
 void FinishRagefireAndSummonKhadgar(Creature* finalBoss)
@@ -397,13 +405,8 @@ public:
         if (!inserted)
             return;
 
-        // Mark the instance first, then load its grids. Creatures created while loading
-        // pass through OnBeforeCreatureSelectLevel and receive the gauntlet level using
-        // AzerothCore's own stock creature-stat calculation.
         map->LoadAllGrids();
 
-        // The entrance grid can already be loaded by the time this hook fires. Re-run
-        // stock SelectLevel for those creatures so the whole dungeon uses the same level.
         for (auto const& [spawnId, creature] : map->GetCreatureBySpawnIdStore())
         {
             (void)spawnId;
@@ -443,8 +446,6 @@ public:
         if (!creature || !IsActiveRunCreature(creature))
             return;
 
-        // Trash never drops anything inside the gauntlet. Bosses and rares are
-        // deliberately preserved because they will use the expedition reward system.
         if (!IsRewardCreature(creature))
         {
             creature->loot.clear();
@@ -575,6 +576,14 @@ public:
             return true;
         }
 
+        if (IsAdventurerGauntletFallen(player))
+        {
+            ChatHandler(player->GetSession()).SendSysMessage(
+                "|cffff2020Khadgar: Tu expedicion ya termino. El Baul de Expediciones conserva tu legado.|r");
+            CloseGossipMenuFor(player);
+            return true;
+        }
+
         if (creature->GetMapId() == RagefireMapId && GetPendingRunName(player))
         {
             AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Estamos listos. Abri el camino a la siguiente mazmorra.", GOSSIP_SENDER_MAIN, ACTION_CONTINUE);
@@ -663,7 +672,7 @@ public:
                 ChatHandler(player->GetSession()).SendSysMessage(
                     "El desafio comienza con personajes de nivel 1 y encadena mazmorras hasta que no quede ningun aventurero vivo.");
                 ChatHandler(player->GetSession()).SendSysMessage(
-                    "Khadgar abre personalmente cada portal. Al derrotar al jefe final, vuelve a aparecer para guiar a la expedicion al siguiente destino.");
+                    "Los objetos especiales descubiertos quedan registrados en la cuenta. El Baul de Expediciones permite asegurarlos y compartirlos con futuros Aventureros.");
                 CloseGossipMenuFor(player);
                 return true;
             case ACTION_STATUS:
