@@ -10,6 +10,7 @@
 #include "WorldSession.h"
 
 #include <cmath>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -18,18 +19,23 @@ namespace
 {
 constexpr uint32 KhadgarEntry = 910000;
 constexpr uint32 AccountStashEntry = 910002;
-constexpr uint32 GauntletItemMin = 911000;
-constexpr uint32 GauntletItemMax = 911999;
 constexpr char ProtocolPrefix[] = "AGSTASH|";
-
-bool IsGauntletAccountItem(uint32 entry)
-{
-    return entry >= GauntletItemMin && entry <= GauntletItemMax;
-}
 
 uint32 GetAccountId(Player* player)
 {
     return player && player->GetSession() ? player->GetSession()->GetAccountId() : 0;
+}
+
+bool IsStashableItem(uint32 entry)
+{
+    ItemTemplate const* item = sObjectMgr->GetItemTemplate(entry);
+    if (!item)
+        return false;
+
+    if (item->Class != ITEM_CLASS_WEAPON && item->Class != ITEM_CLASS_ARMOR)
+        return false;
+
+    return item->InventoryType != INVTYPE_NON_EQUIP && item->InventoryType != INVTYPE_BAG;
 }
 
 std::string GetItemName(uint32 entry)
@@ -51,22 +57,6 @@ void RefreshEquipmentVisuals(Player* player)
     player->SetVirtualItemSlot(0, player->GetWeaponForAttack(BASE_ATTACK, true));
     player->SetVirtualItemSlot(1, player->GetWeaponForAttack(OFF_ATTACK, true));
     player->SetVirtualItemSlot(2, player->GetWeaponForAttack(RANGED_ATTACK, true));
-}
-
-std::vector<std::pair<uint32, uint32>> GetCarriedAccountItems(Player* player)
-{
-    std::vector<std::pair<uint32, uint32>> items;
-    if (!player)
-        return items;
-
-    for (uint32 entry = GauntletItemMin; entry <= GauntletItemMax; ++entry)
-    {
-        uint32 count = player->GetItemCount(entry, false);
-        if (count)
-            items.emplace_back(entry, count);
-    }
-
-    return items;
 }
 
 std::vector<std::pair<uint32, uint32>> GetStashItems(Player* player)
@@ -95,7 +85,7 @@ std::vector<std::pair<uint32, uint32>> GetStashItems(Player* player)
 uint32 GetStashItemCount(Player* player, uint32 entry)
 {
     uint32 accountId = GetAccountId(player);
-    if (!accountId || !IsGauntletAccountItem(entry))
+    if (!accountId || !IsStashableItem(entry))
         return 0;
 
     if (QueryResult result = CharacterDatabase.Query(
@@ -111,7 +101,7 @@ uint32 GetStashItemCount(Player* player, uint32 entry)
 void RemoveOneFromStash(Player* player, uint32 entry)
 {
     uint32 accountId = GetAccountId(player);
-    if (!accountId || !IsGauntletAccountItem(entry))
+    if (!accountId || !IsStashableItem(entry))
         return;
 
     CharacterDatabase.Execute(
@@ -134,11 +124,8 @@ void SendStashState(Player* player)
     ChatHandler handler(player->GetSession());
     handler.SendSysMessage("AGSTASH|OPEN");
 
-    for (auto const& [entry, count] : GetCarriedAccountItems(player))
-        handler.PSendSysMessage("AGSTASH|B|{}|{}", entry, count);
-
     for (auto const& [entry, count] : GetStashItems(player))
-        if (IsGauntletAccountItem(entry) && count)
+        if (IsStashableItem(entry) && count)
             handler.PSendSysMessage("AGSTASH|S|{}|{}", entry, count);
 
     handler.SendSysMessage("AGSTASH|DONE");
@@ -146,7 +133,15 @@ void SendStashState(Player* player)
 
 bool DepositOne(Player* player, uint32 entry)
 {
-    if (!player || !IsGauntletAccountItem(entry) || player->GetItemCount(entry, false) == 0)
+    if (!player || !IsStashableItem(entry))
+    {
+        if (player)
+            ChatHandler(player->GetSession()).SendSysMessage(
+                "El Baul de Expediciones solo acepta armas y armaduras equipables.");
+        return false;
+    }
+
+    if (player->GetItemCount(entry, false) == 0)
         return false;
 
     player->DestroyItemCount(entry, 1, true, true);
@@ -159,43 +154,14 @@ bool DepositOne(Player* player, uint32 entry)
         entry);
 
     ChatHandler(player->GetSession()).PSendSysMessage(
-        "|cff00ff00Baul de Expediciones:|r guardaste |cff0070dd{}|r.",
+        "|cff00ff00Baul de Expediciones:|r aseguraste |cff0070dd{}|r.",
         GetItemName(entry));
     return true;
 }
 
-void DepositAll(Player* player)
-{
-    if (!player)
-        return;
-
-    uint32 deposited = 0;
-    for (auto const& [entry, carried] : GetCarriedAccountItems(player))
-    {
-        if (!carried)
-            continue;
-
-        player->DestroyItemCount(entry, carried, true, true);
-        CharacterDatabase.Execute(
-            "INSERT INTO `adventurer_gauntlet_account_stash` (`account_id`, `item_entry`, `item_count`) "
-            "VALUES ({}, {}, {}) ON DUPLICATE KEY UPDATE `item_count` = `item_count` + {}",
-            GetAccountId(player),
-            entry,
-            carried,
-            carried);
-        deposited += carried;
-    }
-
-    RefreshEquipmentVisuals(player);
-
-    ChatHandler(player->GetSession()).PSendSysMessage(
-        "|cff00ff00Baul de Expediciones:|r guardaste {} objeto(s) de cuenta.",
-        deposited);
-}
-
 bool WithdrawOne(Player* player, uint32 entry)
 {
-    if (!player || !IsGauntletAccountItem(entry) || !GetStashItemCount(player, entry))
+    if (!player || !IsStashableItem(entry) || !GetStashItemCount(player, entry))
         return false;
 
     ItemPosCountVec dest;
@@ -223,7 +189,7 @@ uint32 ParseEntry(std::string const& value)
     {
         size_t consumed = 0;
         unsigned long parsed = std::stoul(value, &consumed, 10);
-        if (consumed != value.size() || parsed > GauntletItemMax)
+        if (consumed != value.size() || parsed > std::numeric_limits<uint32>::max())
             return 0;
         return static_cast<uint32>(parsed);
     }
@@ -232,20 +198,6 @@ uint32 ParseEntry(std::string const& value)
         return 0;
     }
 }
-}
-
-void AddAdventurerGauntletAccountStashItem(Player* player, uint32 entry, uint32 count)
-{
-    if (!player || !count || !IsGauntletAccountItem(entry))
-        return;
-
-    CharacterDatabase.Execute(
-        "INSERT INTO `adventurer_gauntlet_account_stash` (`account_id`, `item_entry`, `item_count`) "
-        "VALUES ({}, {}, {}) ON DUPLICATE KEY UPDATE `item_count` = `item_count` + {}",
-        GetAccountId(player),
-        entry,
-        count,
-        count);
 }
 
 uint32 GetAdventurerGauntletAccountStashTotal(Player* player)
@@ -277,13 +229,6 @@ bool HandleAdventurerGauntletStashAddonCommand(Player* player, std::string const
 
     if (payload == "REFRESH")
     {
-        SendStashState(player);
-        return true;
-    }
-
-    if (payload == "DEPOSITALL")
-    {
-        DepositAll(player);
         SendStashState(player);
         return true;
     }
