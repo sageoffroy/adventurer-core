@@ -9,6 +9,14 @@
 
 namespace
 {
+enum GauntletSetBonusType
+{
+    GAUNTLET_SET_BONUS_ARMOR,
+    GAUNTLET_SET_BONUS_DEFENSE_SKILL,
+    GAUNTLET_SET_BONUS_EXPERTISE_RATING,
+    GAUNTLET_SET_BONUS_SPELL,
+};
+
 struct GauntletSetPiece
 {
     uint32 Entry;
@@ -20,13 +28,15 @@ struct GauntletSetBonus
     char const* SetKey;
     char const* SetName;
     uint8 PiecesRequired;
+    GauntletSetBonusType Type;
+    int32 Value;
     uint32 SpellId;
     char const* Description;
 };
 
 #include "GeneratedGauntletSets.inc"
 
-std::unordered_map<uint32, std::unordered_set<uint32>> AppliedSetSpells;
+std::unordered_map<uint32, std::unordered_set<uint32>> AppliedSetBonuses;
 
 std::unordered_map<std::string_view, uint32> CountEquippedSetPieces(Player* player)
 {
@@ -54,6 +64,36 @@ std::unordered_map<std::string_view, uint32> CountEquippedSetPieces(Player* play
     return counts;
 }
 
+void ApplyGauntletSetBonus(Player* player, GauntletSetBonus const& bonus, bool apply)
+{
+    if (!player)
+        return;
+
+    switch (bonus.Type)
+    {
+        case GAUNTLET_SET_BONUS_ARMOR:
+            player->ApplyStatFlatModifier(
+                UNIT_MOD_ARMOR,
+                TOTAL_VALUE,
+                apply ? float(bonus.Value) : -float(bonus.Value));
+            player->UpdateArmor();
+            break;
+        case GAUNTLET_SET_BONUS_DEFENSE_SKILL:
+            player->ModifySkillBonus(SKILL_DEFENSE, apply ? bonus.Value : -bonus.Value, false);
+            player->UpdateDefenseBonusesMod();
+            break;
+        case GAUNTLET_SET_BONUS_EXPERTISE_RATING:
+            player->ApplyRatingMod(CR_EXPERTISE, bonus.Value, apply);
+            break;
+        case GAUNTLET_SET_BONUS_SPELL:
+            if (apply)
+                player->CastSpell(player, bonus.SpellId, true);
+            else
+                player->RemoveAurasDueToSpell(bonus.SpellId);
+            break;
+    }
+}
+
 void RefreshGauntletSetBonuses(Player* player)
 {
     if (!player)
@@ -61,41 +101,42 @@ void RefreshGauntletSetBonuses(Player* player)
 
     uint32 guid = player->GetGUID().GetCounter();
     auto counts = CountEquippedSetPieces(player);
-    std::unordered_set<uint32> desiredSpells;
+    std::unordered_set<uint32> desiredBonuses;
 
-    for (GauntletSetBonus const& bonus : GauntletSetBonuses)
+    for (uint32 index = 0; index < GauntletSetBonuses.size(); ++index)
     {
+        GauntletSetBonus const& bonus = GauntletSetBonuses[index];
         auto itr = counts.find(bonus.SetKey);
         uint32 count = itr == counts.end() ? 0 : itr->second;
         if (count >= bonus.PiecesRequired)
-            desiredSpells.insert(bonus.SpellId);
+            desiredBonuses.insert(index);
     }
 
-    auto& appliedSpells = AppliedSetSpells[guid];
+    auto& appliedBonuses = AppliedSetBonuses[guid];
 
-    for (auto itr = appliedSpells.begin(); itr != appliedSpells.end();)
+    for (auto itr = appliedBonuses.begin(); itr != appliedBonuses.end();)
     {
-        if (desiredSpells.find(*itr) != desiredSpells.end())
+        if (desiredBonuses.find(*itr) != desiredBonuses.end())
         {
             ++itr;
             continue;
         }
 
-        player->RemoveAurasDueToSpell(*itr);
-        itr = appliedSpells.erase(itr);
+        ApplyGauntletSetBonus(player, GauntletSetBonuses[*itr], false);
+        itr = appliedBonuses.erase(itr);
     }
 
-    for (uint32 spellId : desiredSpells)
+    for (uint32 index : desiredBonuses)
     {
-        if (appliedSpells.find(spellId) != appliedSpells.end())
+        if (appliedBonuses.find(index) != appliedBonuses.end())
             continue;
 
-        player->CastSpell(player, spellId, true);
-        appliedSpells.insert(spellId);
+        ApplyGauntletSetBonus(player, GauntletSetBonuses[index], true);
+        appliedBonuses.insert(index);
     }
 
-    if (appliedSpells.empty())
-        AppliedSetSpells.erase(guid);
+    if (appliedBonuses.empty())
+        AppliedSetBonuses.erase(guid);
 }
 
 void ClearGauntletSetBonuses(Player* player)
@@ -104,14 +145,14 @@ void ClearGauntletSetBonuses(Player* player)
         return;
 
     uint32 guid = player->GetGUID().GetCounter();
-    auto itr = AppliedSetSpells.find(guid);
-    if (itr == AppliedSetSpells.end())
+    auto itr = AppliedSetBonuses.find(guid);
+    if (itr == AppliedSetBonuses.end())
         return;
 
-    for (uint32 spellId : itr->second)
-        player->RemoveAurasDueToSpell(spellId);
+    for (uint32 index : itr->second)
+        ApplyGauntletSetBonus(player, GauntletSetBonuses[index], false);
 
-    AppliedSetSpells.erase(itr);
+    AppliedSetBonuses.erase(itr);
 }
 }
 
@@ -143,8 +184,8 @@ public:
 
     void OnPlayerBeforeLogout(Player* player) override
     {
-        // Do not persist server-side set auras. They are reconstructed from equipped
-        // pieces on the next login, just like a native item-set bonus.
+        // Server-side set modifiers are reconstructed from the equipped pieces
+        // on login and therefore must not persist independently of the items.
         ClearGauntletSetBonuses(player);
     }
 };
