@@ -1,16 +1,23 @@
 -- Adventurer Gauntlet account stash UI for WoW 3.3.5a.
--- Uses Blizzard's real ContainerFrame backpack template. Only the data source and
--- slot interactions are custom; the frame, background and slot art are stock WoW.
+-- Uses Blizzard's real ContainerFrame backpack template. The layout is stock WoW;
+-- only the data source and account-backed slot operations are custom.
 
 local STASH_ITEMS = {}
 local SLOTS = {}
 local MAX_SLOTS = 16
 local PREFIX = "AGSTASH"
 local FRAME_NAME = "AdventurerGauntletStashFrame"
+local PENDING_WITHDRAW = nil
 
 local function SendCommand(command)
     if not UnitName("player") then return end
     SendAddonMessage(PREFIX, command, "WHISPER", UnitName("player"))
+end
+
+local function ItemIdFromLink(link)
+    if not link then return nil end
+    local id = string.match(link, "item:(%d+)")
+    return id and tonumber(id) or nil
 end
 
 local function CursorItemEntry()
@@ -21,13 +28,85 @@ local function CursorItemEntry()
     return nil
 end
 
-local function TryDepositCursorItem()
+local function SnapshotInventoryEntry(entry)
+    local snapshot = {}
+    for bag = 0, NUM_BAG_SLOTS do
+        for slot = 1, GetContainerNumSlots(bag) do
+            local id = ItemIdFromLink(GetContainerItemLink(bag, slot))
+            if id == entry then
+                local _, count = GetContainerItemInfo(bag, slot)
+                snapshot[bag .. ":" .. slot] = count or 1
+            end
+        end
+    end
+    return snapshot
+end
+
+local function TryPickupPendingWithdraw()
+    local pending = PENDING_WITHDRAW
+    if not pending or CursorHasItem() then return end
+
+    for bag = 0, NUM_BAG_SLOTS do
+        for slot = 1, GetContainerNumSlots(bag) do
+            local id = ItemIdFromLink(GetContainerItemLink(bag, slot))
+            if id == pending.entry then
+                local _, count = GetContainerItemInfo(bag, slot)
+                local before = pending.before[bag .. ":" .. slot] or 0
+                if (count or 1) > before then
+                    PENDING_WITHDRAW = nil
+                    PickupContainerItem(bag, slot)
+                    if not CursorHasItem() then
+                        PENDING_WITHDRAW = pending
+                    end
+                    return
+                end
+            end
+        end
+    end
+end
+
+local function FirstFreeStashSlot()
+    for slot = 1, MAX_SLOTS do
+        if not STASH_ITEMS[slot] then
+            return slot
+        end
+    end
+    return nil
+end
+
+local function TryDepositCursorItem(targetSlot)
     local entry = CursorItemEntry()
     if not entry then return false end
 
+    targetSlot = targetSlot or FirstFreeStashSlot()
+    if not targetSlot then
+        UIErrorsFrame:AddMessage("El Baúl de Expediciones está lleno.", 1.0, 0.1, 0.1, 1.0)
+        return false
+    end
+
+    if STASH_ITEMS[targetSlot] then
+        UIErrorsFrame:AddMessage("Esa casilla ya está ocupada.", 1.0, 0.1, 0.1, 1.0)
+        return false
+    end
+
+    -- Returning the cursor item to its real bag before asking the server to destroy
+    -- it keeps the inventory authoritative while still feeling like a normal drop.
     ClearCursor()
-    SendCommand("DEPOSIT|" .. entry)
+    SendCommand("DEPOSIT|" .. entry .. "|" .. targetSlot)
     return true
+end
+
+local function RequestWithdraw(button)
+    if not button or not button.entry or PENDING_WITHDRAW or CursorHasItem() then
+        return
+    end
+
+    PENDING_WITHDRAW = {
+        slot = button.stashSlot,
+        entry = button.entry,
+        before = SnapshotInventoryEntry(button.entry),
+    }
+    SendCommand("WITHDRAW|" .. button.stashSlot)
 end
 
 -- ContainerFrameTemplate is the exact template used by the 3.3.5 backpack/bags.
@@ -44,7 +123,9 @@ frame:SetScript("OnHide", function()
     GameTooltip:Hide()
     PlaySound("igBackPackClose")
 end)
-frame:SetScript("OnReceiveDrag", TryDepositCursorItem)
+frame:SetScript("OnReceiveDrag", function()
+    TryDepositCursorItem(nil)
+end)
 frame:SetID(100)
 frame.size = MAX_SLOTS
 frame:SetWidth(192)
@@ -62,8 +143,7 @@ frame:Hide()
 
 tinsert(UISpecialFrames, FRAME_NAME)
 
--- Configure the inherited ContainerFrame exactly as Blizzard configures bag 0
--- (the backpack) in ContainerFrame_GenerateFrame.
+-- Configure the inherited ContainerFrame exactly as Blizzard configures bag 0.
 local bgTop = _G[FRAME_NAME .. "BackgroundTop"]
 local bgMiddle1 = _G[FRAME_NAME .. "BackgroundMiddle1"]
 local bgMiddle2 = _G[FRAME_NAME .. "BackgroundMiddle2"]
@@ -87,7 +167,12 @@ if bgMiddle2 then bgMiddle2:Hide() end
 if bgBottom then bgBottom:Hide() end
 if moneyFrame then moneyFrame:Show() end
 if nameText then nameText:SetText("Baúl de Expediciones") end
-if portrait then SetBagPortraitTexture(portrait, 0) end
+if portrait then
+    portrait:SetTexture("Interface\\Icons\\INV_Box_04")
+    if SetPortraitToTexture then
+        SetPortraitToTexture(portrait, "Interface\\Icons\\INV_Box_04")
+    end
+end
 
 if portraitButton then
     portraitButton:SetID(100)
@@ -104,10 +189,21 @@ if closeButton then
     closeButton:SetScript("OnClick", function() frame:Hide() end)
 end
 
-local function ConfigureSlot(button, visualIndex)
+local function UpdateStashTooltip(button)
+    if not button or not button.entry then
+        GameTooltip:Hide()
+        return
+    end
+
+    GameTooltip:SetOwner(button, "ANCHOR_LEFT")
+    GameTooltip:SetHyperlink("item:" .. button.entry)
+    GameTooltip:Show()
+end
+
+local function ConfigureSlot(button, visualIndex, stashSlot)
     button:ClearAllPoints()
 
-    -- These are Blizzard's exact backpack anchors from ContainerFrame_GenerateFrame.
+    -- Blizzard's exact backpack anchors from ContainerFrame_GenerateFrame.
     if visualIndex == 1 then
         button:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -12, -208)
     elseif ((visualIndex - 1) % 4) == 0 then
@@ -116,35 +212,31 @@ local function ConfigureSlot(button, visualIndex)
         button:SetPoint("BOTTOMRIGHT", _G[FRAME_NAME .. "Item" .. (visualIndex - 1)], "BOTTOMLEFT", -5, 0)
     end
 
+    button.stashSlot = stashSlot
     button:Show()
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
 
-    -- Replace the stock bag API handlers while keeping the stock button visuals.
+    -- Keep stock ContainerFrame visuals but replace stock bag API interactions.
     button:SetScript("OnClick", function(self)
         if CursorHasItem() then
-            TryDepositCursorItem()
+            TryDepositCursorItem(self.stashSlot)
             return
         end
-        if self.entry then
-            SendCommand("WITHDRAW|" .. self.entry)
-        end
+        RequestWithdraw(self)
     end)
     button:SetScript("OnDragStart", function(self)
-        if self.entry then
-            SendCommand("WITHDRAW|" .. self.entry)
-        end
+        RequestWithdraw(self)
     end)
-    button:SetScript("OnReceiveDrag", TryDepositCursorItem)
+    button:SetScript("OnReceiveDrag", function(self)
+        TryDepositCursorItem(self.stashSlot)
+    end)
+    button.UpdateTooltip = UpdateStashTooltip
     button:SetScript("OnEnter", function(self)
-        if not self.entry then return end
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:SetHyperlink("item:" .. self.entry)
-        GameTooltip:Show()
+        self:UpdateTooltip()
     end)
     button:SetScript("OnLeave", function()
         GameTooltip:Hide()
-        ResetCursor()
     end)
 
     local questTexture = _G[button:GetName() .. "IconQuestTexture"]
@@ -153,30 +245,19 @@ local function ConfigureSlot(button, visualIndex)
     if cooldown then cooldown:Hide() end
 end
 
--- Blizzard's backpack numbers slots in reverse visual order. Preserve that mapping
--- so our first stored item appears in the backpack's top-left slot.
+-- Blizzard numbers backpack buttons in reverse visual order. Preserve that mapping
+-- so stash slot 1 is the top-left visible slot and the location is persistent.
 for visualIndex = 1, MAX_SLOTS do
     local button = _G[FRAME_NAME .. "Item" .. visualIndex]
-    local stashIndex = MAX_SLOTS - visualIndex + 1
-    button:SetID(stashIndex)
-    ConfigureSlot(button, visualIndex)
-    SLOTS[stashIndex] = button
+    local stashSlot = MAX_SLOTS - visualIndex + 1
+    button:SetID(stashSlot)
+    ConfigureSlot(button, visualIndex, stashSlot)
+    SLOTS[stashSlot] = button
 end
 
 for visualIndex = MAX_SLOTS + 1, 36 do
     local button = _G[FRAME_NAME .. "Item" .. visualIndex]
     if button then button:Hide() end
-end
-
-local function SortedItems()
-    local items = {}
-    for entry, count in pairs(STASH_ITEMS) do
-        if count and count > 0 then
-            table.insert(items, { entry = entry, count = count })
-        end
-    end
-    table.sort(items, function(a, b) return a.entry < b.entry end)
-    return items
 end
 
 local function PaintItem(button, item)
@@ -186,6 +267,9 @@ local function PaintItem(button, item)
         SetItemButtonTexture(button, nil)
         SetItemButtonCount(button, 0)
         SetItemButtonDesaturated(button, false)
+        if GameTooltip:GetOwner() == button then
+            GameTooltip:Hide()
+        end
         return
     end
 
@@ -193,12 +277,15 @@ local function PaintItem(button, item)
     SetItemButtonTexture(button, texture)
     SetItemButtonCount(button, item.count)
     SetItemButtonDesaturated(button, false)
+
+    if GameTooltip:GetOwner() == button then
+        button:UpdateTooltip()
+    end
 end
 
 local function RefreshUI()
-    local items = SortedItems()
-    for index = 1, MAX_SLOTS do
-        PaintItem(SLOTS[index], items[index])
+    for slot = 1, MAX_SLOTS do
+        PaintItem(SLOTS[slot], STASH_ITEMS[slot])
     end
 end
 
@@ -212,32 +299,34 @@ local function HandleState(message)
     if message == "DONE" then
         RefreshUI()
         frame:Show()
+
+        -- If the requested source slot is still occupied, the server rejected the
+        -- withdraw (normally because inventory was full); do not wait forever.
+        if PENDING_WITHDRAW and STASH_ITEMS[PENDING_WITHDRAW.slot] then
+            PENDING_WITHDRAW = nil
+        end
         return
     end
 
-    local entry, count = string.match(message, "^S|(%d+)|(%d+)$")
-    if entry and count then
-        STASH_ITEMS[tonumber(entry)] = tonumber(count)
+    local slot, entry, count = string.match(message, "^S|(%d+)|(%d+)|(%d+)$")
+    if slot and entry and count then
+        slot = tonumber(slot)
+        if slot and slot >= 1 and slot <= MAX_SLOTS then
+            STASH_ITEMS[slot] = {
+                entry = tonumber(entry),
+                count = tonumber(count),
+            }
+        end
     end
 end
 
--- The current server snapshot travels as hidden-looking system messages. Consume
--- them here so the protocol never appears in the player's chat window.
+-- Consume the server snapshot transport so AGSTASH never appears in chat.
 local function SystemMessageFilter(self, event, message, ...)
     if type(message) ~= "string" or string.sub(message, 1, 8) ~= "AGSTASH|" then
         return false, message, ...
     end
 
-    local payload = string.sub(message, 9)
-    if payload == "OPEN" or payload == "DONE" then
-        HandleState(payload)
-    else
-        local kind, entry, count = string.match(payload, "^([BS])|(%d+)|(%d+)$")
-        if kind == "S" and entry and count then
-            HandleState("S|" .. entry .. "|" .. count)
-        end
-    end
-
+    HandleState(string.sub(message, 9))
     return true
 end
 
@@ -245,14 +334,14 @@ ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", SystemMessageFilter)
 
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("CHAT_MSG_ADDON")
-eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+eventFrame:RegisterEvent("BAG_UPDATE")
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "CHAT_MSG_ADDON" then
         local prefix, message = ...
         if prefix == PREFIX then
             HandleState(message)
         end
-    elseif event == "GET_ITEM_INFO_RECEIVED" and frame:IsShown() then
-        RefreshUI()
+    elseif event == "BAG_UPDATE" then
+        TryPickupPendingWithdraw()
     end
 end)
