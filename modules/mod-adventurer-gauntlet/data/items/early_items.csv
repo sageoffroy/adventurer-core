@@ -1,5 +1,11 @@
 enabled;entry;source_entry;display_id;set_key;name;quality;required_level;item_level;strength;agility;stamina;intellect;spirit;attack_power;spell_power;hit_rating;crit_rating;haste_rating;armor;dmg_min1;dmg_max1;delay;equip_spell1;equip_spell2;description
-1;911100;796;;cuero_oso;Botas de cuero de oso;blue;1;4;;1;;1;;;;;;;;;;;;;Set Cuero de Oso. 2 piezas: +5 armadura. 3 piezas: +2 indice de defensa. 4 piezas: +1 indice de pericia.
-1;911101;797;;cuero_oso;Guantes de cuero de oso;blue;1;4;1;1;2;;;;;;;;;;;;;;Set Cuero de Oso. 2 piezas: +5 armadura. 3 piezas: +2 indice de defensa. 4 piezas: +1 indice de pericia.
-1;911102;798;;cuero_oso;Pantalones de cuero de oso;blue;1;4;1;;2;1;;;;;;;;;;;;;Set Cuero de Oso. 2 piezas: +5 armadura. 3 piezas: +2 indice de defensa. 4 piezas: +1 indice de pericia.
-1;911103;799;;cuero_oso;Jubon de cuero de oso;blue;1;4;2;2;2;;;;;;;;;;;;;;Set Cuero de Oso. 2 piezas: +5 armadura. 3 piezas: +2 indice de defensa. 4 piezas: +1 indice de pericia.
+1;911100;796;;cuero_oso;Botas de cuero de oso;blue;1;4;;1;;1;;;;;;;;;;;;;
+1;911101;797;;cuero_oso;Guantes de cuero de oso;blue;1;4;1;1;2;;;;;;;;;;;;;;
+1;911102;798;;cuero_oso;Pantalones de cuero de oso;blue;1;4;1;;2;1;;;;;;;;;;;;;
+1;911103;799;;cuero_oso;Jubon de cuero de oso;blue;1;4;2;2;2;;;;;;;;;;;;;;
+1;911110;840;;monje_errante;Zapatos del Monje Errante;blue;1;4;;1;1;;1;;;;;;;;;;;;
+1;911111;839;;monje_errante;Guantes del Monje Errante;blue;1;4;1;;1;1;;;;;;;;;;;;;
+1;911112;838;;monje_errante;Pantalones del Monje Errante;blue;1;4;;1;2;2;;;;;;;;;;;;;
+1;911113;837;;monje_errante;Jubon del Monje Errante;blue;1;4;;2;2;;2;;;;;;;;;;;;
+1;911114;3589;;monje_errante;Cinturon del Monje Errante;blue;1;4;1;;1;;1;;;;;;;;;;;;
+1;911115;3590;;monje_errante;Brazales del Monje Errante;blue;1;4;;;1;1;1;;;;;;;;;;;;
