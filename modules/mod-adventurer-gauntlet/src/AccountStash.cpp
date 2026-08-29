@@ -104,12 +104,12 @@ void RemoveOneFromStash(Player* player, uint32 entry)
     if (!accountId || !IsStashableItem(entry))
         return;
 
-    CharacterDatabase.Execute(
+    CharacterDatabase.DirectExecute(
         "UPDATE `adventurer_gauntlet_account_stash` SET `item_count` = `item_count` - 1 "
         "WHERE `account_id` = {} AND `item_entry` = {} AND `item_count` > 0",
         accountId,
         entry);
-    CharacterDatabase.Execute(
+    CharacterDatabase.DirectExecute(
         "DELETE FROM `adventurer_gauntlet_account_stash` "
         "WHERE `account_id` = {} AND `item_entry` = {} AND `item_count` = 0",
         accountId,
@@ -147,7 +147,9 @@ bool DepositOne(Player* player, uint32 entry)
     player->DestroyItemCount(entry, 1, true, true);
     RefreshEquipmentVisuals(player);
 
-    CharacterDatabase.Execute(
+    // The UI refreshes immediately after a deposit. Keep this write synchronous so
+    // the snapshot sent below already contains the newly secured item.
+    CharacterDatabase.DirectExecute(
         "INSERT INTO `adventurer_gauntlet_account_stash` (`account_id`, `item_entry`, `item_count`) "
         "VALUES ({}, {}, 1) ON DUPLICATE KEY UPDATE `item_count` = `item_count` + 1",
         GetAccountId(player),
