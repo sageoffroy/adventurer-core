@@ -9,6 +9,7 @@
 #include "ScriptMgr.h"
 #include "WorldSession.h"
 
+#include <array>
 #include <cmath>
 #include <limits>
 #include <string>
@@ -19,11 +20,24 @@ namespace
 {
 constexpr uint32 KhadgarEntry = 910000;
 constexpr uint32 AccountStashEntry = 910002;
+constexpr uint32 AccountStashSlots = 16;
 constexpr char ProtocolPrefix[] = "AGSTASH|";
+
+struct StashItem
+{
+    uint32 slot = 0;
+    uint32 entry = 0;
+    uint32 count = 0;
+};
 
 uint32 GetAccountId(Player* player)
 {
     return player && player->GetSession() ? player->GetSession()->GetAccountId() : 0;
+}
+
+bool IsValidStashSlot(uint32 slot)
+{
+    return slot >= 1 && slot <= AccountStashSlots;
 }
 
 bool IsStashableItem(uint32 entry)
@@ -59,22 +73,22 @@ void RefreshEquipmentVisuals(Player* player)
     player->SetVirtualItemSlot(2, player->GetWeaponForAttack(RANGED_ATTACK, true));
 }
 
-std::vector<std::pair<uint32, uint32>> GetStashItems(Player* player)
+std::vector<StashItem> GetStashItems(Player* player)
 {
-    std::vector<std::pair<uint32, uint32>> items;
+    std::vector<StashItem> items;
     uint32 accountId = GetAccountId(player);
     if (!accountId)
         return items;
 
     if (QueryResult result = CharacterDatabase.Query(
-        "SELECT `item_entry`, `item_count` FROM `adventurer_gauntlet_account_stash` "
-        "WHERE `account_id` = {} AND `item_count` > 0 ORDER BY `item_entry`",
+        "SELECT `slot_index`, `item_entry`, `item_count` FROM `adventurer_gauntlet_account_stash` "
+        "WHERE `account_id` = {} AND `item_count` > 0 ORDER BY `slot_index`",
         accountId))
     {
         do
         {
             Field* fields = result->Fetch();
-            items.emplace_back(fields[0].Get<uint32>(), fields[1].Get<uint32>());
+            items.push_back({ fields[0].Get<uint32>(), fields[1].Get<uint32>(), fields[2].Get<uint32>() });
         }
         while (result->NextRow());
     }
@@ -82,38 +96,56 @@ std::vector<std::pair<uint32, uint32>> GetStashItems(Player* player)
     return items;
 }
 
-uint32 GetStashItemCount(Player* player, uint32 entry)
+bool GetStashItemAtSlot(Player* player, uint32 slot, StashItem& item)
 {
     uint32 accountId = GetAccountId(player);
-    if (!accountId || !IsStashableItem(entry))
-        return 0;
+    if (!accountId || !IsValidStashSlot(slot))
+        return false;
 
     if (QueryResult result = CharacterDatabase.Query(
-        "SELECT `item_count` FROM `adventurer_gauntlet_account_stash` "
-        "WHERE `account_id` = {} AND `item_entry` = {} LIMIT 1",
+        "SELECT `item_entry`, `item_count` FROM `adventurer_gauntlet_account_stash` "
+        "WHERE `account_id` = {} AND `slot_index` = {} AND `item_count` > 0 LIMIT 1",
         accountId,
-        entry))
-        return (*result)[0].Get<uint32>();
+        slot))
+    {
+        Field* fields = result->Fetch();
+        item = { slot, fields[0].Get<uint32>(), fields[1].Get<uint32>() };
+        return true;
+    }
+
+    return false;
+}
+
+uint32 FindFirstFreeStashSlot(Player* player)
+{
+    std::array<bool, AccountStashSlots + 1> used{};
+    for (StashItem const& item : GetStashItems(player))
+        if (IsValidStashSlot(item.slot))
+            used[item.slot] = true;
+
+    for (uint32 slot = 1; slot <= AccountStashSlots; ++slot)
+        if (!used[slot])
+            return slot;
 
     return 0;
 }
 
-void RemoveOneFromStash(Player* player, uint32 entry)
+void RemoveOneFromStashSlot(Player* player, uint32 slot)
 {
     uint32 accountId = GetAccountId(player);
-    if (!accountId || !IsStashableItem(entry))
+    if (!accountId || !IsValidStashSlot(slot))
         return;
 
     CharacterDatabase.DirectExecute(
         "UPDATE `adventurer_gauntlet_account_stash` SET `item_count` = `item_count` - 1 "
-        "WHERE `account_id` = {} AND `item_entry` = {} AND `item_count` > 0",
+        "WHERE `account_id` = {} AND `slot_index` = {} AND `item_count` > 0",
         accountId,
-        entry);
+        slot);
     CharacterDatabase.DirectExecute(
         "DELETE FROM `adventurer_gauntlet_account_stash` "
-        "WHERE `account_id` = {} AND `item_entry` = {} AND `item_count` = 0",
+        "WHERE `account_id` = {} AND `slot_index` = {} AND `item_count` = 0",
         accountId,
-        entry);
+        slot);
 }
 
 void SendStashState(Player* player)
@@ -124,14 +156,14 @@ void SendStashState(Player* player)
     ChatHandler handler(player->GetSession());
     handler.SendSysMessage("AGSTASH|OPEN");
 
-    for (auto const& [entry, count] : GetStashItems(player))
-        if (IsStashableItem(entry) && count)
-            handler.PSendSysMessage("AGSTASH|S|{}|{}", entry, count);
+    for (StashItem const& item : GetStashItems(player))
+        if (IsValidStashSlot(item.slot) && IsStashableItem(item.entry) && item.count)
+            handler.PSendSysMessage("AGSTASH|S|{}|{}|{}", item.slot, item.entry, item.count);
 
     handler.SendSysMessage("AGSTASH|DONE");
 }
 
-bool DepositOne(Player* player, uint32 entry)
+bool DepositOne(Player* player, uint32 entry, uint32 targetSlot)
 {
     if (!player || !IsStashableItem(entry))
     {
@@ -141,18 +173,30 @@ bool DepositOne(Player* player, uint32 entry)
         return false;
     }
 
+    if (!IsValidStashSlot(targetSlot))
+    {
+        ChatHandler(player->GetSession()).SendSysMessage("Esa casilla del Baul de Expediciones no existe.");
+        return false;
+    }
+
+    StashItem occupied;
+    if (GetStashItemAtSlot(player, targetSlot, occupied))
+    {
+        ChatHandler(player->GetSession()).SendSysMessage("Esa casilla del Baul de Expediciones ya esta ocupada.");
+        return false;
+    }
+
     if (player->GetItemCount(entry, false) == 0)
         return false;
 
     player->DestroyItemCount(entry, 1, true, true);
     RefreshEquipmentVisuals(player);
 
-    // The UI refreshes immediately after a deposit. Keep this write synchronous so
-    // the snapshot sent below already contains the newly secured item.
     CharacterDatabase.DirectExecute(
-        "INSERT INTO `adventurer_gauntlet_account_stash` (`account_id`, `item_entry`, `item_count`) "
-        "VALUES ({}, {}, 1) ON DUPLICATE KEY UPDATE `item_count` = `item_count` + 1",
+        "INSERT INTO `adventurer_gauntlet_account_stash` "
+        "(`account_id`, `slot_index`, `item_entry`, `item_count`) VALUES ({}, {}, {}, 1)",
         GetAccountId(player),
+        targetSlot,
         entry);
 
     ChatHandler(player->GetSession()).PSendSysMessage(
@@ -161,31 +205,32 @@ bool DepositOne(Player* player, uint32 entry)
     return true;
 }
 
-bool WithdrawOne(Player* player, uint32 entry)
+bool WithdrawOne(Player* player, uint32 sourceSlot)
 {
-    if (!player || !IsStashableItem(entry) || !GetStashItemCount(player, entry))
+    StashItem stashItem;
+    if (!player || !GetStashItemAtSlot(player, sourceSlot, stashItem) || !IsStashableItem(stashItem.entry))
         return false;
 
     ItemPosCountVec dest;
-    InventoryResult result = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, entry, 1);
+    InventoryResult result = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, stashItem.entry, 1);
     if (result != EQUIP_ERR_OK)
     {
         ChatHandler(player->GetSession()).SendSysMessage("No tienes espacio para retirar ese objeto.");
         return false;
     }
 
-    Item* item = player->StoreNewItem(dest, entry, true);
+    Item* item = player->StoreNewItem(dest, stashItem.entry, true);
     if (!item)
         return false;
 
-    RemoveOneFromStash(player, entry);
+    RemoveOneFromStashSlot(player, sourceSlot);
     ChatHandler(player->GetSession()).PSendSysMessage(
         "|cff00ff00Baul de Expediciones:|r retiraste |cff0070dd{}|r.",
-        GetItemName(entry));
+        GetItemName(stashItem.entry));
     return true;
 }
 
-uint32 ParseEntry(std::string const& value)
+uint32 ParseNumber(std::string const& value)
 {
     try
     {
@@ -199,6 +244,17 @@ uint32 ParseEntry(std::string const& value)
     {
         return 0;
     }
+}
+
+bool ParseTwoNumbers(std::string const& value, uint32& first, uint32& second)
+{
+    size_t separator = value.find('|');
+    if (separator == std::string::npos)
+        return false;
+
+    first = ParseNumber(value.substr(0, separator));
+    second = ParseNumber(value.substr(separator + 1));
+    return first != 0 && second != 0;
 }
 }
 
@@ -238,9 +294,18 @@ bool HandleAdventurerGauntletStashAddonCommand(Player* player, std::string const
     constexpr char DepositPrefix[] = "DEPOSIT|";
     if (payload.rfind(DepositPrefix, 0) == 0)
     {
-        uint32 entry = ParseEntry(payload.substr(sizeof(DepositPrefix) - 1));
-        if (entry)
-            DepositOne(player, entry);
+        std::string arguments = payload.substr(sizeof(DepositPrefix) - 1);
+        uint32 entry = 0;
+        uint32 slot = 0;
+        if (ParseTwoNumbers(arguments, entry, slot))
+            DepositOne(player, entry, slot);
+        else
+        {
+            entry = ParseNumber(arguments);
+            slot = FindFirstFreeStashSlot(player);
+            if (entry && slot)
+                DepositOne(player, entry, slot);
+        }
         SendStashState(player);
         return true;
     }
@@ -248,9 +313,9 @@ bool HandleAdventurerGauntletStashAddonCommand(Player* player, std::string const
     constexpr char WithdrawPrefix[] = "WITHDRAW|";
     if (payload.rfind(WithdrawPrefix, 0) == 0)
     {
-        uint32 entry = ParseEntry(payload.substr(sizeof(WithdrawPrefix) - 1));
-        if (entry)
-            WithdrawOne(player, entry);
+        uint32 slot = ParseNumber(payload.substr(sizeof(WithdrawPrefix) - 1));
+        if (slot)
+            WithdrawOne(player, slot);
         SendStashState(player);
         return true;
     }
