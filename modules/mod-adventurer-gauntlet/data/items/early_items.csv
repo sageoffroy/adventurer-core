@@ -9,3 +9,9 @@ enabled;entry;source_entry;display_id;set_key;name;quality;required_level;item_l
 1;911113;837;;monje_errante;Jubon del Monje Errante;blue;1;4;;2;2;;2;;;;;;;;;;;;
 1;911114;3589;;monje_errante;Cinturon del Monje Errante;blue;1;4;1;;1;;1;;;;;;;;;;;;
 1;911115;3590;;monje_errante;Brazales del Monje Errante;blue;1;4;;;1;1;1;;;;;;;;;;;;
+1;911120;285;;escamas;Jubon de Escamas;blue;4;7;3;;2;;;;;;;;82;;;;;;
+1;911121;286;;escamas;Pantalones de Escamas;blue;3;6;2;;2;;;;;;;;68;;;;;;
+1;911122;718;;escamas;Guantes de Escamas;blue;2;5;2;;1;;;;;;;;42;;;;;;
+1;911123;287;;escamas;Botas de Escamas;blue;2;5;1;;2;;;;;;;;50;;;;;;
+1;911124;1853;;escamas;Cinturon de Escamas;blue;1;4;1;;1;;;;;;;;36;;;;;;
+1;911125;1852;;escamas;Brazales de Escamas;blue;1;4;1;;1;;;;;;;;30;;;;;;
