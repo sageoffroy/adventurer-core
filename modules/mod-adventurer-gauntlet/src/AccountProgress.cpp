@@ -1,6 +1,7 @@
 #include "Chat.h"
 #include "DatabaseEnv.h"
 #include "Item.h"
+#include "ObjectMgr.h"
 #include "Player.h"
 #include "ScriptMgr.h"
 #include "WorldSession.h"
@@ -27,6 +28,14 @@ bool IsGauntletMap(uint32 mapId)
 bool IsGauntletItem(uint32 entry)
 {
     return entry >= GauntletItemMin && entry <= GauntletItemMax;
+}
+
+bool IsRunEquipment(ItemTemplate const& item)
+{
+    if (item.Class != ITEM_CLASS_WEAPON && item.Class != ITEM_CLASS_ARMOR)
+        return false;
+
+    return item.InventoryType != INVTYPE_NON_EQUIP && item.InventoryType != INVTYPE_BAG;
 }
 
 uint32 GetAccountCollectionCount(Player* player)
@@ -61,29 +70,21 @@ void LoseUnsecuredRunItems(Player* player)
         return;
 
     uint32 lost = 0;
-
-    // Curated/account expedition items are only safe if the player manually
-    // deposited them in the account stash before the run. Anything still carried
-    // at death is part of the failed expedition and is destroyed.
-    for (uint32 entry = GauntletItemMin; entry <= GauntletItemMax; ++entry)
+    ItemTemplateContainer const* itemStore = sObjectMgr->GetItemTemplateStore();
+    if (itemStore)
     {
-        uint32 carried = player->GetItemCount(entry, false);
-        if (!carried)
-            continue;
+        for (auto const& [entry, itemTemplate] : *itemStore)
+        {
+            if (!IsRunEquipment(itemTemplate))
+                continue;
 
-        player->DestroyItemCount(entry, carried, true, true);
-        lost += carried;
-    }
+            uint32 carried = player->GetItemCount(entry, false);
+            if (!carried)
+                continue;
 
-    // Remaining equipped stock gear is also lost with the fallen Adventurer.
-    for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
-    {
-        Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
-        if (!item)
-            continue;
-
-        lost += item->GetCount();
-        player->DestroyItem(INVENTORY_SLOT_BAG_0, slot, true);
+            player->DestroyItemCount(entry, carried, true, true);
+            lost += carried;
+        }
     }
 
     // Destroying equipment while dead can leave stale visible/virtual fields until
@@ -92,11 +93,11 @@ void LoseUnsecuredRunItems(Player* player)
 
     if (lost)
         ChatHandler(player->GetSession()).PSendSysMessage(
-            "|cffff2020{} objeto(s) no asegurado(s) se perdieron con este Aventurero.|r",
+            "|cffff2020{} objeto(s) de equipo no asegurado(s) se perdieron con este Aventurero.|r",
             lost);
 
     ChatHandler(player->GetSession()).SendSysMessage(
-        "|cff00ff00Solo los objetos depositados previamente en el Baul de Expediciones permanecen a salvo.|r");
+        "|cff00ff00Solo el equipo depositado previamente en el Baul de Expediciones permanece a salvo.|r");
 }
 
 void UnlockAccountItem(Player* player, Item* item)
@@ -161,7 +162,7 @@ bool MarkFallen(Player* player)
     ChatHandler(player->GetSession()).SendSysMessage(
         "|cffff2020Este Aventurero ha quedado CAIDO permanentemente.|r");
     ChatHandler(player->GetSession()).SendSysMessage(
-        "El contenido asegurado en el Baul de Expediciones permanece disponible para futuros Aventureros.");
+        "El equipo asegurado en el Baul de Expediciones permanece disponible para futuros Aventureros.");
     return true;
 }
 }
