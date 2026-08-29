@@ -1,34 +1,28 @@
 -- Adventurer Gauntlet account stash UI for WoW 3.3.5a.
--- Server state arrives through hidden AGSTASH system messages.
+-- A single account bank: drag account items in, click stored items to withdraw.
 
-local BAG_ITEMS = {}
 local STASH_ITEMS = {}
-local LEFT_SLOTS = {}
-local RIGHT_SLOTS = {}
-local MAX_SLOTS = 24
-
-local function SplitProtocol(message)
-    local parts = {}
-    for token in string.gmatch(message, "[^|]+") do
-        table.insert(parts, token)
-    end
-    return parts
-end
+local SLOTS = {}
+local MAX_SLOTS = 49
+local COLUMNS = 7
+local PREFIX = "AGSTASH"
 
 local function SendCommand(command)
     if not UnitName("player") then return end
-    SendAddonMessage("AGSTASH", command, "WHISPER", UnitName("player"))
+    SendAddonMessage(PREFIX, command, "WHISPER", UnitName("player"))
 end
 
 local frame = CreateFrame("Frame", "AdventurerGauntletStashFrame", UIParent)
-frame:SetWidth(590)
-frame:SetHeight(300)
-frame:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
+frame:SetWidth(360)
+frame:SetHeight(380)
+frame:SetPoint("CENTER", UIParent, "CENTER", 0, 35)
 frame:SetFrameStrata("DIALOG")
 frame:SetMovable(true)
 frame:EnableMouse(true)
 frame:RegisterForDrag("LeftButton")
-frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
+frame:SetScript("OnDragStart", function(self)
+    if not CursorHasItem() then self:StartMoving() end
+end)
 frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
 frame:SetBackdrop({
     bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -46,63 +40,69 @@ local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 title:SetPoint("TOP", frame, "TOP", 0, -16)
 title:SetText("Baúl de Expediciones")
 
+local subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+subtitle:SetPoint("TOP", title, "BOTTOM", 0, -7)
+subtitle:SetText("Objetos guardados de tu cuenta")
+
 local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -7, -7)
 
-local leftLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-leftLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", 32, -48)
-leftLabel:SetText("Tu Aventurero")
-
-local rightLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-rightLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", 322, -48)
-rightLabel:SetText("Cuenta")
+local panel = CreateFrame("Frame", nil, frame)
+panel:SetWidth(308)
+panel:SetHeight(308)
+panel:SetPoint("TOP", frame, "TOP", 0, -61)
+panel:SetBackdrop({
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true,
+    tileSize = 16,
+    edgeSize = 12,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 }
+})
+panel:SetBackdropColor(0.03, 0.03, 0.03, 0.90)
+panel:EnableMouse(true)
 
 local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-hint:SetPoint("BOTTOM", frame, "BOTTOM", 0, 21)
-hint:SetText("Haz clic en un objeto para moverlo al otro lado.")
+hint:SetPoint("BOTTOM", frame, "BOTTOM", 0, 15)
+hint:SetText("Arrastra objetos de cuenta aquí · Clic para retirar")
 
-local depositAll = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-depositAll:SetWidth(110)
-depositAll:SetHeight(22)
-depositAll:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 31, 15)
-depositAll:SetText("Guardar todo")
-depositAll:SetScript("OnClick", function() SendCommand("DEPOSITALL") end)
-
-local refresh = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-refresh:SetWidth(82)
-refresh:SetHeight(22)
-refresh:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -31, 15)
-refresh:SetText("Actualizar")
-refresh:SetScript("OnClick", function() SendCommand("REFRESH") end)
-
-local function CreatePanel(parent, x)
-    local panel = CreateFrame("Frame", nil, parent)
-    panel:SetWidth(252)
-    panel:SetHeight(178)
-    panel:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -69)
-    panel:SetBackdrop({
-        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true,
-        tileSize = 16,
-        edgeSize = 12,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 }
-    })
-    panel:SetBackdropColor(0.03, 0.03, 0.03, 0.86)
-    return panel
+local function CursorItemEntry()
+    local cursorType, itemID = GetCursorInfo()
+    if cursorType == "item" then
+        return tonumber(itemID)
+    end
+    return nil
 end
 
-local leftPanel = CreatePanel(frame, 25)
-local rightPanel = CreatePanel(frame, 313)
+local function TryDepositCursorItem()
+    local entry = CursorItemEntry()
+    if not entry then return false end
 
-local function CreateSlot(panel, index, side)
+    if entry < 911000 or entry > 911999 then
+        UIErrorsFrame:AddMessage("Solo puedes guardar objetos de cuenta de la expedición.", 1.0, 0.2, 0.2, 1.0)
+        return true
+    end
+
+    ClearCursor()
+    SendCommand("DEPOSIT|" .. entry)
+    return true
+end
+
+panel:SetScript("OnReceiveDrag", TryDepositCursorItem)
+panel:SetScript("OnMouseUp", function()
+    if CursorHasItem() then TryDepositCursorItem() end
+end)
+
+local function CreateSlot(index)
     local button = CreateFrame("Button", nil, panel)
-    button:SetWidth(36)
-    button:SetHeight(36)
+    button:SetWidth(40)
+    button:SetHeight(40)
 
-    local column = math.mod(index - 1, 6)
-    local row = math.floor((index - 1) / 6)
-    button:SetPoint("TOPLEFT", panel, "TOPLEFT", 8 + column * 40, -8 - row * 40)
+    local column = math.mod(index - 1, COLUMNS)
+    local row = math.floor((index - 1) / COLUMNS)
+    button:SetPoint("TOPLEFT", panel, "TOPLEFT", 8 + column * 42, -8 - row * 42)
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    button:RegisterForDrag("LeftButton")
 
     local background = button:CreateTexture(nil, "BACKGROUND")
     background:SetAllPoints(button)
@@ -110,17 +110,16 @@ local function CreateSlot(panel, index, side)
     button.background = background
 
     local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetPoint("TOPLEFT", button, "TOPLEFT", 3, -3)
-    icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -3, 3)
+    icon:SetPoint("TOPLEFT", button, "TOPLEFT", 4, -4)
+    icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -4, 4)
+    icon:Hide()
     button.icon = icon
 
     local count = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
-    count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
+    count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -3, 3)
     button.count = count
 
-    button.side = side
     button.entry = nil
-    button:EnableMouse(false)
 
     button:SetScript("OnEnter", function(self)
         if not self.entry then return end
@@ -134,25 +133,29 @@ local function CreateSlot(panel, index, side)
     end)
 
     button:SetScript("OnClick", function(self)
-        if not self.entry then return end
-        if self.side == "bag" then
-            SendCommand("DEPOSIT|" .. self.entry)
-        else
+        if CursorHasItem() then
+            TryDepositCursorItem()
+            return
+        end
+        if self.entry then
             SendCommand("WITHDRAW|" .. self.entry)
         end
+    end)
+
+    button:SetScript("OnReceiveDrag", function()
+        TryDepositCursorItem()
     end)
 
     return button
 end
 
 for index = 1, MAX_SLOTS do
-    LEFT_SLOTS[index] = CreateSlot(leftPanel, index, "bag")
-    RIGHT_SLOTS[index] = CreateSlot(rightPanel, index, "stash")
+    SLOTS[index] = CreateSlot(index)
 end
 
-local function SortedItems(source)
+local function SortedItems()
     local items = {}
-    for entry, count in pairs(source) do
+    for entry, count in pairs(STASH_ITEMS) do
         if count and count > 0 then
             table.insert(items, { entry = entry, count = count })
         end
@@ -161,71 +164,54 @@ local function SortedItems(source)
     return items
 end
 
-local function PaintSlots(slots, source)
-    local items = SortedItems(source)
+local function RefreshUI()
+    local items = SortedItems()
     for index = 1, MAX_SLOTS do
-        local button = slots[index]
+        local button = SLOTS[index]
         local item = items[index]
         if item then
             button.entry = item.entry
             button.icon:SetTexture(GetItemIcon(item.entry) or "Interface\\Icons\\INV_Misc_QuestionMark")
             button.icon:Show()
             button.count:SetText(item.count > 1 and item.count or "")
-            button:EnableMouse(true)
         else
             button.entry = nil
             button.icon:SetTexture(nil)
             button.icon:Hide()
             button.count:SetText("")
-            button:EnableMouse(false)
         end
     end
 end
 
-local function RefreshUI()
-    PaintSlots(LEFT_SLOTS, BAG_ITEMS)
-    PaintSlots(RIGHT_SLOTS, STASH_ITEMS)
-end
-
-local function ResetState()
-    BAG_ITEMS = {}
-    STASH_ITEMS = {}
-end
-
-local function HandleProtocol(message)
-    local parts = SplitProtocol(message)
-    if parts[1] ~= "AGSTASH" then return end
-
-    local kind = parts[2]
-    if kind == "OPEN" then
-        ResetState()
+local function HandleState(message)
+    if message == "OPEN" then
+        STASH_ITEMS = {}
         frame:Show()
-    elseif kind == "B" then
-        local entry = tonumber(parts[3])
-        local count = tonumber(parts[4])
-        if entry and count then BAG_ITEMS[entry] = count end
-    elseif kind == "S" then
-        local entry = tonumber(parts[3])
-        local count = tonumber(parts[4])
-        if entry and count then STASH_ITEMS[entry] = count end
-    elseif kind == "DONE" then
+        return
+    end
+
+    if message == "DONE" then
         RefreshUI()
         frame:Show()
+        return
+    end
+
+    local entry, count = string.match(message, "^S|(%d+)|(%d+)$")
+    if entry and count then
+        STASH_ITEMS[tonumber(entry)] = tonumber(count)
     end
 end
-
-local function SystemMessageFilter(self, event, message, ...)
-    if type(message) == "string" and string.sub(message, 1, 8) == "AGSTASH|" then
-        HandleProtocol(message)
-        return true
-    end
-    return false, message, ...
-end
-
-ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", SystemMessageFilter)
 
 local eventFrame = CreateFrame("Frame")
+eventFrame:RegisterEvent("CHAT_MSG_ADDON")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-eventFrame:SetScript("OnEvent", function()
-    if frame:IsShown() then RefreshUI() end
+eventFrame:SetScript("OnEvent", function(self, event, ...)
+    if event == "CHAT_MSG_ADDON" then
+        local prefix, message = ...
+        if prefix == PREFIX then
+            HandleState(message)
+        end
+    elseif event == "GET_ITEM_INFO_RECEIVED" and frame:IsShown() then
+        RefreshUI()
+    end
 end)
