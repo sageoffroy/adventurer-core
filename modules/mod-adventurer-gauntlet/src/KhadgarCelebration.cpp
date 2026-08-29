@@ -18,7 +18,6 @@ namespace
 constexpr uint32 KhadgarEntry = 910000;
 constexpr uint32 KhadgarTeleportVisual = 41232;
 constexpr uint32 RagefireMapId = 389;
-constexpr uint32 RagefireFinalBossEntry = 11520;
 constexpr uint32 GauntletItemMin = 911000;
 constexpr uint32 GauntletItemMax = 911999;
 
@@ -37,6 +36,7 @@ struct RewardPools
 {
     std::vector<uint32> GreenItems;
     std::vector<uint32> SetItems;
+    std::vector<uint32> PurpleItems;
 };
 
 bool IsEquippableReward(ItemTemplate const& item, uint8 playerLevel)
@@ -83,6 +83,8 @@ RewardPools BuildRewardPools(uint8 playerLevel)
 
         if (item.Quality == ITEM_QUALITY_UNCOMMON)
             pools.GreenItems.push_back(entry);
+        else if (item.Quality == ITEM_QUALITY_EPIC)
+            pools.PurpleItems.push_back(entry);
     }
 
     return pools;
@@ -112,16 +114,17 @@ void AddLootItem(Creature* boss, uint32 itemEntry)
     LootStoreItem lootItem(itemEntry, 0, 100.0f, false, LOOT_MODE_DEFAULT, 0, 1, 1);
     boss->loot.AddItem(lootItem);
 }
+}
 
-void FillBossLoot(Creature* khadgar, Creature* boss)
+void FillAdventurerGauntletBossLoot(Creature* boss, bool finalBoss)
 {
-    if (!khadgar || !boss || !khadgar->GetMap())
+    if (!boss || !boss->GetMap())
         return;
 
     uint32 survivorCount = 0;
     uint8 rewardLevel = 0;
 
-    for (auto const& ref : khadgar->GetMap()->GetPlayers())
+    for (auto const& ref : boss->GetMap()->GetPlayers())
     {
         Player* player = ref.GetSource();
         if (!player || !player->IsAlive())
@@ -137,9 +140,8 @@ void FillBossLoot(Creature* khadgar, Creature* boss)
     RewardPools pools = BuildRewardPools(rewardLevel);
     std::unordered_set<uint32> usedEntries;
 
-    // The boss corpse is the only reward container. Stock boss loot is removed:
-    // one level-appropriate green item is added per survivor, plus one blue
-    // Adventurer Gauntlet set piece for the whole group.
+    // Every Gauntlet dungeon boss replaces its stock loot with one level-appropriate
+    // green item per survivor and one blue custom set piece for the group.
     boss->loot.clear();
     boss->loot.loot_type = LOOT_CORPSE;
 
@@ -148,11 +150,20 @@ void FillBossLoot(Creature* khadgar, Creature* boss)
 
     AddLootItem(boss, SelectUniqueItem(pools.SetItems, usedEntries));
 
+    // The final boss adds a high-rarity reward. If no level-appropriate epic exists,
+    // the fallback is a second blue Gauntlet set piece instead of an empty slot.
+    if (finalBoss)
+    {
+        uint32 extraReward = SelectUniqueItem(pools.PurpleItems, usedEntries);
+        if (!extraReward)
+            extraReward = SelectUniqueItem(pools.SetItems, usedEntries);
+        AddLootItem(boss, extraReward);
+    }
+
     if (!boss->loot.empty())
         boss->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
     else
         boss->RemoveDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
-}
 }
 
 class AdventurerGauntletKhadgarCelebrationScript : public AllCreatureScript
@@ -163,13 +174,10 @@ public:
 
     void OnCreatureAddWorld(Creature* creature) override
     {
-        // The permanent Khadgar is outside the dungeon. A summoned Khadgar in
-        // Ragefire is the expedition guide that appears after the final boss.
+        // Only the summoned Khadgar after the final boss celebrates and offers
+        // continuation. Boss loot is already generated on the boss death event.
         if (!creature || creature->GetEntry() != KhadgarEntry || creature->GetMapId() != RagefireMapId || !creature->IsSummon())
             return;
-
-        if (Creature* finalBoss = creature->FindNearestCreature(RagefireFinalBossEntry, 20.0f, false))
-            FillBossLoot(creature, finalBoss);
 
         creature->CastSpell(creature, KhadgarTeleportVisual, true);
         creature->HandleEmoteCommand(EMOTE_ONESHOT_APPLAUD);
