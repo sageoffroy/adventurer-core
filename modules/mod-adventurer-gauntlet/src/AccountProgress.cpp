@@ -6,10 +6,10 @@
 #include "WorldSession.h"
 
 #include <unordered_set>
-#include <vector>
 
 void AddAdventurerGauntletAccountStashItem(Player* player, uint32 entry, uint32 count);
 uint32 GetAdventurerGauntletAccountStashTotal(Player* player);
+bool HandleAdventurerGauntletStashAddonCommand(Player* player, std::string const& rawMessage);
 
 namespace
 {
@@ -43,22 +43,17 @@ uint32 GetAccountCollectionCount(Player* player)
     return 0;
 }
 
-std::vector<uint32> GetDiscoveredAccountItems(Player* player)
+void RefreshEquipmentVisuals(Player* player)
 {
-    std::vector<uint32> entries;
     if (!player)
-        return entries;
+        return;
 
-    if (QueryResult result = CharacterDatabase.Query(
-        "SELECT `item_entry` FROM `adventurer_gauntlet_account_items` WHERE `account_id` = {}",
-        player->GetSession()->GetAccountId()))
-    {
-        do
-            entries.push_back(result->Fetch()[0].Get<uint32>());
-        while (result->NextRow());
-    }
+    for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+        player->SetVisibleItemSlot(slot, player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
 
-    return entries;
+    player->SetVirtualItemSlot(0, player->GetWeaponForAttack(BASE_ATTACK, true));
+    player->SetVirtualItemSlot(1, player->GetWeaponForAttack(OFF_ATTACK, true));
+    player->SetVirtualItemSlot(2, player->GetWeaponForAttack(RANGED_ATTACK, true));
 }
 
 void RescueAccountItemsAndLoseEquippedGear(Player* player)
@@ -67,11 +62,8 @@ void RescueAccountItemsAndLoseEquippedGear(Player* player)
         return;
 
     uint32 rescued = 0;
-    for (uint32 entry : GetDiscoveredAccountItems(player))
+    for (uint32 entry = GauntletItemMin; entry <= GauntletItemMax; ++entry)
     {
-        if (!IsGauntletItem(entry))
-            continue;
-
         uint32 carried = player->GetItemCount(entry, false);
         if (!carried)
             continue;
@@ -91,6 +83,11 @@ void RescueAccountItemsAndLoseEquippedGear(Player* player)
         lost += item->GetCount();
         player->DestroyItem(INVENTORY_SLOT_BAG_0, slot, true);
     }
+
+    // Destroying equipment while the player is dead can leave stale visible/virtual
+    // item fields until a relog. Rebuild them immediately from the now-empty slots so
+    // character select and the live model do not keep phantom weapons or shields.
+    RefreshEquipmentVisuals(player);
 
     if (rescued)
         ChatHandler(player->GetSession()).PSendSysMessage(
@@ -203,6 +200,12 @@ public:
     {
         if (player)
             ActiveGauntletParticipants.erase(player->GetGUID().GetCounter());
+    }
+
+    void OnPlayerBeforeSendChatMessage(Player* player, uint32& /*type*/, uint32& lang, std::string& msg) override
+    {
+        if (player && lang == LANG_ADDON)
+            HandleAdventurerGauntletStashAddonCommand(player, msg);
     }
 
     bool OnPlayerBeforeTeleport(Player* player, uint32 mapId, float /*x*/, float /*y*/, float /*z*/, float /*orientation*/, uint32 options, Unit* /*target*/) override
