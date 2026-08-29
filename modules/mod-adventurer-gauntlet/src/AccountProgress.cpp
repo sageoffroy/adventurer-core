@@ -7,7 +7,6 @@
 
 #include <unordered_set>
 
-void AddAdventurerGauntletAccountStashItem(Player* player, uint32 entry, uint32 count);
 uint32 GetAdventurerGauntletAccountStashTotal(Player* player);
 bool HandleAdventurerGauntletStashAddonCommand(Player* player, std::string const& rawMessage);
 
@@ -56,24 +55,27 @@ void RefreshEquipmentVisuals(Player* player)
     player->SetVirtualItemSlot(2, player->GetWeaponForAttack(RANGED_ATTACK, true));
 }
 
-void RescueAccountItemsAndLoseEquippedGear(Player* player)
+void LoseUnsecuredRunItems(Player* player)
 {
     if (!player)
         return;
 
-    uint32 rescued = 0;
+    uint32 lost = 0;
+
+    // Curated/account expedition items are only safe if the player manually
+    // deposited them in the account stash before the run. Anything still carried
+    // at death is part of the failed expedition and is destroyed.
     for (uint32 entry = GauntletItemMin; entry <= GauntletItemMax; ++entry)
     {
         uint32 carried = player->GetItemCount(entry, false);
         if (!carried)
             continue;
 
-        AddAdventurerGauntletAccountStashItem(player, entry, carried);
         player->DestroyItemCount(entry, carried, true, true);
-        rescued += carried;
+        lost += carried;
     }
 
-    uint32 lost = 0;
+    // Remaining equipped stock gear is also lost with the fallen Adventurer.
     for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
     {
         Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
@@ -84,20 +86,17 @@ void RescueAccountItemsAndLoseEquippedGear(Player* player)
         player->DestroyItem(INVENTORY_SLOT_BAG_0, slot, true);
     }
 
-    // Destroying equipment while the player is dead can leave stale visible/virtual
-    // item fields until a relog. Rebuild them immediately from the now-empty slots so
-    // character select and the live model do not keep phantom weapons or shields.
+    // Destroying equipment while dead can leave stale visible/virtual fields until
+    // relog. Rebuild them from the actual inventory immediately.
     RefreshEquipmentVisuals(player);
-
-    if (rescued)
-        ChatHandler(player->GetSession()).PSendSysMessage(
-            "|cff00ff00Khadgar recupero {} objeto(s) de cuenta y los envio al Baul de Expediciones.|r",
-            rescued);
 
     if (lost)
         ChatHandler(player->GetSession()).PSendSysMessage(
-            "|cffff2020{} objeto(s) de equipo comun se perdieron con este Aventurero.|r",
+            "|cffff2020{} objeto(s) no asegurado(s) se perdieron con este Aventurero.|r",
             lost);
+
+    ChatHandler(player->GetSession()).SendSysMessage(
+        "|cff00ff00Solo los objetos depositados previamente en el Baul de Expediciones permanecen a salvo.|r");
 }
 
 void UnlockAccountItem(Player* player, Item* item)
@@ -147,7 +146,7 @@ bool MarkFallen(Player* player)
     uint32 guid = player->GetGUID().GetCounter();
     uint32 accountId = player->GetSession()->GetAccountId();
 
-    RescueAccountItemsAndLoseEquippedGear(player);
+    LoseUnsecuredRunItems(player);
 
     CharacterDatabase.Execute(
         "INSERT IGNORE INTO `adventurer_gauntlet_fallen` "
@@ -162,7 +161,7 @@ bool MarkFallen(Player* player)
     ChatHandler(player->GetSession()).SendSysMessage(
         "|cffff2020Este Aventurero ha quedado CAIDO permanentemente.|r");
     ChatHandler(player->GetSession()).SendSysMessage(
-        "Su coleccion y los objetos de cuenta rescatados permanecen disponibles para futuros Aventureros.");
+        "El contenido asegurado en el Baul de Expediciones permanece disponible para futuros Aventureros.");
     return true;
 }
 }
@@ -188,7 +187,7 @@ public:
             ChatHandler(player->GetSession()).SendSysMessage(
                 "|cffff2020Este personaje figura como CAIDO en el Desafio de Khadgar.|r");
             ChatHandler(player->GetSession()).SendSysMessage(
-                "Puedes conservarlo como recuerdo y usar el baul, pero no puede volver a participar.");
+                "Puedes conservarlo como recuerdo, pero ya no puede modificar el Baul ni volver a participar.");
             return;
         }
 
@@ -204,7 +203,7 @@ public:
 
     void OnPlayerBeforeSendChatMessage(Player* player, uint32& /*type*/, uint32& lang, std::string& msg) override
     {
-        if (player && lang == LANG_ADDON)
+        if (player && lang == LANG_ADDON && !IsAdventurerGauntletFallen(player))
             HandleAdventurerGauntletStashAddonCommand(player, msg);
     }
 
