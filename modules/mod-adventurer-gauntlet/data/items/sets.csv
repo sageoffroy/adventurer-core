@@ -7,3 +7,8 @@ enabled;set_key;name;pieces_required;bonus_type;value;spell_id;description
 1;monje_errante;Monje Errante;4;intellect;2;;+2 Intelecto
 1;monje_errante;Monje Errante;5;defense_skill;2;;+2 puntos de defensa
 1;monje_errante;Monje Errante;6;expertise_rating;1;;+1 indice de pericia
+1;escamas;Malla de Escamas;2;stamina;2;;+2 Aguante
+1;escamas;Malla de Escamas;3;strength;2;;+2 Fuerza
+1;escamas;Malla de Escamas;4;armor;5;;+5 armadura
+1;escamas;Malla de Escamas;5;strength;3;;+3 Fuerza
+1;escamas;Malla de Escamas;6;spell;;15438;Cuando te golpean cuerpo a cuerpo, infliges 3 p. de dano Arcano al atacante.
