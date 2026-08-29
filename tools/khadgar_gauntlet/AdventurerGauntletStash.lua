@@ -1,5 +1,5 @@
 -- Adventurer Gauntlet account stash UI for WoW 3.3.5a.
--- A single account bank: drag account items in, click stored items to withdraw.
+-- A single account bank: drag equipment in, click stored items to withdraw.
 
 local STASH_ITEMS = {}
 local SLOTS = {}
@@ -42,7 +42,7 @@ title:SetText("Baúl de Expediciones")
 
 local subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 subtitle:SetPoint("TOP", title, "BOTTOM", 0, -7)
-subtitle:SetText("Objetos guardados de tu cuenta")
+subtitle:SetText("Equipo asegurado de tu cuenta")
 
 local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -7, -7)
@@ -64,7 +64,7 @@ panel:EnableMouse(true)
 
 local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 hint:SetPoint("BOTTOM", frame, "BOTTOM", 0, 15)
-hint:SetText("Arrastra objetos de cuenta aquí · Clic para retirar")
+hint:SetText("Arrastra armas o armaduras aquí · Clic para retirar")
 
 local function CursorItemEntry()
     local cursorType, itemID = GetCursorInfo()
@@ -78,11 +78,8 @@ local function TryDepositCursorItem()
     local entry = CursorItemEntry()
     if not entry then return false end
 
-    if entry < 911000 or entry > 911999 then
-        UIErrorsFrame:AddMessage("Solo puedes guardar objetos de cuenta de la expedición.", 1.0, 0.2, 0.2, 1.0)
-        return true
-    end
-
+    -- ClearCursor only cancels the client's pickup. The server validates that the
+    -- item is equipable and removes exactly one real item if the deposit succeeds.
     ClearCursor()
     SendCommand("DEPOSIT|" .. entry)
     return true
@@ -203,8 +200,7 @@ local function HandleState(message)
 end
 
 -- Current server builds the snapshot through system messages. Consume them here so
--- the transport stays invisible to the player. B records are intentionally ignored:
--- the final UI only represents the persistent account stash.
+-- the transport stays invisible to the player.
 local function SystemMessageFilter(self, event, message, ...)
     if type(message) ~= "string" or string.sub(message, 1, 8) ~= "AGSTASH|" then
         return false, message, ...
@@ -225,7 +221,7 @@ end
 
 ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", SystemMessageFilter)
 
--- Future/clean transport: also understand hidden addon-channel snapshots.
+-- Also understand hidden addon-channel snapshots if the server transport changes.
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("CHAT_MSG_ADDON")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
