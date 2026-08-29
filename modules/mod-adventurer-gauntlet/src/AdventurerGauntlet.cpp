@@ -150,8 +150,8 @@ void AnnounceRunStart(std::vector<Player*> const& members, std::string const& co
     for (Player* member : members)
     {
         ChatHandler(member->GetSession()).PSendSysMessage(
-            "Khadgar acepta el desafio. Desde ahora seran conocidos como |cff00ff00%s|r.",
-            companyName.c_str());
+            "Khadgar acepta el desafio. Desde ahora seran conocidos como |cff00ff00{}|r.",
+            companyName);
         ChatHandler(member->GetSession()).SendSysMessage(
             "Primer destino: |cffffd100Sima Ignea|r.");
     }
@@ -241,7 +241,7 @@ public:
                 return true;
             case ACTION_STATUS:
                 if (std::string const* companyName = GetPendingRunName(player))
-                    ChatHandler(player->GetSession()).PSendSysMessage("Su compania es |cff00ff00%s|r.", companyName->c_str());
+                    ChatHandler(player->GetSession()).PSendSysMessage("Su compania es |cff00ff00{}|r.", *companyName);
                 CloseGossipMenuFor(player);
                 return true;
             default:
