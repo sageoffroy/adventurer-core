@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import csv
+import re
 from pathlib import Path
 
 QUALITY = {
@@ -33,11 +34,13 @@ STAT_COLUMNS = [
 ]
 
 REQUIRED_COLUMNS = {
-    "enabled", "entry", "source_entry", "name", "quality", "required_level", "item_level",
-    "strength", "agility", "stamina", "intellect", "spirit", "attack_power", "spell_power",
-    "hit_rating", "crit_rating", "haste_rating", "armor", "dmg_min1", "dmg_max1", "delay",
-    "description",
+    "enabled", "entry", "source_entry", "display_id", "set_key", "name", "quality",
+    "required_level", "item_level", "strength", "agility", "stamina", "intellect", "spirit",
+    "attack_power", "spell_power", "hit_rating", "crit_rating", "haste_rating", "armor",
+    "dmg_min1", "dmg_max1", "delay", "equip_spell1", "equip_spell2", "description",
 }
+
+SET_KEY_RE = re.compile(r"^[a-z0-9_]+$")
 
 
 def sql_string(value: str) -> str:
@@ -74,6 +77,14 @@ def generate_row(row, line: int) -> str:
     if 911000 <= source <= 911999:
         raise ValueError(f"line {line}: source_entry must be a stock item, not another gauntlet item")
 
+    display_id = parse_optional_number(row["display_id"], "display_id", line, integer=True)
+    if display_id is not None and display_id <= 0:
+        raise ValueError(f"line {line}: display_id must be positive")
+
+    set_key = row["set_key"].strip().lower()
+    if set_key and not SET_KEY_RE.fullmatch(set_key):
+        raise ValueError(f"line {line}: set_key may contain only lowercase letters, numbers and underscores")
+
     name = row["name"].strip()
     if not name:
         raise ValueError(f"line {line}: name cannot be empty")
@@ -104,6 +115,9 @@ def generate_row(row, line: int) -> str:
     dmg_min = parse_optional_number(row["dmg_min1"], "dmg_min1", line)
     dmg_max = parse_optional_number(row["dmg_max1"], "dmg_max1", line)
     delay = parse_optional_number(row["delay"], "delay", line, integer=True)
+    equip_spell1 = parse_optional_number(row["equip_spell1"], "equip_spell1", line, integer=True)
+    equip_spell2 = parse_optional_number(row["equip_spell2"], "equip_spell2", line, integer=True)
+
     if (dmg_min is None) != (dmg_max is None):
         raise ValueError(f"line {line}: dmg_min1 and dmg_max1 must be supplied together")
     if dmg_min is not None and dmg_max < dmg_min:
@@ -112,6 +126,9 @@ def generate_row(row, line: int) -> str:
         raise ValueError(f"line {line}: armor cannot be negative")
     if delay is not None and delay <= 0:
         raise ValueError(f"line {line}: delay must be positive")
+    for field, spell in (("equip_spell1", equip_spell1), ("equip_spell2", equip_spell2)):
+        if spell is not None and spell <= 0:
+            raise ValueError(f"line {line}: {field} must be positive")
 
     updates = [
         f"`entry` = {entry}",
@@ -120,7 +137,11 @@ def generate_row(row, line: int) -> str:
         f"`RequiredLevel` = {required_level}",
         f"`ItemLevel` = {item_level}",
         f"`StatsCount` = {len(stats)}",
+        "`itemset` = 0",
     ]
+
+    if display_id is not None:
+        updates.append(f"`displayid` = {display_id}")
 
     for index in range(1, 11):
         if index <= len(stats):
@@ -138,13 +159,34 @@ def generate_row(row, line: int) -> str:
     if delay is not None:
         updates.append(f"`delay` = {delay}")
 
+    # Curated gauntlet items should not accidentally inherit use/equip effects from
+    # their visual source. Effects are opt-in through equip_spell1/equip_spell2.
+    for index in range(1, 6):
+        updates.extend([
+            f"`spellid_{index}` = 0",
+            f"`spelltrigger_{index}` = 0",
+            f"`spellcharges_{index}` = 0",
+            f"`spellppmRate_{index}` = 0",
+            f"`spellcooldown_{index}` = -1",
+            f"`spellcategory_{index}` = 0",
+            f"`spellcategorycooldown_{index}` = -1",
+        ])
+
+    for index, spell in enumerate((equip_spell1, equip_spell2), start=1):
+        if spell is None:
+            continue
+        updates.extend([
+            f"`spellid_{index}` = {spell}",
+            f"`spelltrigger_{index}` = 1",
+        ])
+
     description = row["description"].strip()
     updates.append(f"`description` = {sql_string(description)}")
     updates.append("`VerifiedBuild` = 0")
 
     temp = f"tmp_adventurer_gauntlet_item_{entry}"
     return "\n".join([
-        f"-- {entry}: {name}",
+        f"-- {entry}: {name}" + (f" [set={set_key}]" if set_key else ""),
         f"DROP TEMPORARY TABLE IF EXISTS `{temp}`;",
         f"CREATE TEMPORARY TABLE `{temp}` AS SELECT * FROM `item_template` WHERE `entry` = {source};",
         f"UPDATE `{temp}` SET\n    " + ",\n    ".join(updates) + ";",
