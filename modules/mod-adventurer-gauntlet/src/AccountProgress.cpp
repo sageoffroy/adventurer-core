@@ -6,6 +6,10 @@
 #include "WorldSession.h"
 
 #include <unordered_set>
+#include <vector>
+
+void AddAdventurerGauntletAccountStashItem(Player* player, uint32 entry, uint32 count);
+uint32 GetAdventurerGauntletAccountStashTotal(Player* player);
 
 namespace
 {
@@ -39,39 +43,64 @@ uint32 GetAccountCollectionCount(Player* player)
     return 0;
 }
 
-bool IsFallen(Player* player)
+std::vector<uint32> GetDiscoveredAccountItems(Player* player)
 {
+    std::vector<uint32> entries;
     if (!player)
-        return false;
+        return entries;
 
-    return bool(CharacterDatabase.Query(
-        "SELECT 1 FROM `adventurer_gauntlet_fallen` WHERE `guid` = {} LIMIT 1",
-        player->GetGUID().GetCounter()));
+    if (QueryResult result = CharacterDatabase.Query(
+        "SELECT `item_entry` FROM `adventurer_gauntlet_account_items` WHERE `account_id` = {}",
+        player->GetSession()->GetAccountId()))
+    {
+        do
+            entries.push_back(result->Fetch()[0].Get<uint32>());
+        while (result->NextRow());
+    }
+
+    return entries;
 }
 
-bool MarkFallen(Player* player)
+void RescueAccountItemsAndLoseEquippedGear(Player* player)
 {
-    if (!player || IsFallen(player))
-        return false;
+    if (!player)
+        return;
 
-    uint32 guid = player->GetGUID().GetCounter();
-    uint32 accountId = player->GetSession()->GetAccountId();
+    uint32 rescued = 0;
+    for (uint32 entry : GetDiscoveredAccountItems(player))
+    {
+        if (!IsGauntletItem(entry))
+            continue;
 
-    CharacterDatabase.Execute(
-        "INSERT IGNORE INTO `adventurer_gauntlet_fallen` "
-        "(`guid`, `account_id`, `map_id`, `level`) VALUES ({}, {}, {}, {})",
-        guid,
-        accountId,
-        player->GetMapId(),
-        player->GetLevel());
+        uint32 carried = player->GetItemCount(entry, false);
+        if (!carried)
+            continue;
 
-    ActiveGauntletParticipants.erase(guid);
+        AddAdventurerGauntletAccountStashItem(player, entry, carried);
+        player->DestroyItemCount(entry, carried, true, true);
+        rescued += carried;
+    }
 
-    ChatHandler(player->GetSession()).SendSysMessage(
-        "|cffff2020Este Aventurero ha quedado CAIDO permanentemente.|r");
-    ChatHandler(player->GetSession()).SendSysMessage(
-        "Su coleccion de cuenta permanece intacta, pero este personaje no puede iniciar otra expedicion.");
-    return true;
+    uint32 lost = 0;
+    for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+    {
+        Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+        if (!item)
+            continue;
+
+        lost += item->GetCount();
+        player->DestroyItem(INVENTORY_SLOT_BAG_0, slot, true);
+    }
+
+    if (rescued)
+        ChatHandler(player->GetSession()).PSendSysMessage(
+            "|cff00ff00Khadgar recupero {} objeto(s) de cuenta y los envio al Baul de Expediciones.|r",
+            rescued);
+
+    if (lost)
+        ChatHandler(player->GetSession()).PSendSysMessage(
+            "|cffff2020{} objeto(s) de equipo comun se perdieron con este Aventurero.|r",
+            lost);
 }
 
 void UnlockAccountItem(Player* player, Item* item)
@@ -101,6 +130,46 @@ void UnlockAccountItem(Player* player, Item* item)
 }
 }
 
+bool IsAdventurerGauntletFallen(Player* player)
+{
+    if (!player)
+        return false;
+
+    return bool(CharacterDatabase.Query(
+        "SELECT 1 FROM `adventurer_gauntlet_fallen` WHERE `guid` = {} LIMIT 1",
+        player->GetGUID().GetCounter()));
+}
+
+namespace
+{
+bool MarkFallen(Player* player)
+{
+    if (!player || IsAdventurerGauntletFallen(player))
+        return false;
+
+    uint32 guid = player->GetGUID().GetCounter();
+    uint32 accountId = player->GetSession()->GetAccountId();
+
+    RescueAccountItemsAndLoseEquippedGear(player);
+
+    CharacterDatabase.Execute(
+        "INSERT IGNORE INTO `adventurer_gauntlet_fallen` "
+        "(`guid`, `account_id`, `map_id`, `level`) VALUES ({}, {}, {}, {})",
+        guid,
+        accountId,
+        player->GetMapId(),
+        player->GetLevel());
+
+    ActiveGauntletParticipants.erase(guid);
+
+    ChatHandler(player->GetSession()).SendSysMessage(
+        "|cffff2020Este Aventurero ha quedado CAIDO permanentemente.|r");
+    ChatHandler(player->GetSession()).SendSysMessage(
+        "Su coleccion y los objetos de cuenta rescatados permanecen disponibles para futuros Aventureros.");
+    return true;
+}
+}
+
 class AdventurerGauntletAccountProgressScript : public PlayerScript
 {
 public:
@@ -113,15 +182,16 @@ public:
             return;
 
         ChatHandler(player->GetSession()).PSendSysMessage(
-            "|cff00ff00Coleccion de Expediciones:|r {} pieza(s) descubierta(s) en esta cuenta.",
-            GetAccountCollectionCount(player));
+            "|cff00ff00Coleccion de Expediciones:|r {} pieza(s) descubierta(s). |cff00ff00Baul:|r {} objeto(s).",
+            GetAccountCollectionCount(player),
+            GetAdventurerGauntletAccountStashTotal(player));
 
-        if (IsFallen(player))
+        if (IsAdventurerGauntletFallen(player))
         {
             ChatHandler(player->GetSession()).SendSysMessage(
                 "|cffff2020Este personaje figura como CAIDO en el Desafio de Khadgar.|r");
             ChatHandler(player->GetSession()).SendSysMessage(
-                "Puedes conservarlo como recuerdo, pero no puede volver a participar.");
+                "Puedes conservarlo como recuerdo y usar el baul, pero no puede volver a participar.");
             return;
         }
 
@@ -140,7 +210,7 @@ public:
         if (!player || !IsGauntletMap(mapId))
             return true;
 
-        if (IsFallen(player))
+        if (IsAdventurerGauntletFallen(player))
         {
             ChatHandler(player->GetSession()).SendSysMessage(
                 "|cffff2020Khadgar niega el portal: este Aventurero ya ha caido.|r");
