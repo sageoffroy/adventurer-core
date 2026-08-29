@@ -26,6 +26,19 @@ bool IsGauntletItem(uint32 entry)
     return entry >= GauntletItemMin && entry <= GauntletItemMax;
 }
 
+uint32 GetAccountCollectionCount(Player* player)
+{
+    if (!player)
+        return 0;
+
+    if (QueryResult result = CharacterDatabase.Query(
+        "SELECT COUNT(*) FROM `adventurer_gauntlet_account_items` WHERE `account_id` = {}",
+        player->GetSession()->GetAccountId()))
+        return (*result)[0].Get<uint32>();
+
+    return 0;
+}
+
 bool IsFallen(Player* player)
 {
     if (!player)
@@ -83,7 +96,7 @@ void UnlockAccountItem(Player* player, Item* item)
         player->GetGUID().GetCounter());
 
     ChatHandler(player->GetSession()).PSendSysMessage(
-        "|cff00ff00Coleccion de cuenta:|r has descubierto |cff0070dd{}|r.",
+        "|cff00ff00Coleccion de Expediciones:|r has descubierto |cff0070dd{}|r.",
         item->GetTemplate()->Name1);
 }
 }
@@ -98,6 +111,10 @@ public:
     {
         if (!player)
             return;
+
+        ChatHandler(player->GetSession()).PSendSysMessage(
+            "|cff00ff00Coleccion de Expediciones:|r {} pieza(s) descubierta(s) en esta cuenta.",
+            GetAccountCollectionCount(player));
 
         if (IsFallen(player))
         {
