@@ -13,8 +13,8 @@ local function SendCommand(command)
 end
 
 local frame = CreateFrame("Frame", "AdventurerGauntletStashFrame", UIParent)
-frame:SetWidth(360)
-frame:SetHeight(380)
+frame:SetWidth(356)
+frame:SetHeight(382)
 frame:SetPoint("CENTER", UIParent, "CENTER", 0, 35)
 frame:SetFrameStrata("DIALOG")
 frame:SetMovable(true)
@@ -30,41 +30,42 @@ frame:SetBackdrop({
     tile = true,
     tileSize = 32,
     edgeSize = 32,
-    insets = { left = 10, right = 10, top = 10, bottom = 10 }
+    insets = { left = 11, right = 11, top = 11, bottom = 11 }
 })
 frame:Hide()
 
 tinsert(UISpecialFrames, "AdventurerGauntletStashFrame")
 
 local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-title:SetPoint("TOP", frame, "TOP", 0, -16)
+title:SetPoint("TOP", frame, "TOP", 0, -17)
 title:SetText("Baúl de Expediciones")
 
 local subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-subtitle:SetPoint("TOP", title, "BOTTOM", 0, -7)
-subtitle:SetText("Equipo asegurado de tu cuenta")
+subtitle:SetPoint("TOP", title, "BOTTOM", 0, -6)
+subtitle:SetText("Todo lo que guardes aquí sobrevive a la muerte")
 
 local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -7, -7)
 
 local panel = CreateFrame("Frame", nil, frame)
-panel:SetWidth(308)
-panel:SetHeight(308)
-panel:SetPoint("TOP", frame, "TOP", 0, -61)
+panel:SetWidth(310)
+panel:SetHeight(310)
+panel:SetPoint("TOP", frame, "TOP", 0, -62)
 panel:SetBackdrop({
     bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
     tile = true,
     tileSize = 16,
     edgeSize = 12,
-    insets = { left = 3, right = 3, top = 3, bottom = 3 }
+    insets = { left = 4, right = 4, top = 4, bottom = 4 }
 })
-panel:SetBackdropColor(0.03, 0.03, 0.03, 0.90)
+panel:SetBackdropColor(0.08, 0.06, 0.03, 0.96)
+panel:SetBackdropBorderColor(0.55, 0.43, 0.24, 1.0)
 panel:EnableMouse(true)
 
 local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-hint:SetPoint("BOTTOM", frame, "BOTTOM", 0, 15)
-hint:SetText("Arrastra armas o armaduras aquí · Clic para retirar")
+hint:SetPoint("BOTTOM", frame, "BOTTOM", 0, 13)
+hint:SetText("Arrastra equipo para guardar · Clic para retirar")
 
 local function CursorItemEntry()
     local cursorType, itemID = GetCursorInfo()
@@ -91,30 +92,35 @@ panel:SetScript("OnMouseUp", function()
 end)
 
 local function CreateSlot(index)
-    local button = CreateFrame("Button", nil, panel)
-    button:SetWidth(40)
-    button:SetHeight(40)
+    local name = "AdventurerGauntletStashSlot" .. index
+    local button = CreateFrame("Button", name, panel, "ItemButtonTemplate")
+    button:SetWidth(38)
+    button:SetHeight(38)
 
     local column = (index - 1) % COLUMNS
     local row = math.floor((index - 1) / COLUMNS)
-    button:SetPoint("TOPLEFT", panel, "TOPLEFT", 8 + column * 42, -8 - row * 42)
+    button:SetPoint("TOPLEFT", panel, "TOPLEFT", 10 + column * 42, -10 - row * 42)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
 
-    local background = button:CreateTexture(nil, "BACKGROUND")
-    background:SetAllPoints(button)
-    background:SetTexture("Interface\\Buttons\\UI-Quickslot2")
-    button.background = background
+    -- ItemButtonTemplate is the same native slot family used by bags/bank.
+    local normal = button:GetNormalTexture()
+    if normal then
+        normal:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+        normal:SetAllPoints(button)
+    end
 
-    local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetPoint("TOPLEFT", button, "TOPLEFT", 4, -4)
-    icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -4, 4)
-    icon:Hide()
-    button.icon = icon
+    local highlight = button:GetHighlightTexture()
+    if highlight then
+        highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+        highlight:SetBlendMode("ADD")
+        highlight:SetAllPoints(button)
+    end
 
-    local count = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
-    count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -3, 3)
-    button.count = count
+    button.icon = _G[name .. "IconTexture"]
+    button.count = _G[name .. "Count"]
+    if button.icon then button.icon:Hide() end
+    if button.count then button.count:SetText("") end
 
     button.entry = nil
 
@@ -161,22 +167,43 @@ local function SortedItems()
     return items
 end
 
+local function PaintItem(button, item)
+    button.entry = item and item.entry or nil
+
+    if not item then
+        if button.icon then
+            button.icon:SetTexture(nil)
+            button.icon:Hide()
+        end
+        if button.count then button.count:SetText("") end
+        if SetItemButtonQuality then SetItemButtonQuality(button, nil) end
+        return
+    end
+
+    local texture = GetItemIcon(item.entry) or "Interface\\Icons\\INV_Misc_QuestionMark"
+    if button.icon then
+        button.icon:SetTexture(texture)
+        button.icon:Show()
+    elseif SetItemButtonTexture then
+        SetItemButtonTexture(button, texture)
+    end
+
+    if button.count then
+        button.count:SetText(item.count > 1 and item.count or "")
+    elseif SetItemButtonCount then
+        SetItemButtonCount(button, item.count)
+    end
+
+    if SetItemButtonQuality then
+        local _, _, quality = GetItemInfo(item.entry)
+        SetItemButtonQuality(button, quality, item.entry)
+    end
+end
+
 local function RefreshUI()
     local items = SortedItems()
     for index = 1, MAX_SLOTS do
-        local button = SLOTS[index]
-        local item = items[index]
-        if item then
-            button.entry = item.entry
-            button.icon:SetTexture(GetItemIcon(item.entry) or "Interface\\Icons\\INV_Misc_QuestionMark")
-            button.icon:Show()
-            button.count:SetText(item.count > 1 and item.count or "")
-        else
-            button.entry = nil
-            button.icon:SetTexture(nil)
-            button.icon:Hide()
-            button.count:SetText("")
-        end
+        PaintItem(SLOTS[index], items[index])
     end
 end
 
