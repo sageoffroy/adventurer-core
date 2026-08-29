@@ -21,7 +21,17 @@ uint8 GauntletStartLevel = 1;
 uint8 GauntletMinPlayers = 1;
 uint8 GauntletMaxPlayers = 5;
 
+struct RunReturnPoint
+{
+    uint32 MapId = 0;
+    float X = 0.0f;
+    float Y = 0.0f;
+    float Z = 0.0f;
+    float O = 0.0f;
+};
+
 std::unordered_map<uint32, std::string> PendingRunNames;
+std::unordered_map<uint32, RunReturnPoint> RunReturnPoints;
 std::unordered_map<uint32, uint8> ActiveRunInstanceLevels;
 
 constexpr uint32 RagefireMapId = 389;
@@ -108,7 +118,17 @@ bool ValidateParty(Player* player, std::vector<Player*>& members, std::string& e
 void RegisterPendingRun(std::vector<Player*> const& members, std::string const& companyName)
 {
     for (Player* member : members)
-        PendingRunNames[member->GetGUID().GetCounter()] = companyName;
+    {
+        uint32 guid = member->GetGUID().GetCounter();
+        PendingRunNames[guid] = companyName;
+        RunReturnPoints[guid] = {
+            member->GetMapId(),
+            member->GetPositionX(),
+            member->GetPositionY(),
+            member->GetPositionZ(),
+            member->GetOrientation()
+        };
+    }
 }
 
 std::string const* GetPendingRunName(Player* player)
@@ -171,6 +191,65 @@ void AnnounceRunStart(std::vector<Player*> const& members, std::string const& co
         ChatHandler(member->GetSession()).SendSysMessage(
             "Primer destino: |cffffd100Sima Ignea|r.");
     }
+}
+
+bool InstanceStillHasLivingAdventurers(Map* map, Player* fallen)
+{
+    if (!map)
+        return false;
+
+    for (auto const& ref : map->GetPlayers())
+    {
+        Player* player = ref.GetSource();
+        if (!player || player == fallen || !player->IsAlive())
+            continue;
+
+        if (PendingRunNames.contains(player->GetGUID().GetCounter()))
+            return true;
+    }
+
+    return false;
+}
+
+void ReturnFallenAdventurer(Player* player)
+{
+    if (!player || player->GetMapId() != RagefireMapId)
+        return;
+
+    uint32 guid = player->GetGUID().GetCounter();
+    auto runItr = PendingRunNames.find(guid);
+    auto returnItr = RunReturnPoints.find(guid);
+    if (runItr == PendingRunNames.end() || returnItr == RunReturnPoints.end())
+        return;
+
+    uint32 instanceId = player->GetInstanceId();
+    std::string companyName = runItr->second;
+    RunReturnPoint returnPoint = returnItr->second;
+    bool runEnded = !InstanceStillHasLivingAdventurers(player->GetMap(), player);
+
+    PendingRunNames.erase(runItr);
+    RunReturnPoints.erase(returnItr);
+    if (runEnded)
+        ActiveRunInstanceLevels.erase(instanceId);
+
+    player->TeleportTo(
+        returnPoint.MapId,
+        returnPoint.X,
+        returnPoint.Y,
+        returnPoint.Z,
+        returnPoint.O,
+        TELE_TO_GM_MODE);
+
+    // Development behavior: keep the loop quick while the permanent Fallen
+    // state and leaderboard persistence are still being built.
+    player->ResurrectPlayer(1.0f);
+    player->SpawnCorpseBones();
+
+    ChatHandler(player->GetSession()).PSendSysMessage(
+        "|cffff2020{} ha caido.|r El desafio termina aqui para este aventurero.",
+        companyName);
+    ChatHandler(player->GetSession()).SendSysMessage(
+        "Khadgar te ha devuelto. Durante el desarrollo puedes volver a intentar el desafio.");
 }
 }
 
@@ -247,6 +326,18 @@ public:
     {
         if (map && map->GetId() == RagefireMapId)
             ActiveRunInstanceLevels.erase(map->GetInstanceId());
+    }
+};
+
+class AdventurerGauntletPlayerScript : public PlayerScript
+{
+public:
+    AdventurerGauntletPlayerScript() : PlayerScript("AdventurerGauntletPlayerScript") { }
+
+    void OnPlayerJustDied(Player* player) override
+    {
+        if (GauntletEnabled)
+            ReturnFallenAdventurer(player);
     }
 };
 
@@ -334,5 +425,6 @@ void AddAdventurerGauntletScripts()
     new AdventurerGauntletConfigScript();
     new AdventurerGauntletCreatureScript();
     new AdventurerGauntletMapScript();
+    new AdventurerGauntletPlayerScript();
     new npc_adventurer_gauntlet_khadgar();
 }
