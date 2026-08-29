@@ -11,3 +11,7 @@ enabled;set_key;name;pieces_required;bonus_type;value;spell_id;description
 1;escamas;Malla de Escamas;3;strength;2;;+2 Fuerza
 1;escamas;Malla de Escamas;4;spell;;13665;+1% probabilidad de parar
 1;escamas;Malla de Escamas;6;spell;;9139;+8 poder de ataque
+1;anillas_encantadas;Malla de Anillas Encantadas;2;stamina;2;;+2 Aguante
+1;anillas_encantadas;Malla de Anillas Encantadas;3;intellect;2;;+2 Intelecto
+1;anillas_encantadas;Malla de Anillas Encantadas;4;defense_skill;2;;+2 puntos de defensa
+1;anillas_encantadas;Malla de Anillas Encantadas;6;spell;;9398;+8 poder con hechizos
