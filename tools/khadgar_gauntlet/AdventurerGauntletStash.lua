@@ -14,8 +14,8 @@ end
 
 local frame = CreateFrame("Frame", "AdventurerGauntletStashFrame", UIParent)
 frame:SetWidth(384)
-frame:SetHeight(512)
-frame:SetPoint("CENTER", UIParent, "CENTER", -150, 20)
+frame:SetHeight(302)
+frame:SetPoint("CENTER", UIParent, "CENTER", -150, 45)
 frame:SetFrameStrata("DIALOG")
 frame:SetMovable(true)
 frame:EnableMouse(true)
@@ -28,7 +28,7 @@ frame:Hide()
 
 tinsert(UISpecialFrames, "AdventurerGauntletStashFrame")
 
--- Reuse the exact four texture pieces that build Blizzard's 3.3.5 bank window.
+-- The upper half of Blizzard's bank artwork already contains the 7x4 item-slot grid.
 local topLeft = frame:CreateTexture(nil, "BORDER")
 topLeft:SetTexture("Interface\\BankFrame\\UI-BankFrame-TopLeft")
 topLeft:SetWidth(256)
@@ -41,17 +41,20 @@ topRight:SetWidth(256)
 topRight:SetHeight(256)
 topRight:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
 
-local botLeft = frame:CreateTexture(nil, "BORDER")
-botLeft:SetTexture("Interface\\BankFrame\\UI-BankFrame-BotLeft")
-botLeft:SetWidth(256)
-botLeft:SetHeight(256)
-botLeft:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
-
-local botRight = frame:CreateTexture(nil, "BORDER")
-botRight:SetTexture("Interface\\BankFrame\\UI-BankFrame-BotRight")
-botRight:SetWidth(256)
-botRight:SetHeight(256)
-botRight:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+-- Cover the bank's bag-slot section with a neutral Blizzard panel and finish the
+-- shortened account-bank window with a standard dialog border.
+local lower = CreateFrame("Frame", nil, frame)
+lower:SetPoint("TOPLEFT", frame, "TOPLEFT", 6, -248)
+lower:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 6)
+lower:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true,
+    tileSize = 32,
+    edgeSize = 18,
+    insets = { left = 5, right = 5, top = 5, bottom = 5 }
+})
+lower:SetFrameLevel(frame:GetFrameLevel())
 
 local portrait = frame:CreateTexture(nil, "ARTWORK")
 portrait:SetWidth(60)
@@ -73,17 +76,15 @@ subtitle:SetText("Lo guardado aquí sobrevive a la muerte")
 local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -42, -8)
 
--- Transparent drop target over the native bank body. The bank artwork itself is
--- responsible for the panel/background; we only add native ItemButton slots.
 local dropTarget = CreateFrame("Frame", nil, frame)
-dropTarget:SetPoint("TOPLEFT", frame, "TOPLEFT", 36, -78)
-dropTarget:SetWidth(304)
-dropTarget:SetHeight(176)
+dropTarget:SetPoint("TOPLEFT", frame, "TOPLEFT", 34, -78)
+dropTarget:SetWidth(308)
+dropTarget:SetHeight(174)
 dropTarget:EnableMouse(true)
 
-local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-hint:SetPoint("TOPLEFT", frame, "TOPLEFT", 45, -270)
-hint:SetText("Arrastra equipo aquí para asegurarlo · Clic para retirar")
+local hint = lower:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+hint:SetPoint("CENTER", lower, "CENTER", 0, 0)
+hint:SetText("Arrastra equipo para guardar · Clic para retirar")
 
 local function CursorItemEntry()
     local cursorType, itemID = GetCursorInfo()
@@ -110,31 +111,39 @@ end)
 local function CreateSlot(index)
     local name = "AdventurerGauntletStashSlot" .. index
     local button = CreateFrame("Button", name, frame, "ItemButtonTemplate")
-    button:SetWidth(37)
-    button:SetHeight(37)
+    button:SetWidth(46)
+    button:SetHeight(46)
 
     local column = (index - 1) % COLUMNS
     local row = math.floor((index - 1) / COLUMNS)
-    button:SetPoint("TOPLEFT", frame, "TOPLEFT", 42 + column * 42, -84 - row * 42)
+    button:SetPoint("TOPLEFT", frame, "TOPLEFT", 35 + column * 43, -78 - row * 43)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
 
+    -- The BankFrame texture already paints the slot border. Hide ItemButtonTemplate's
+    -- own normal border so we only place the item icon on top of Blizzard's slot.
     local normal = button:GetNormalTexture()
     if normal then
-        normal:SetTexture("Interface\\Buttons\\UI-Quickslot2")
-        normal:SetAllPoints(button)
+        normal:SetTexture(nil)
+        normal:Hide()
     end
 
     local highlight = button:GetHighlightTexture()
     if highlight then
         highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
         highlight:SetBlendMode("ADD")
-        highlight:SetAllPoints(button)
+        highlight:SetPoint("TOPLEFT", button, "TOPLEFT", 4, -4)
+        highlight:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -4, 4)
     end
 
     button.icon = _G[name .. "IconTexture"]
     button.count = _G[name .. "Count"]
-    if button.icon then button.icon:Hide() end
+    if button.icon then
+        button.icon:ClearAllPoints()
+        button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 5, -5)
+        button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -5, 5)
+        button.icon:Hide()
+    end
     if button.count then button.count:SetText("") end
 
     button.entry = nil
@@ -210,6 +219,11 @@ local function PaintItem(button, item)
     elseif button.icon then
         button.icon:SetTexture(texture)
         button.icon:Show()
+    end
+
+    if button.icon then
+        button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 5, -5)
+        button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -5, 5)
     end
 
     if SetItemButtonCount then
