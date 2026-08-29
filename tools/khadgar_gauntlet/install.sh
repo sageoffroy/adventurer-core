@@ -13,6 +13,7 @@ SET_CATALOG="$SRC_DIR/data/items/sets.csv"
 ITEM_GENERATOR="$ROOT_DIR/tools/khadgar_gauntlet/generate_items.py"
 SET_GENERATOR="$ROOT_DIR/tools/khadgar_gauntlet/generate_sets.py"
 CLIENT_GENERATOR="$ROOT_DIR/tools/khadgar_gauntlet/client_items.py"
+STASH_ADDON_SOURCE="$ROOT_DIR/tools/khadgar_gauntlet/AdventurerGauntletStash.lua"
 ITEM_SQL="$DST_DIR/data/sql/db-world/updates/2026_08_29_10_adventurer_gauntlet_items.generated.sql"
 SET_INCLUDE="$DST_DIR/src/GeneratedGauntletSets.inc"
 
@@ -59,6 +60,10 @@ if [[ -n "$DBC_SRC" || -n "$CLIENT_DIR" ]]; then
     echo "ERROR: client item generator not found: $CLIENT_GENERATOR" >&2
     exit 1
   fi
+  if [[ ! -f "$STASH_ADDON_SOURCE" ]]; then
+    echo "ERROR: expedition stash addon not found: $STASH_ADDON_SOURCE" >&2
+    exit 1
+  fi
 
   python3 "$CLIENT_GENERATOR" \
     --items "$ITEM_CATALOG" \
@@ -66,17 +71,25 @@ if [[ -n "$DBC_SRC" || -n "$CLIENT_DIR" ]]; then
     --dbc-src "$DBC_SRC" \
     --client-dir "$CLIENT_DIR" \
     --locale "$LOCALE"
+
+  ADDON_DIR="$CLIENT_DIR/Interface/AddOns/AdventurerGauntletSets"
+  ADDON_TOC="$ADDON_DIR/AdventurerGauntletSets.toc"
+  cp "$STASH_ADDON_SOURCE" "$ADDON_DIR/AdventurerGauntletStash.lua"
+  if ! grep -qxF 'AdventurerGauntletStash.lua' "$ADDON_TOC"; then
+    printf '\nAdventurerGauntletStash.lua\n' >> "$ADDON_TOC"
+  fi
 fi
 
 echo
 echo "Adventurer Gauntlet installed into: $DST_DIR"
 echo "Khadgar template entry: 910000"
 echo "Expedition chest entry: 910001"
+echo "Account stash entry: 910002"
 echo "Custom item range: 911000-911999"
 echo "Item catalog: $ITEM_CATALOG"
 echo "Set catalog: $SET_CATALOG"
 if [[ -n "$CLIENT_DIR" ]]; then
   echo "Gauntlet client patch: $CLIENT_DIR/Data/patch-X.MPQ"
-  echo "Gauntlet set tooltip addon installed into client Interface/AddOns."
+  echo "Gauntlet set tooltip + account stash addon installed into client Interface/AddOns."
 fi
 echo "Next: rebuild only when C++ changed; CSV/SQL/client-only changes need a restart."
