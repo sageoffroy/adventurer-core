@@ -4,10 +4,13 @@
 #include "CreatureScript.h"
 #include "Group.h"
 #include "Map.h"
+#include "ObjectAccessor.h"
 #include "Player.h"
 #include "Random.h"
 #include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "ScriptedGossip.h"
+#include "TaskScheduler.h"
 
 #include <array>
 #include <string>
@@ -33,6 +36,10 @@ struct RunReturnPoint
 std::unordered_map<uint32, std::string> PendingRunNames;
 std::unordered_map<uint32, RunReturnPoint> RunReturnPoints;
 std::unordered_map<uint32, uint8> ActiveRunInstanceLevels;
+
+constexpr uint32 KhadgarEntry = 910000;
+constexpr uint32 KhadgarCastVisual = 69659;      // Evocation visual
+constexpr uint32 KhadgarTeleportVisual = 41232;  // Teleport visual
 
 constexpr uint32 RagefireMapId = 389;
 constexpr float RagefireX = 3.81f;
@@ -109,6 +116,25 @@ std::vector<Player*> GetPartyMembers(Player* leader)
     for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
         if (Player* member = ref->GetSource())
             members.push_back(member);
+
+    return members;
+}
+
+std::vector<Player*> GetLivingRunMembers(Map* map)
+{
+    std::vector<Player*> members;
+    if (!map)
+        return members;
+
+    for (auto const& ref : map->GetPlayers())
+    {
+        Player* player = ref.GetSource();
+        if (!player || !player->IsAlive())
+            continue;
+
+        if (PendingRunNames.find(player->GetGUID().GetCounter()) != PendingRunNames.end())
+            members.push_back(player);
+    }
 
     return members;
 }
@@ -203,23 +229,23 @@ void ResetPartyInstances(Player* leader)
         Player::ResetInstances(leader->GetGUID(), INSTANCE_RESET_ALL, false);
 }
 
-bool TeleportPartyToRagefire(std::vector<Player*> const& members)
+bool TeleportParty(std::vector<Player*> const& members, uint32 mapId, float x, float y, float z, float o)
 {
     bool success = true;
 
     for (Player* member : members)
     {
-        if (!member->TeleportTo(
-                RagefireMapId,
-                RagefireX,
-                RagefireY,
-                RagefireZ,
-                RagefireO,
-                TELE_TO_GM_MODE))
+        if (!member || !member->IsAlive())
+            continue;
+
+        member->CastSpell(member, KhadgarTeleportVisual, true);
+
+        if (!member->TeleportTo(mapId, x, y, z, o, TELE_TO_GM_MODE))
         {
             success = false;
-            ChatHandler(member->GetSession()).SendSysMessage(
-                "Khadgar no pudo abrir el portal hacia Sima Ignea para este aventurero.");
+            ChatHandler(member->GetSession()).PSendSysMessage(
+                "Khadgar no pudo abrir el portal hacia {} para este aventurero.",
+                GetGauntletDungeonName(mapId));
         }
     }
 
@@ -234,7 +260,7 @@ void AnnounceRunStart(std::vector<Player*> const& members, std::string const& co
             "Khadgar acepta el desafio. Desde ahora seran conocidos como |cff00ff00{}|r.",
             companyName);
         ChatHandler(member->GetSession()).SendSysMessage(
-            "Primer destino: |cffffd100Sima Ignea|r.");
+            "Khadgar comienza a preparar el portal hacia |cffffd100Sima Ignea|r.");
     }
 }
 
@@ -297,47 +323,31 @@ void ReturnFallenAdventurer(Player* player)
         "Khadgar te ha devuelto. Durante el desarrollo puedes volver a intentar el desafio.");
 }
 
-void TransitionRagefireToDeadmines(Creature* finalBoss)
+void FinishRagefireAndSummonKhadgar(Creature* finalBoss)
 {
     if (!finalBoss || finalBoss->GetMapId() != RagefireMapId || finalBoss->GetEntry() != RagefireFinalBossEntry)
         return;
 
     Map* map = finalBoss->GetMap();
-    if (!map)
-        return;
-
-    std::vector<Player*> survivors;
-    for (auto const& ref : map->GetPlayers())
-    {
-        Player* player = ref.GetSource();
-        if (!player || !player->IsAlive())
-            continue;
-
-        if (PendingRunNames.find(player->GetGUID().GetCounter()) != PendingRunNames.end())
-            survivors.push_back(player);
-    }
-
+    std::vector<Player*> survivors = GetLivingRunMembers(map);
     if (survivors.empty())
         return;
+
+    Creature* khadgar = finalBoss->SummonCreature(
+        KhadgarEntry,
+        finalBoss->GetPositionX() + 2.5f,
+        finalBoss->GetPositionY() + 1.5f,
+        finalBoss->GetPositionZ(),
+        finalBoss->GetOrientation());
 
     for (Player* player : survivors)
     {
         ChatHandler(player->GetSession()).SendSysMessage(
-            "|cff00ff00Sima Ignea completada.|r Khadgar abre el siguiente portal.");
+            "|cff00ff00Sima Ignea completada.|r");
         ChatHandler(player->GetSession()).SendSysMessage(
-            "Segundo destino: |cffffd100Minas de la Muerte|r.");
-
-        if (!player->TeleportTo(
-                DeadminesMapId,
-                DeadminesX,
-                DeadminesY,
-                DeadminesZ,
-                DeadminesO,
-                TELE_TO_GM_MODE))
-        {
-            ChatHandler(player->GetSession()).SendSysMessage(
-                "Khadgar no pudo abrir el portal hacia Minas de la Muerte.");
-        }
+            khadgar
+                ? "Khadgar ha llegado. Habla con el cuando la expedicion este lista para continuar."
+                : "Khadgar intento llegar, pero no pudo materializarse junto al jefe.");
     }
 }
 }
@@ -442,7 +452,7 @@ public:
         }
 
         if (creature->GetMapId() == RagefireMapId && creature->GetEntry() == RagefireFinalBossEntry)
-            TransitionRagefireToDeadmines(creature);
+            FinishRagefireAndSummonKhadgar(creature);
     }
 };
 
@@ -463,12 +473,98 @@ enum KhadgarGauntletActions
     ACTION_START = GOSSIP_ACTION_INFO_DEF + 1,
     ACTION_EXPLAIN = GOSSIP_ACTION_INFO_DEF + 2,
     ACTION_STATUS = GOSSIP_ACTION_INFO_DEF + 3,
+    ACTION_CONTINUE = GOSSIP_ACTION_INFO_DEF + 4,
+};
+
+enum KhadgarTravelDestination
+{
+    KHADGAR_TRAVEL_NONE = 0,
+    KHADGAR_TRAVEL_RAGEFIRE = 1,
+    KHADGAR_TRAVEL_DEADMINES = 2,
 };
 
 class npc_adventurer_gauntlet_khadgar : public CreatureScript
 {
 public:
     npc_adventurer_gauntlet_khadgar() : CreatureScript("npc_adventurer_gauntlet_khadgar") { }
+
+    struct npc_adventurer_gauntlet_khadgarAI : public ScriptedAI
+    {
+        npc_adventurer_gauntlet_khadgarAI(Creature* creature) : ScriptedAI(creature) { }
+
+        void BeginTravel(std::vector<Player*> const& members, uint8 destination)
+        {
+            if (_travelInProgress || members.empty())
+                return;
+
+            _travelInProgress = true;
+            _destination = destination;
+            _travellers.clear();
+            _travellers.reserve(members.size());
+            for (Player* member : members)
+                if (member)
+                    _travellers.push_back(member->GetGUID());
+
+            me->ReplaceAllNpcFlags(UNIT_NPC_FLAG_NONE);
+            DoCastSelf(KhadgarCastVisual, false);
+
+            _scheduler.Schedule(2500ms, [this](TaskContext /*context*/)
+            {
+                std::vector<Player*> travellers;
+                travellers.reserve(_travellers.size());
+                for (ObjectGuid const& guid : _travellers)
+                    if (Player* player = ObjectAccessor::FindPlayer(guid))
+                        travellers.push_back(player);
+
+                bool success = false;
+                if (_destination == KHADGAR_TRAVEL_RAGEFIRE)
+                {
+                    success = TeleportParty(travellers, RagefireMapId, RagefireX, RagefireY, RagefireZ, RagefireO);
+                }
+                else if (_destination == KHADGAR_TRAVEL_DEADMINES)
+                {
+                    for (Player* player : travellers)
+                        ChatHandler(player->GetSession()).SendSysMessage(
+                            "Khadgar abre el camino hacia |cffffd100Minas de la Muerte|r.");
+
+                    success = TeleportParty(travellers, DeadminesMapId, DeadminesX, DeadminesY, DeadminesZ, DeadminesO);
+                }
+
+                if (!success)
+                    for (Player* player : travellers)
+                        ChatHandler(player->GetSession()).SendSysMessage(
+                            "El portal de Khadgar no pudo transportar a toda la expedicion.");
+
+                me->CastSpell(me, KhadgarTeleportVisual, true);
+
+                uint8 finishedDestination = _destination;
+                _destination = KHADGAR_TRAVEL_NONE;
+                _travellers.clear();
+                _travelInProgress = false;
+
+                if (finishedDestination == KHADGAR_TRAVEL_DEADMINES)
+                    me->DespawnOrUnsummon(1000ms);
+                else
+                    me->ReplaceAllNpcFlags(UNIT_NPC_FLAG_GOSSIP);
+            });
+        }
+
+        void UpdateAI(uint32 diff) override
+        {
+            _scheduler.Update(diff);
+        }
+
+    private:
+        TaskScheduler _scheduler;
+        std::vector<ObjectGuid> _travellers;
+        uint8 _destination = KHADGAR_TRAVEL_NONE;
+        bool _travelInProgress = false;
+    };
+
+    CreatureAI* GetAI(Creature* creature) const override
+    {
+        return new npc_adventurer_gauntlet_khadgarAI(creature);
+    }
 
     bool OnGossipHello(Player* player, Creature* creature) override
     {
@@ -479,17 +575,25 @@ public:
             return true;
         }
 
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Estamos listos. Proponenos un desafio.", GOSSIP_SENDER_MAIN, ACTION_START);
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Explicame como funciona el desafio.", GOSSIP_SENDER_MAIN, ACTION_EXPLAIN);
-
-        if (GetPendingRunName(player))
+        if (creature->GetMapId() == RagefireMapId && GetPendingRunName(player))
+        {
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Estamos listos. Abri el camino a la siguiente mazmorra.", GOSSIP_SENDER_MAIN, ACTION_CONTINUE);
             AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Recordame el nombre de nuestra compania.", GOSSIP_SENDER_MAIN, ACTION_STATUS);
+        }
+        else
+        {
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Estamos listos. Proponenos un desafio.", GOSSIP_SENDER_MAIN, ACTION_START);
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Explicame como funciona el desafio.", GOSSIP_SENDER_MAIN, ACTION_EXPLAIN);
+
+            if (GetPendingRunName(player))
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Recordame el nombre de nuestra compania.", GOSSIP_SENDER_MAIN, ACTION_STATUS);
+        }
 
         SendGossipMenuFor(player, DEFAULT_GOSSIP_MESSAGE, creature->GetGUID());
         return true;
     }
 
-    bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 action) override
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
     {
         ClearGossipMenuFor(player);
 
@@ -511,9 +615,46 @@ public:
                 RegisterPendingRun(members, companyName);
                 AnnounceRunStart(members, companyName);
 
-                if (!TeleportPartyToRagefire(members))
-                    ChatHandler(player->GetSession()).SendSysMessage(
-                        "El portal no pudo transportar a todos los integrantes del grupo.");
+                static_cast<npc_adventurer_gauntlet_khadgarAI*>(creature->AI())->BeginTravel(
+                    members,
+                    KHADGAR_TRAVEL_RAGEFIRE);
+
+                CloseGossipMenuFor(player);
+                return true;
+            }
+            case ACTION_CONTINUE:
+            {
+                if (creature->GetMapId() != RagefireMapId || !GetPendingRunName(player))
+                {
+                    CloseGossipMenuFor(player);
+                    return true;
+                }
+
+                if (Group* group = player->GetGroup())
+                {
+                    if (!group->IsLeader(player->GetGUID()))
+                    {
+                        ChatHandler(player->GetSession()).SendSysMessage(
+                            "Solo el lider de la expedicion puede pedirle a Khadgar que abra el siguiente portal.");
+                        CloseGossipMenuFor(player);
+                        return true;
+                    }
+                }
+
+                std::vector<Player*> survivors = GetLivingRunMembers(player->GetMap());
+                if (survivors.empty())
+                {
+                    CloseGossipMenuFor(player);
+                    return true;
+                }
+
+                for (Player* survivor : survivors)
+                    ChatHandler(survivor->GetSession()).SendSysMessage(
+                        "Khadgar comienza a preparar el siguiente portal.");
+
+                static_cast<npc_adventurer_gauntlet_khadgarAI*>(creature->AI())->BeginTravel(
+                    survivors,
+                    KHADGAR_TRAVEL_DEADMINES);
 
                 CloseGossipMenuFor(player);
                 return true;
@@ -522,7 +663,7 @@ public:
                 ChatHandler(player->GetSession()).SendSysMessage(
                     "El desafio comienza con personajes de nivel 1 y encadena mazmorras hasta que no quede ningun aventurero vivo.");
                 ChatHandler(player->GetSession()).SendSysMessage(
-                    "Por ahora, la primera prueba comienza en Sima Ignea y continua en Minas de la Muerte.");
+                    "Khadgar abre personalmente cada portal. Al derrotar al jefe final, vuelve a aparecer para guiar a la expedicion al siguiente destino.");
                 CloseGossipMenuFor(player);
                 return true;
             case ACTION_STATUS:
