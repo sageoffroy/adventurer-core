@@ -103,23 +103,35 @@ local function CreateSlot(index)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
 
-    -- ItemButtonTemplate is the same native slot family used by bags/bank.
+    button.icon = _G[name .. "IconTexture"]
+    button.count = _G[name .. "Count"]
+
+    -- WoW's ItemButtonTemplate gives the empty-slot texture and the item icon
+    -- slightly different internal sizes. Force both to use the exact same box.
+    if button.icon then
+        button.icon:ClearAllPoints()
+        button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+        button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
+        button.icon:Hide()
+    end
+
     local normal = button:GetNormalTexture()
     if normal then
         normal:SetTexture("Interface\\Buttons\\UI-Quickslot2")
-        normal:SetAllPoints(button)
+        normal:ClearAllPoints()
+        normal:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+        normal:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
     end
 
     local highlight = button:GetHighlightTexture()
     if highlight then
         highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
         highlight:SetBlendMode("ADD")
-        highlight:SetAllPoints(button)
+        highlight:ClearAllPoints()
+        highlight:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+        highlight:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
     end
 
-    button.icon = _G[name .. "IconTexture"]
-    button.count = _G[name .. "Count"]
-    if button.icon then button.icon:Hide() end
     if button.count then button.count:SetText("") end
 
     button.entry = nil
