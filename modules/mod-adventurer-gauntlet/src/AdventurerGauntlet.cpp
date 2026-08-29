@@ -1,7 +1,9 @@
 #include "Chat.h"
 #include "Config.h"
+#include "Creature.h"
 #include "CreatureScript.h"
 #include "Group.h"
+#include "Map.h"
 #include "Player.h"
 #include "Random.h"
 #include "ScriptMgr.h"
@@ -20,6 +22,7 @@ uint8 GauntletMinPlayers = 1;
 uint8 GauntletMaxPlayers = 5;
 
 std::unordered_map<uint32, std::string> PendingRunNames;
+std::unordered_map<uint32, uint8> ActiveRunInstanceLevels;
 
 constexpr uint32 RagefireMapId = 389;
 constexpr float RagefireX = 3.81f;
@@ -114,6 +117,19 @@ std::string const* GetPendingRunName(Player* player)
     return itr == PendingRunNames.end() ? nullptr : &itr->second;
 }
 
+bool GetActiveRunLevel(Creature const* creature, uint8& level)
+{
+    if (!creature || creature->GetMapId() != RagefireMapId || creature->IsPet() || creature->IsTrigger())
+        return false;
+
+    auto itr = ActiveRunInstanceLevels.find(creature->GetInstanceId());
+    if (itr == ActiveRunInstanceLevels.end())
+        return false;
+
+    level = itr->second;
+    return true;
+}
+
 void ResetPartyInstances(Player* leader)
 {
     if (Group* group = leader->GetGroup())
@@ -169,6 +185,68 @@ public:
         GauntletStartLevel = sConfigMgr->GetOption<uint8>("AdventurerGauntlet.StartLevel", 1);
         GauntletMinPlayers = sConfigMgr->GetOption<uint8>("AdventurerGauntlet.MinPlayers", 1);
         GauntletMaxPlayers = sConfigMgr->GetOption<uint8>("AdventurerGauntlet.MaxPlayers", 5);
+    }
+};
+
+class AdventurerGauntletCreatureScript : public AllCreatureScript
+{
+public:
+    AdventurerGauntletCreatureScript() : AllCreatureScript("AdventurerGauntletCreatureScript") { }
+
+    void OnBeforeCreatureSelectLevel(CreatureTemplate const* /*creatureTemplate*/, Creature* creature, uint8& level) override
+    {
+        uint8 runLevel = 0;
+        if (GauntletEnabled && GetActiveRunLevel(creature, runLevel))
+            level = runLevel;
+    }
+};
+
+class AdventurerGauntletMapScript : public AllMapScript
+{
+public:
+    AdventurerGauntletMapScript() : AllMapScript("AdventurerGauntletMapScript") { }
+
+    void OnPlayerEnterAll(Map* map, Player* player) override
+    {
+        if (!GauntletEnabled || !map || !player || map->GetId() != RagefireMapId || !GetPendingRunName(player))
+            return;
+
+        uint32 instanceId = map->GetInstanceId();
+        if (!instanceId)
+            return;
+
+        auto [itr, inserted] = ActiveRunInstanceLevels.emplace(instanceId, player->GetLevel());
+        if (!inserted)
+            return;
+
+        // Mark the instance first, then load its grids. Creatures created while loading
+        // pass through OnBeforeCreatureSelectLevel and receive the gauntlet level using
+        // AzerothCore's own stock creature-stat calculation.
+        map->LoadAllGrids();
+
+        // The entrance grid can already be loaded by the time this hook fires. Re-run
+        // stock SelectLevel for those creatures so the whole dungeon uses the same level.
+        for (auto const& [spawnId, creature] : map->GetCreatureBySpawnIdStore())
+        {
+            (void)spawnId;
+            uint8 runLevel = 0;
+            if (!GetActiveRunLevel(creature, runLevel))
+                continue;
+
+            creature->SelectLevel();
+            if (creature->IsAlive())
+                creature->SetHealth(creature->GetMaxHealth());
+        }
+
+        ChatHandler(player->GetSession()).PSendSysMessage(
+            "El desafio adapta Sima Ignea al nivel |cffffd100{}|r.",
+            itr->second);
+    }
+
+    void OnDestroyInstance(MapInstanced* /*mapInstanced*/, Map* map) override
+    {
+        if (map && map->GetId() == RagefireMapId)
+            ActiveRunInstanceLevels.erase(map->GetInstanceId());
     }
 };
 
@@ -254,5 +332,7 @@ public:
 void AddAdventurerGauntletScripts()
 {
     new AdventurerGauntletConfigScript();
+    new AdventurerGauntletCreatureScript();
+    new AdventurerGauntletMapScript();
     new npc_adventurer_gauntlet_khadgar();
 }
