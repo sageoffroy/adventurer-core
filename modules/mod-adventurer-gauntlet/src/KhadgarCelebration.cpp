@@ -1,6 +1,4 @@
-#include "Config.h"
 #include "Creature.h"
-#include "GameObject.h"
 #include "ItemTemplate.h"
 #include "LootMgr.h"
 #include "Map.h"
@@ -18,10 +16,11 @@
 namespace
 {
 constexpr uint32 KhadgarEntry = 910000;
-constexpr uint32 ExpeditionChestEntry = 910001;
 constexpr uint32 KhadgarTeleportVisual = 41232;
 constexpr uint32 RagefireMapId = 389;
 constexpr uint32 RagefireFinalBossEntry = 11520;
+constexpr uint32 GauntletItemMin = 911000;
+constexpr uint32 GauntletItemMax = 911999;
 
 constexpr std::array<char const*, 8> KhadgarVictoryLines = {
     "Pensaba que no llegarian ni al primer jefe.",
@@ -36,14 +35,12 @@ constexpr std::array<char const*, 8> KhadgarVictoryLines = {
 
 struct RewardPools
 {
-    std::array<std::vector<uint32>, 3> Items;
+    std::vector<uint32> GreenItems;
+    std::vector<uint32> SetItems;
 };
 
-bool IsRewardCandidate(ItemTemplate const& item, uint8 playerLevel)
+bool IsEquippableReward(ItemTemplate const& item, uint8 playerLevel)
 {
-    if (item.Quality < ITEM_QUALITY_UNCOMMON || item.Quality > ITEM_QUALITY_EPIC)
-        return false;
-
     if (item.Class != ITEM_CLASS_WEAPON && item.Class != ITEM_CLASS_ARMOR)
         return false;
 
@@ -58,16 +55,11 @@ bool IsRewardCandidate(ItemTemplate const& item, uint8 playerLevel)
     if (item.ItemLevel < minItemLevel || item.ItemLevel > maxItemLevel)
         return false;
 
-    // The gauntlet deliberately ignores class/spec, but it should not hand out
-    // items gated behind professions, reputation, spells or old PvP ranks.
     if (item.RequiredSkill || item.RequiredSpell || item.RequiredReputationFaction ||
         item.RequiredHonorRank || item.RequiredCityRank)
         return false;
 
-    if (item.HasFlag(ITEM_FLAG_DEPRECATED))
-        return false;
-
-    return true;
+    return !item.HasFlag(ITEM_FLAG_DEPRECATED);
 }
 
 RewardPools BuildRewardPools(uint8 playerLevel)
@@ -79,67 +71,51 @@ RewardPools BuildRewardPools(uint8 playerLevel)
 
     for (auto const& [entry, item] : *itemStore)
     {
-        if (!IsRewardCandidate(item, playerLevel))
+        if (!IsEquippableReward(item, playerLevel))
             continue;
 
-        pools.Items[item.Quality - ITEM_QUALITY_UNCOMMON].push_back(entry);
+        if (entry >= GauntletItemMin && entry <= GauntletItemMax)
+        {
+            if (item.Quality == ITEM_QUALITY_RARE)
+                pools.SetItems.push_back(entry);
+            continue;
+        }
+
+        if (item.Quality == ITEM_QUALITY_UNCOMMON)
+            pools.GreenItems.push_back(entry);
     }
 
     return pools;
 }
 
-uint8 RollRewardPoolIndex()
+uint32 SelectUniqueItem(std::vector<uint32> const& candidates, std::unordered_set<uint32>& usedEntries)
 {
-    uint32 greenWeight = sConfigMgr->GetOption<uint32>("AdventurerGauntlet.RewardGreenWeight", 70);
-    uint32 blueWeight = sConfigMgr->GetOption<uint32>("AdventurerGauntlet.RewardBlueWeight", 25);
-    uint32 purpleWeight = sConfigMgr->GetOption<uint32>("AdventurerGauntlet.RewardPurpleWeight", 5);
-    uint32 totalWeight = greenWeight + blueWeight + purpleWeight;
-
-    if (!totalWeight)
+    if (candidates.empty())
         return 0;
 
-    uint32 roll = urand(1, totalWeight);
-    if (roll <= greenWeight)
-        return 0;
-    if (roll <= greenWeight + blueWeight)
-        return 1;
-    return 2;
-}
-
-uint32 SelectRewardItem(RewardPools const& pools, std::unordered_set<uint32>& usedEntries)
-{
-    uint8 preferred = RollRewardPoolIndex();
-
-    for (uint8 offset = 0; offset < 3; ++offset)
+    uint32 attempts = std::min<uint32>(static_cast<uint32>(candidates.size()), 32);
+    for (uint32 attempt = 0; attempt < attempts; ++attempt)
     {
-        uint8 index = (preferred + offset) % 3;
-        auto const& candidates = pools.Items[index];
-        if (candidates.empty())
-            continue;
-
-        // Prefer unique rewards inside a single chest. If the pool is too small,
-        // a later fallback may repeat an item rather than reducing reward count.
-        uint32 attempts = std::min<uint32>(static_cast<uint32>(candidates.size()), 32);
-        for (uint32 attempt = 0; attempt < attempts; ++attempt)
-        {
-            uint32 entry = candidates[urand(0, static_cast<uint32>(candidates.size() - 1))];
-            if (usedEntries.insert(entry).second)
-                return entry;
-        }
+        uint32 entry = candidates[urand(0, static_cast<uint32>(candidates.size() - 1))];
+        if (usedEntries.insert(entry).second)
+            return entry;
     }
 
-    for (auto const& candidates : pools.Items)
-    {
-        if (!candidates.empty())
-            return candidates[urand(0, static_cast<uint32>(candidates.size() - 1))];
-    }
-
-    return 0;
+    return candidates[urand(0, static_cast<uint32>(candidates.size() - 1))];
 }
 
-void FillExpeditionChest(Creature* khadgar, GameObject* chest)
+void AddLootItem(Creature* boss, uint32 itemEntry)
 {
-    if (!khadgar || !chest || !khadgar->GetMap())
+    if (!boss || !itemEntry)
+        return;
+
+    LootStoreItem lootItem(itemEntry, 0, 100.0f, false, LOOT_MODE_DEFAULT, 0, 1, 1);
+    boss->loot.AddItem(lootItem);
+}
+
+void FillBossLoot(Creature* khadgar, Creature* boss)
+{
+    if (!khadgar || !boss || !khadgar->GetMap())
         return;
 
     uint32 survivorCount = 0;
@@ -161,21 +137,21 @@ void FillExpeditionChest(Creature* khadgar, GameObject* chest)
     RewardPools pools = BuildRewardPools(rewardLevel);
     std::unordered_set<uint32> usedEntries;
 
-    chest->loot.clear();
-    chest->loot.loot_type = LOOT_CORPSE;
+    // The boss corpse is the only reward container. Stock boss loot is removed:
+    // one level-appropriate green item is added per survivor, plus one blue
+    // Adventurer Gauntlet set piece for the whole group.
+    boss->loot.clear();
+    boss->loot.loot_type = LOOT_CORPSE;
 
     for (uint32 reward = 0; reward < survivorCount; ++reward)
-    {
-        uint32 itemEntry = SelectRewardItem(pools, usedEntries);
-        if (!itemEntry)
-            break;
+        AddLootItem(boss, SelectUniqueItem(pools.GreenItems, usedEntries));
 
-        LootStoreItem lootItem(itemEntry, 0, 100.0f, false, LOOT_MODE_DEFAULT, 0, 1, 1);
-        chest->loot.AddItem(lootItem);
-    }
+    AddLootItem(boss, SelectUniqueItem(pools.SetItems, usedEntries));
 
-    chest->SetLootRecipient(khadgar->GetMap());
-    chest->SetLootGenerationTime();
+    if (!boss->loot.empty())
+        boss->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
+    else
+        boss->RemoveDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
 }
 }
 
@@ -192,13 +168,8 @@ public:
         if (!creature || creature->GetEntry() != KhadgarEntry || creature->GetMapId() != RagefireMapId || !creature->IsSummon())
             return;
 
-        // The final boss no longer has its stock loot. Its reward belongs to the
-        // Expedition Chest instead.
         if (Creature* finalBoss = creature->FindNearestCreature(RagefireFinalBossEntry, 20.0f, false))
-        {
-            finalBoss->loot.clear();
-            finalBoss->RemoveDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
-        }
+            FillBossLoot(creature, finalBoss);
 
         creature->CastSpell(creature, KhadgarTeleportVisual, true);
         creature->HandleEmoteCommand(EMOTE_ONESHOT_APPLAUD);
@@ -206,19 +177,8 @@ public:
             KhadgarVictoryLines[urand(0, KhadgarVictoryLines.size() - 1)],
             LANG_UNIVERSAL);
 
-        GameObject* chest = creature->SummonGameObject(
-            ExpeditionChestEntry,
-            creature->GetPositionX(),
-            creature->GetPositionY() - 2.5f,
-            creature->GetPositionZ(),
-            0.0f,
-            0.0f,
-            0.0f,
-            0.0f,
-            1.0f,
-            0);
-
-        FillExpeditionChest(creature, chest);
+        // AccountStash.cpp observes this summoned Khadgar and creates the
+        // expedition stash beside him. No separate reward chest is spawned.
     }
 };
 
