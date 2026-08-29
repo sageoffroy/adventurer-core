@@ -22,7 +22,10 @@ BONUS_TYPES = {
     "defense_skill": "GAUNTLET_SET_BONUS_DEFENSE_SKILL",
     "expertise_rating": "GAUNTLET_SET_BONUS_EXPERTISE_RATING",
     "spell": "GAUNTLET_SET_BONUS_SPELL",
+    "mainhand_sword_spell": "GAUNTLET_SET_BONUS_MAINHAND_SWORD_SPELL",
 }
+
+SPELL_BONUS_TYPES = {"spell", "mainhand_sword_spell"}
 
 
 def cpp_string(value: str) -> str:
@@ -118,11 +121,11 @@ def read_bonuses(path: Path, piece_counts):
 
             value = parse_optional_positive_int(row.get("value"), "value", line)
             spell_id = parse_optional_positive_int(row.get("spell_id"), "spell_id", line)
-            if bonus_type == "spell":
+            if bonus_type in SPELL_BONUS_TYPES:
                 if not spell_id:
-                    raise SystemExit(f"line {line}: spell bonus requires spell_id")
+                    raise SystemExit(f"line {line}: {bonus_type} bonus requires spell_id")
                 if value:
-                    raise SystemExit(f"line {line}: spell bonus must leave value empty")
+                    raise SystemExit(f"line {line}: {bonus_type} bonus must leave value empty")
             else:
                 if not value:
                     raise SystemExit(f"line {line}: {bonus_type} bonus requires value")
