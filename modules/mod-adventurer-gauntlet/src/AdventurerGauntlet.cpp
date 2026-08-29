@@ -39,6 +39,13 @@ constexpr float RagefireX = 3.81f;
 constexpr float RagefireY = -14.82f;
 constexpr float RagefireZ = -17.84f;
 constexpr float RagefireO = 4.39f;
+constexpr uint32 RagefireFinalBossEntry = 11520; // Taragaman the Hungerer
+
+constexpr uint32 DeadminesMapId = 36;
+constexpr float DeadminesX = -16.4f;
+constexpr float DeadminesY = -383.07f;
+constexpr float DeadminesZ = 61.78f;
+constexpr float DeadminesO = 1.86f;
 
 constexpr std::array<char const*, 12> CompanyTitles = {
     "Retirados", "Cuervos", "Exiliados", "Errantes", "Juramentados", "Centinelas",
@@ -49,6 +56,38 @@ constexpr std::array<char const*, 12> CompanyPlaces = {
     "Lordaeron", "Karazhan", "Stromgarde", "Gilneas", "Forjaz", "Dalaran",
     "Quel'Thalas", "Alterac", "Tirisfal", "Arathi", "Dun Morogh", "Kalimdor"
 };
+
+bool IsGauntletDungeon(uint32 mapId)
+{
+    return mapId == RagefireMapId || mapId == DeadminesMapId;
+}
+
+char const* GetGauntletDungeonName(uint32 mapId)
+{
+    switch (mapId)
+    {
+        case RagefireMapId:
+            return "Sima Ignea";
+        case DeadminesMapId:
+            return "Minas de la Muerte";
+        default:
+            return "mazmorra";
+    }
+}
+
+bool IsRareCreature(Creature const* creature)
+{
+    if (!creature)
+        return false;
+
+    uint32 rank = creature->GetCreatureTemplate()->rank;
+    return rank == CREATURE_ELITE_RARE || rank == CREATURE_ELITE_RAREELITE;
+}
+
+bool IsRewardCreature(Creature const* creature)
+{
+    return creature && (creature->IsDungeonBoss() || IsRareCreature(creature));
+}
 
 std::string GenerateCompanyName()
 {
@@ -139,7 +178,7 @@ std::string const* GetPendingRunName(Player* player)
 
 bool GetActiveRunLevel(Creature const* creature, uint8& level)
 {
-    if (!creature || creature->GetMapId() != RagefireMapId || creature->IsPet() || creature->IsTrigger())
+    if (!creature || !IsGauntletDungeon(creature->GetMapId()) || creature->IsPet() || creature->IsTrigger())
         return false;
 
     auto itr = ActiveRunInstanceLevels.find(creature->GetInstanceId());
@@ -148,6 +187,12 @@ bool GetActiveRunLevel(Creature const* creature, uint8& level)
 
     level = itr->second;
     return true;
+}
+
+bool IsActiveRunCreature(Creature const* creature)
+{
+    uint8 level = 0;
+    return GetActiveRunLevel(creature, level);
 }
 
 void ResetPartyInstances(Player* leader)
@@ -213,7 +258,7 @@ bool InstanceStillHasLivingAdventurers(Map* map, Player* fallen)
 
 void ReturnFallenAdventurer(Player* player)
 {
-    if (!player || player->GetMapId() != RagefireMapId)
+    if (!player || !IsGauntletDungeon(player->GetMapId()))
         return;
 
     uint32 guid = player->GetGUID().GetCounter();
@@ -251,6 +296,50 @@ void ReturnFallenAdventurer(Player* player)
     ChatHandler(player->GetSession()).SendSysMessage(
         "Khadgar te ha devuelto. Durante el desarrollo puedes volver a intentar el desafio.");
 }
+
+void TransitionRagefireToDeadmines(Creature* finalBoss)
+{
+    if (!finalBoss || finalBoss->GetMapId() != RagefireMapId || finalBoss->GetEntry() != RagefireFinalBossEntry)
+        return;
+
+    Map* map = finalBoss->GetMap();
+    if (!map)
+        return;
+
+    std::vector<Player*> survivors;
+    for (auto const& ref : map->GetPlayers())
+    {
+        Player* player = ref.GetSource();
+        if (!player || !player->IsAlive())
+            continue;
+
+        if (PendingRunNames.find(player->GetGUID().GetCounter()) != PendingRunNames.end())
+            survivors.push_back(player);
+    }
+
+    if (survivors.empty())
+        return;
+
+    for (Player* player : survivors)
+    {
+        ChatHandler(player->GetSession()).SendSysMessage(
+            "|cff00ff00Sima Ignea completada.|r Khadgar abre el siguiente portal.");
+        ChatHandler(player->GetSession()).SendSysMessage(
+            "Segundo destino: |cffffd100Minas de la Muerte|r.");
+
+        if (!player->TeleportTo(
+                DeadminesMapId,
+                DeadminesX,
+                DeadminesY,
+                DeadminesZ,
+                DeadminesO,
+                TELE_TO_GM_MODE))
+        {
+            ChatHandler(player->GetSession()).SendSysMessage(
+                "Khadgar no pudo abrir el portal hacia Minas de la Muerte.");
+        }
+    }
+}
 }
 
 class AdventurerGauntletConfigScript : public WorldScript
@@ -287,7 +376,7 @@ public:
 
     void OnPlayerEnterAll(Map* map, Player* player) override
     {
-        if (!GauntletEnabled || !map || !player || map->GetId() != RagefireMapId || !GetPendingRunName(player))
+        if (!GauntletEnabled || !map || !player || !IsGauntletDungeon(map->GetId()) || !GetPendingRunName(player))
             return;
 
         uint32 instanceId = map->GetInstanceId();
@@ -318,14 +407,42 @@ public:
         }
 
         ChatHandler(player->GetSession()).PSendSysMessage(
-            "El desafio adapta Sima Ignea al nivel |cffffd100{}|r.",
+            "El desafio adapta {} al nivel |cffffd100{}|r.",
+            GetGauntletDungeonName(map->GetId()),
             itr->second);
     }
 
     void OnDestroyInstance(MapInstanced* /*mapInstanced*/, Map* map) override
     {
-        if (map && map->GetId() == RagefireMapId)
+        if (map && IsGauntletDungeon(map->GetId()))
             ActiveRunInstanceLevels.erase(map->GetInstanceId());
+    }
+};
+
+class AdventurerGauntletUnitScript : public UnitScript
+{
+public:
+    AdventurerGauntletUnitScript() : UnitScript("AdventurerGauntletUnitScript") { }
+
+    void OnUnitDeath(Unit* unit, Unit* /*killer*/) override
+    {
+        if (!GauntletEnabled || !unit)
+            return;
+
+        Creature* creature = unit->ToCreature();
+        if (!creature || !IsActiveRunCreature(creature))
+            return;
+
+        // Trash never drops anything inside the gauntlet. Bosses and rares are
+        // deliberately preserved because they will use the expedition reward system.
+        if (!IsRewardCreature(creature))
+        {
+            creature->loot.clear();
+            creature->RemoveDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
+        }
+
+        if (creature->GetMapId() == RagefireMapId && creature->GetEntry() == RagefireFinalBossEntry)
+            TransitionRagefireToDeadmines(creature);
     }
 };
 
@@ -405,7 +522,7 @@ public:
                 ChatHandler(player->GetSession()).SendSysMessage(
                     "El desafio comienza con personajes de nivel 1 y encadena mazmorras hasta que no quede ningun aventurero vivo.");
                 ChatHandler(player->GetSession()).SendSysMessage(
-                    "Por ahora, la primera prueba siempre comienza en Sima Ignea.");
+                    "Por ahora, la primera prueba comienza en Sima Ignea y continua en Minas de la Muerte.");
                 CloseGossipMenuFor(player);
                 return true;
             case ACTION_STATUS:
@@ -425,6 +542,7 @@ void AddAdventurerGauntletScripts()
     new AdventurerGauntletConfigScript();
     new AdventurerGauntletCreatureScript();
     new AdventurerGauntletMapScript();
+    new AdventurerGauntletUnitScript();
     new AdventurerGauntletPlayerScript();
     new npc_adventurer_gauntlet_khadgar();
 }
