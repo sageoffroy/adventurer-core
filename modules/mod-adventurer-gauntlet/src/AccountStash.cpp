@@ -6,6 +6,7 @@
 #include "Item.h"
 #include "ObjectMgr.h"
 #include "Player.h"
+#include "ScriptMgr.h"
 #include "ScriptedGossip.h"
 #include "WorldSession.h"
 
@@ -16,6 +17,7 @@
 
 namespace
 {
+constexpr uint32 KhadgarEntry = 910000;
 constexpr uint32 AccountStashEntry = 910002;
 constexpr uint32 GauntletItemMin = 911000;
 constexpr uint32 GauntletItemMax = 911999;
@@ -354,7 +356,21 @@ public:
     }
 };
 
+class AdventurerGauntletAccountStashKhadgarScript : public AllCreatureScript
+{
+public:
+    AdventurerGauntletAccountStashKhadgarScript()
+        : AllCreatureScript("AdventurerGauntletAccountStashKhadgarScript") { }
+
+    void OnCreatureAddWorld(Creature* creature) override
+    {
+        if (creature && creature->GetEntry() == KhadgarEntry)
+            EnsureAdventurerGauntletAccountStash(creature);
+    }
+};
+
 void AddAdventurerGauntletAccountStashScripts()
 {
     new go_adventurer_gauntlet_account_stash();
+    new AdventurerGauntletAccountStashKhadgarScript();
 }
