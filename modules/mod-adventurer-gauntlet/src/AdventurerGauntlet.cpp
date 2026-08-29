@@ -18,6 +18,7 @@
 #include <vector>
 
 bool IsAdventurerGauntletFallen(Player* player);
+void FillAdventurerGauntletBossLoot(Creature* boss, bool finalBoss);
 
 namespace
 {
@@ -446,13 +447,17 @@ public:
         if (!creature || !IsActiveRunCreature(creature))
             return;
 
-        if (!IsRewardCreature(creature))
+        bool finalBoss = creature->GetMapId() == RagefireMapId && creature->GetEntry() == RagefireFinalBossEntry;
+
+        if (creature->IsDungeonBoss())
+            FillAdventurerGauntletBossLoot(creature, finalBoss);
+        else if (!IsRewardCreature(creature))
         {
             creature->loot.clear();
             creature->RemoveDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
         }
 
-        if (creature->GetMapId() == RagefireMapId && creature->GetEntry() == RagefireFinalBossEntry)
+        if (finalBoss)
             FinishRagefireAndSummonKhadgar(creature);
     }
 };
