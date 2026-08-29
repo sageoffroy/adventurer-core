@@ -8,7 +8,16 @@ from pathlib import Path
 SET_KEY_RE = re.compile(r"^[a-z0-9_]+$")
 
 ITEM_REQUIRED_COLUMNS = {"enabled", "entry", "set_key"}
-SET_REQUIRED_COLUMNS = {"enabled", "set_key", "name", "pieces_required", "spell_id", "description"}
+SET_REQUIRED_COLUMNS = {
+    "enabled", "set_key", "name", "pieces_required", "bonus_type", "value", "spell_id", "description"
+}
+
+BONUS_TYPES = {
+    "armor": "GAUNTLET_SET_BONUS_ARMOR",
+    "defense_skill": "GAUNTLET_SET_BONUS_DEFENSE_SKILL",
+    "expertise_rating": "GAUNTLET_SET_BONUS_EXPERTISE_RATING",
+    "spell": "GAUNTLET_SET_BONUS_SPELL",
+}
 
 
 def cpp_string(value: str) -> str:
@@ -32,6 +41,13 @@ def parse_positive_int(raw: str, field: str, line: int) -> int:
     if value <= 0:
         raise SystemExit(f"line {line}: {field} must be positive")
     return value
+
+
+def parse_optional_positive_int(raw: str, field: str, line: int) -> int:
+    value = (raw or "").strip()
+    if not value:
+        return 0
+    return parse_positive_int(value, field, line)
 
 
 def validate_key(key: str, line: int) -> str:
@@ -80,12 +96,34 @@ def read_bonuses(path: Path, piece_counts):
         for line, row in enumerate(reader, start=2):
             if not is_enabled(row.get("enabled"), line):
                 continue
+
             key = validate_key(row.get("set_key") or "", line)
             name = (row.get("name") or "").strip()
             if not name:
                 raise SystemExit(f"line {line}: set name cannot be empty")
-            pieces_required = parse_positive_int((row.get("pieces_required") or "").strip(), "pieces_required", line)
-            spell_id = parse_positive_int((row.get("spell_id") or "").strip(), "spell_id", line)
+
+            pieces_required = parse_positive_int(
+                (row.get("pieces_required") or "").strip(), "pieces_required", line
+            )
+            bonus_type = (row.get("bonus_type") or "").strip().lower()
+            if bonus_type not in BONUS_TYPES:
+                raise SystemExit(
+                    f"line {line}: bonus_type must be one of {', '.join(sorted(BONUS_TYPES))}"
+                )
+
+            value = parse_optional_positive_int(row.get("value"), "value", line)
+            spell_id = parse_optional_positive_int(row.get("spell_id"), "spell_id", line)
+            if bonus_type == "spell":
+                if not spell_id:
+                    raise SystemExit(f"line {line}: spell bonus requires spell_id")
+                if value:
+                    raise SystemExit(f"line {line}: spell bonus must leave value empty")
+            else:
+                if not value:
+                    raise SystemExit(f"line {line}: {bonus_type} bonus requires value")
+                if spell_id:
+                    raise SystemExit(f"line {line}: {bonus_type} bonus must leave spell_id empty")
+
             description = (row.get("description") or "").strip()
 
             if key not in piece_counts:
@@ -101,7 +139,17 @@ def read_bonuses(path: Path, piece_counts):
 
             names[key] = name
             seen.add((key, pieces_required))
-            bonuses.append((key, name, pieces_required, spell_id, description))
+            bonuses.append(
+                (
+                    key,
+                    name,
+                    pieces_required,
+                    BONUS_TYPES[bonus_type],
+                    value,
+                    spell_id,
+                    description,
+                )
+            )
 
     return bonuses
 
@@ -119,9 +167,15 @@ def main() -> int:
     piece_lines = [f"    GauntletSetPiece{{{entry}, {cpp_string(key)}}}," for entry, key in pieces]
     bonus_lines = [
         "    GauntletSetBonus{" + ", ".join([
-            cpp_string(key), cpp_string(name), str(required), str(spell_id), cpp_string(description)
+            cpp_string(key),
+            cpp_string(name),
+            str(required),
+            bonus_type,
+            str(value),
+            str(spell_id),
+            cpp_string(description),
         ]) + "},"
-        for key, name, required, spell_id, description in bonuses
+        for key, name, required, bonus_type, value, spell_id, description in bonuses
     ]
 
     output = [
