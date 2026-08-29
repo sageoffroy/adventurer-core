@@ -95,7 +95,7 @@ local function CreateSlot(index)
     button:SetWidth(40)
     button:SetHeight(40)
 
-    local column = math.mod(index - 1, COLUMNS)
+    local column = (index - 1) % COLUMNS
     local row = math.floor((index - 1) / COLUMNS)
     button:SetPoint("TOPLEFT", panel, "TOPLEFT", 8 + column * 42, -8 - row * 42)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
