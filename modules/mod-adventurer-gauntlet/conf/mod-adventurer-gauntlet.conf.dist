@@ -4,3 +4,8 @@ AdventurerGauntlet.Enable = 1
 AdventurerGauntlet.StartLevel = 1
 AdventurerGauntlet.MinPlayers = 1
 AdventurerGauntlet.MaxPlayers = 5
+
+# Expedition Chest quality weights. These are relative weights, not required to total 100.
+AdventurerGauntlet.RewardGreenWeight = 70
+AdventurerGauntlet.RewardBlueWeight = 25
+AdventurerGauntlet.RewardPurpleWeight = 5
