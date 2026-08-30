@@ -2,6 +2,7 @@
 #include "Language.h"
 #include "Opcodes.h"
 #include "Player.h"
+#include "Random.h"
 #include "ScriptDefines/PlayerScript.h"
 #include "SharedDefines.h"
 #include "WorldPacket.h"
@@ -228,10 +229,26 @@ void EnsureSubclassSkills(Player* player)
         player->SetSkill(skillId, 1, 1, 1);
 }
 
+void GiveAdventurerStartingMoney(Player* player)
+{
+    if (!IsAdventurer(player))
+        return;
+
+    uint32 gold = urand(3, 5);
+    uint32 silver = urand(1, 99);
+    uint32 copper = urand(1, 99);
+    player->SetMoney(gold * 10000u + silver * 100u + copper);
+}
+
 class AdventurerCollectionsScript final : public PlayerScript
 {
 public:
     AdventurerCollectionsScript() : PlayerScript("AdventurerCollectionsScript") { }
+
+    void OnPlayerCreate(Player* player) override
+    {
+        GiveAdventurerStartingMoney(player);
+    }
 
     void OnPlayerLogin(Player* player) override
     {
