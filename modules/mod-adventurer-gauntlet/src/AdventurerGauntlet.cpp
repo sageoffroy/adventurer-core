@@ -20,7 +20,7 @@
 namespace
 {
 bool GauntletEnabled = true;
-uint8 GauntletStartLevel = 1;
+constexpr uint8 GauntletStartLevel = 3;
 uint8 GauntletMinPlayers = 1;
 uint8 GauntletMaxPlayers = 5;
 
@@ -38,15 +38,17 @@ std::unordered_map<uint32, RunReturnPoint> RunReturnPoints;
 std::unordered_map<uint32, uint8> ActiveRunInstanceLevels;
 
 constexpr uint32 KhadgarEntry = 910000;
-constexpr uint32 KhadgarCastVisual = 69659;      // Evocation visual
-constexpr uint32 KhadgarTeleportVisual = 41232;  // Teleport visual
+constexpr uint32 KhadgarIntroText = 910000;
+constexpr uint32 KhadgarConfirmText = 910001;
+constexpr uint32 KhadgarCastVisual = 69659;
+constexpr uint32 KhadgarTeleportVisual = 41232;
 
 constexpr uint32 RagefireMapId = 389;
 constexpr float RagefireX = 3.81f;
 constexpr float RagefireY = -14.82f;
 constexpr float RagefireZ = -17.84f;
 constexpr float RagefireO = 4.39f;
-constexpr uint32 RagefireFinalBossEntry = 11520; // Taragaman the Hungerer
+constexpr uint32 RagefireFinalBossEntry = 11520;
 
 constexpr uint32 DeadminesMapId = 36;
 constexpr float DeadminesX = -16.4f;
@@ -166,7 +168,7 @@ bool ValidateParty(Player* player, std::vector<Player*>& members, std::string& e
     {
         if (member->GetLevel() != GauntletStartLevel)
         {
-            error = "Todos los integrantes deben comenzar el desafio en el nivel requerido.";
+            error = "Todos los integrantes deben comenzar el desafio en nivel 3.";
             return false;
         }
 
@@ -311,8 +313,6 @@ void ReturnFallenAdventurer(Player* player)
         returnPoint.O,
         TELE_TO_GM_MODE);
 
-    // Development behavior: keep the loop quick while the permanent Fallen
-    // state and leaderboard persistence are still being built.
     player->ResurrectPlayer(1.0f);
     player->SpawnCorpseBones();
 
@@ -360,7 +360,6 @@ public:
     void OnBeforeConfigLoad(bool /*reload*/) override
     {
         GauntletEnabled = sConfigMgr->GetOption<bool>("AdventurerGauntlet.Enable", true);
-        GauntletStartLevel = sConfigMgr->GetOption<uint8>("AdventurerGauntlet.StartLevel", 1);
         GauntletMinPlayers = sConfigMgr->GetOption<uint8>("AdventurerGauntlet.MinPlayers", 1);
         GauntletMaxPlayers = sConfigMgr->GetOption<uint8>("AdventurerGauntlet.MaxPlayers", 5);
     }
@@ -397,13 +396,8 @@ public:
         if (!inserted)
             return;
 
-        // Mark the instance first, then load its grids. Creatures created while loading
-        // pass through OnBeforeCreatureSelectLevel and receive the gauntlet level using
-        // AzerothCore's own stock creature-stat calculation.
         map->LoadAllGrids();
 
-        // The entrance grid can already be loaded by the time this hook fires. Re-run
-        // stock SelectLevel for those creatures so the whole dungeon uses the same level.
         for (auto const& [spawnId, creature] : map->GetCreatureBySpawnIdStore())
         {
             (void)spawnId;
@@ -443,8 +437,6 @@ public:
         if (!creature || !IsActiveRunCreature(creature))
             return;
 
-        // Trash never drops anything inside the gauntlet. Bosses and rares are
-        // deliberately preserved because they will use the expedition reward system.
         if (!IsRewardCreature(creature))
         {
             creature->loot.clear();
@@ -470,8 +462,8 @@ public:
 
 enum KhadgarGauntletActions
 {
-    ACTION_START = GOSSIP_ACTION_INFO_DEF + 1,
-    ACTION_EXPLAIN = GOSSIP_ACTION_INFO_DEF + 2,
+    ACTION_LEARN_MORE = GOSSIP_ACTION_INFO_DEF + 1,
+    ACTION_START = GOSSIP_ACTION_INFO_DEF + 2,
     ACTION_STATUS = GOSSIP_ACTION_INFO_DEF + 3,
     ACTION_CONTINUE = GOSSIP_ACTION_INFO_DEF + 4,
 };
@@ -518,9 +510,7 @@ public:
 
                 bool success = false;
                 if (_destination == KHADGAR_TRAVEL_RAGEFIRE)
-                {
                     success = TeleportParty(travellers, RagefireMapId, RagefireX, RagefireY, RagefireZ, RagefireO);
-                }
                 else if (_destination == KHADGAR_TRAVEL_DEADMINES)
                 {
                     for (Player* player : travellers)
@@ -577,19 +567,14 @@ public:
 
         if (creature->GetMapId() == RagefireMapId && GetPendingRunName(player))
         {
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Estamos listos. Abri el camino a la siguiente mazmorra.", GOSSIP_SENDER_MAIN, ACTION_CONTINUE);
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Recordame el nombre de nuestra compania.", GOSSIP_SENDER_MAIN, ACTION_STATUS);
-        }
-        else
-        {
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Estamos listos. Proponenos un desafio.", GOSSIP_SENDER_MAIN, ACTION_START);
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Explicame como funciona el desafio.", GOSSIP_SENDER_MAIN, ACTION_EXPLAIN);
-
-            if (GetPendingRunName(player))
-                AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Recordame el nombre de nuestra compania.", GOSSIP_SENDER_MAIN, ACTION_STATUS);
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Estamos listos. Abre el camino a la siguiente mazmorra.", GOSSIP_SENDER_MAIN, ACTION_CONTINUE);
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Recuerdame el nombre de nuestra compania.", GOSSIP_SENDER_MAIN, ACTION_STATUS);
+            SendGossipMenuFor(player, DEFAULT_GOSSIP_MESSAGE, creature->GetGUID());
+            return true;
         }
 
-        SendGossipMenuFor(player, DEFAULT_GOSSIP_MESSAGE, creature->GetGUID());
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Quiero saber mas.", GOSSIP_SENDER_MAIN, ACTION_LEARN_MORE);
+        SendGossipMenuFor(player, KhadgarIntroText, creature->GetGUID());
         return true;
     }
 
@@ -599,6 +584,10 @@ public:
 
         switch (action)
         {
+            case ACTION_LEARN_MORE:
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Si. Quiero afrontar el desafio.", GOSSIP_SENDER_MAIN, ACTION_START);
+                SendGossipMenuFor(player, KhadgarConfirmText, creature->GetGUID());
+                return true;
             case ACTION_START:
             {
                 std::vector<Player*> members;
@@ -659,13 +648,6 @@ public:
                 CloseGossipMenuFor(player);
                 return true;
             }
-            case ACTION_EXPLAIN:
-                ChatHandler(player->GetSession()).SendSysMessage(
-                    "El desafio comienza con personajes de nivel 1 y encadena mazmorras hasta que no quede ningun aventurero vivo.");
-                ChatHandler(player->GetSession()).SendSysMessage(
-                    "Khadgar abre personalmente cada portal. Al derrotar al jefe final, vuelve a aparecer para guiar a la expedicion al siguiente destino.");
-                CloseGossipMenuFor(player);
-                return true;
             case ACTION_STATUS:
                 if (std::string const* companyName = GetPendingRunName(player))
                     ChatHandler(player->GetSession()).PSendSysMessage("Su compania es |cff00ff00{}|r.", *companyName);
