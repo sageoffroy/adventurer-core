@@ -4,8 +4,6 @@ Patch layer for running the native **Adventurer (class ID 10)** and its SpellDra
 
 The project makes the unused class slot 10 playable, installs the Adventurer server/client/runtime pieces, and uses SpellDraft cards for abilities and talents. Playerbots integration is optional and detected when present.
 
-The Khadgar Gauntlet development branch adds the expedition/gauntlet gameplay module on top of this shared Adventurer Core baseline.
-
 ## Install
 
 ```bash
