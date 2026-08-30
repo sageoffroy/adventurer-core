@@ -20,6 +20,7 @@ namespace
 constexpr char ADVENTURER_DRAFT_PREFIX[] = "AdventurerDraft";
 constexpr char TALENT_COLLECTION_REQUEST[] = "ADRAFT_TALENTS";
 constexpr uint32 ADVENTURER_SUBCLASS_SKILLS[] = {900, 901, 902, 903};
+constexpr uint8 ADVENTURER_START_LEVEL = 3;
 
 struct CollectionTalent
 {
@@ -229,10 +230,13 @@ void EnsureSubclassSkills(Player* player)
         player->SetSkill(skillId, 1, 1, 1);
 }
 
-void GiveAdventurerStartingMoney(Player* player)
+void InitializeAdventurerFirstLogin(Player* player)
 {
     if (!IsAdventurer(player))
         return;
+
+    if (player->GetLevel() < ADVENTURER_START_LEVEL)
+        player->GiveLevel(ADVENTURER_START_LEVEL);
 
     uint32 gold = urand(3, 5);
     uint32 silver = urand(1, 99);
@@ -248,7 +252,7 @@ public:
 
     void OnPlayerFirstLogin(Player* player) override
     {
-        GiveAdventurerStartingMoney(player);
+        InitializeAdventurerFirstLogin(player);
     }
 
     void OnPlayerLogin(Player* player) override
