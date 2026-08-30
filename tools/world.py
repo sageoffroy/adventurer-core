@@ -44,7 +44,8 @@ class WorldUpdate:
 # 010 adds two Adventurer-owned low-level rare contraband items; 011 replaces
 # the temporary native green assortment with the custom contraband starter set;
 # 012 adds cloth gloves, a shield, and cloth/leather/mail belts; 013 turns the
-# two Goldshire hand-offs into real 0/1 talk objectives.
+# two Goldshire hand-offs into real 0/1 talk objectives; 014 restores the two
+# custom daggers to the native one-hand InventoryType used by their chassis.
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
@@ -85,6 +86,10 @@ WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "013_adventurer_goldshire_objectives.sql",
         "rev_1787446800000000010.sql",
+    ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "014_adventurer_contraband_dagger_inventory.sql",
+        "rev_1787446800000000011.sql",
     ),
 )
 
