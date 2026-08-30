@@ -13,19 +13,25 @@ SET
 WHERE `class` = @ADVENTURER_CLASS
   AND `race` IN (1,3,4,7,11);
 
--- Every Adventurer starts with the same basic clothes and no class-specific weapon.
+-- CharStartOutfit.dbc owns the three equipped clothing pieces. Keep
+-- playercreateinfo_item for inventory-only supplies so the clothes are not
+-- duplicated into the backpack.
 DELETE FROM `playercreateinfo_item`
 WHERE `class` = @ADVENTURER_CLASS;
 
 INSERT INTO `playercreateinfo_item` (`race`, `class`, `itemid`, `amount`, `Note`)
-SELECT `race`, @ADVENTURER_CLASS, 20921, 1, 'Adventurer - Sun Cured Boots'
+SELECT `race`, @ADVENTURER_CLASS, 6948, 1, 'Adventurer - Hearthstone'
 FROM `playercreateinfo`
 WHERE `class` = @ADVENTURER_CLASS
 UNION ALL
-SELECT `race`, @ADVENTURER_CLASS, 4907, 1, 'Adventurer - Woodland Tunic'
+SELECT `race`, @ADVENTURER_CLASS, 4500, 1, 'Adventurer - Traveler Backpack'
 FROM `playercreateinfo`
 WHERE `class` = @ADVENTURER_CLASS
 UNION ALL
-SELECT `race`, @ADVENTURER_CLASS, 61, 1, 'Adventurer - Dwarven Leather Pants'
+SELECT `race`, @ADVENTURER_CLASS, 23172, 1, 'Adventurer - Refreshing Red Apple'
+FROM `playercreateinfo`
+WHERE `class` = @ADVENTURER_CLASS
+UNION ALL
+SELECT `race`, @ADVENTURER_CLASS, 19222, 1, 'Adventurer - Cheap Beer'
 FROM `playercreateinfo`
 WHERE `class` = @ADVENTURER_CLASS;
