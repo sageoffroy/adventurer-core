@@ -31,7 +31,7 @@ fi
 # databases changed, recoverable class-10 characters still exist, or an owned
 # file was edited outside Adventurer Core.
 python3 "$ROOT/tools/database.py" can-rollback "$@"
-python3 "$ROOT/tools/adventurer.py" verify "$@"
+python3 "$ROOT/tools/adventurer.py" verify --core-dir "$core_dir"
 if (( has_playerbots == 1 )); then
     python3 "$ROOT/tools/playerbots_source_patch.py" verify --core-dir "$core_dir"
     python3 "$ROOT/tools/playerbots_runtime.py" verify --core-dir "$core_dir"
