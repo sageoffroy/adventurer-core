@@ -1,8 +1,10 @@
 #include "Config.h"
+#include "Creature.h"
 #include "Language.h"
 #include "Opcodes.h"
 #include "Player.h"
 #include "Random.h"
+#include "ScriptDefines/AllCreatureScript.h"
 #include "ScriptDefines/PlayerScript.h"
 #include "SharedDefines.h"
 #include "WorldPacket.h"
@@ -21,6 +23,8 @@ constexpr char ADVENTURER_DRAFT_PREFIX[] = "AdventurerDraft";
 constexpr char TALENT_COLLECTION_REQUEST[] = "ADRAFT_TALENTS";
 constexpr uint32 ADVENTURER_SUBCLASS_SKILLS[] = {900, 901, 902, 903};
 constexpr uint8 ADVENTURER_START_LEVEL = 3;
+constexpr uint32 THARYNN_BOUDEN_ENTRY = 66;
+constexpr uint32 REMEN_MARCOT_ENTRY = 6121;
 
 struct CollectionTalent
 {
@@ -274,9 +278,29 @@ public:
         return false;
     }
 };
+
+class AdventurerIntroTalkScript final : public AllCreatureScript
+{
+public:
+    AdventurerIntroTalkScript() : AllCreatureScript("AdventurerIntroTalkScript") { }
+
+    bool CanCreatureGossipHello(Player* player, Creature* creature) override
+    {
+        if (!IsAdventurer(player) || !creature)
+            return false;
+
+        uint32 entry = creature->GetEntry();
+        if (entry == THARYNN_BOUDEN_ENTRY || entry == REMEN_MARCOT_ENTRY)
+            player->TalkedToCreature(entry, creature->GetGUID());
+
+        // Never replace the NPC's native gossip/vendor/trainer behavior.
+        return false;
+    }
+};
 }
 
 void AddAdventurerCollectionScripts()
 {
     new AdventurerCollectionsScript();
+    new AdventurerIntroTalkScript();
 }
