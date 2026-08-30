@@ -1,0 +1,786 @@
+#!/usr/bin/env python3
+"""Narrow, idempotent source transformations for native Adventurer class 10.
+
+The transformations are deliberately anchor-based instead of fuzzy patching.
+Every anchor must occur exactly as expected, or the preflight aborts before any
+file is written. This gives us a compatibility signal when AzerothCore changes.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+
+class PatchError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class PlannedFile:
+    relative_path: str
+    original: bytes | None
+    patched: bytes
+
+
+def replace_once(text: str, old: str, new: str, label: str) -> str:
+    if new in text:
+        return text
+    count = text.count(old)
+    if count != 1:
+        raise PatchError(f"{label}: expected exactly one clean anchor, found {count}")
+    return text.replace(old, new, 1)
+
+
+def replace_optional_once(text: str, old: str, new: str, label: str) -> str:
+    """Patch one optional extension when present, while still rejecting ambiguity."""
+    clean_count = text.count(old)
+    patched_count = text.count(new)
+    if clean_count == 1 and patched_count == 0:
+        return text.replace(old, new, 1)
+    if clean_count == 0 and patched_count in (0, 1):
+        return text
+    raise PatchError(
+        f"{label}: optional anchor is ambiguous; "
+        f"found clean={clean_count}, patched={patched_count}"
+    )
+
+
+def replace_transition(text: str, clean: str, legacy: str, new: str, label: str) -> str:
+    """Accept a stock core or the previous Adventurer-owned form, never fuzz."""
+    if new in text:
+        return text
+    clean_count = text.count(clean)
+    legacy_count = text.count(legacy)
+
+    # Some legacy forms deliberately extend the stock anchor, so counting the
+    # stock text also counts the copy nested inside the single legacy anchor.
+    # Accept that exact overlap, but still reject an independent extra stock
+    # anchor elsewhere in the file.
+    if legacy_count == 1 and clean_count == legacy.count(clean):
+        return text.replace(legacy, new, 1)
+    if clean_count == 1 and legacy_count == 0:
+        return text.replace(clean, new, 1)
+    raise PatchError(
+        f"{label}: expected exactly one stock or legacy anchor, "
+        f"found stock={clean_count}, legacy={legacy_count}"
+    )
+
+
+def replace_transitions(
+    text: str,
+    clean: str,
+    legacies: tuple[str, ...],
+    new: str,
+    label: str,
+) -> str:
+    """Accept stock or one of several known Adventurer-owned predecessor forms."""
+    if new in text:
+        return text
+
+    for legacy in legacies:
+        legacy_count = text.count(legacy)
+        if legacy_count > 1:
+            raise PatchError(f"{label}: predecessor anchor is ambiguous; found {legacy_count}")
+        if legacy_count == 1:
+            clean_count = text.count(clean)
+            nested_clean = legacy.count(clean)
+            if clean_count != nested_clean:
+                raise PatchError(
+                    f"{label}: predecessor matched but found an independent stock anchor; "
+                    f"stock={clean_count}, nested={nested_clean}"
+                )
+            return text.replace(legacy, new, 1)
+
+    clean_count = text.count(clean)
+    if clean_count == 1:
+        return text.replace(clean, new, 1)
+    raise PatchError(
+        f"{label}: expected exactly one stock or known predecessor anchor, found stock={clean_count}"
+    )
+
+
+def replace_exact_count(text: str, old: str, new: str, count: int, label: str) -> str:
+    if old not in text:
+        if text.count(new) == count:
+            return text
+        raise PatchError(f"{label}: clean anchor not found and patched form is incomplete")
+    actual = text.count(old)
+    if actual != count:
+        raise PatchError(f"{label}: expected {count} clean anchors, found {actual}")
+    return text.replace(old, new)
+
+
+def patch_shared_defines(text: str) -> str:
+    text = replace_once(
+        text,
+        "    CLASS_WARLOCK       = 9, // TITLE Warlock\n    //CLASS_UNK           = 10,\n    CLASS_DRUID         = 11 // TITLE Druid",
+        "    CLASS_WARLOCK       = 9, // TITLE Warlock\n    CLASS_ADVENTURER    = 10, // TITLE Adventurer (native classless class)\n    CLASS_DRUID         = 11 // TITLE Druid",
+        "SharedDefines Classes",
+    )
+    return replace_once(
+        text,
+        "    (1<<(CLASS_MAGE-1))   |(1<<(CLASS_WARLOCK-1))|(1<<(CLASS_DRUID-1)) | \\\n    (1<<(CLASS_DEATH_KNIGHT-1)))",
+        "    (1<<(CLASS_MAGE-1))   |(1<<(CLASS_WARLOCK-1))|(1<<(CLASS_ADVENTURER-1))| \\\n    (1<<(CLASS_DRUID-1))  |(1<<(CLASS_DEATH_KNIGHT-1)))",
+        "SharedDefines playable class mask",
+    )
+
+
+def patch_enuminfo(text: str) -> str:
+    text = replace_once(
+        text,
+        '        case CLASS_WARLOCK: return { "CLASS_WARLOCK", "Warlock", "" };\n        case CLASS_DRUID: return { "CLASS_DRUID", "Druid", "" };',
+        '        case CLASS_WARLOCK: return { "CLASS_WARLOCK", "Warlock", "" };\n        case CLASS_ADVENTURER: return { "CLASS_ADVENTURER", "Adventurer", "Native classless class" };\n        case CLASS_DRUID: return { "CLASS_DRUID", "Druid", "" };',
+        "EnumUtils Classes::ToString",
+    )
+    text = replace_once(
+        text,
+        "AC_API_EXPORT std::size_t EnumUtils<Classes>::Count() { return 10; }",
+        "AC_API_EXPORT std::size_t EnumUtils<Classes>::Count() { return 11; }",
+        "EnumUtils Classes::Count",
+    )
+    text = replace_once(
+        text,
+        "        case 8: return CLASS_WARLOCK;\n        case 9: return CLASS_DRUID;",
+        "        case 8: return CLASS_WARLOCK;\n        case 9: return CLASS_ADVENTURER;\n        case 10: return CLASS_DRUID;",
+        "EnumUtils Classes::FromIndex",
+    )
+    return replace_once(
+        text,
+        "        case CLASS_WARLOCK: return 8;\n        case CLASS_DRUID: return 9;",
+        "        case CLASS_WARLOCK: return 8;\n        case CLASS_ADVENTURER: return 9;\n        case CLASS_DRUID: return 10;",
+        "EnumUtils Classes::ToIndex",
+    )
+
+
+def patch_stat_system(text: str) -> str:
+    text = replace_once(
+        text,
+        "    0.9830f,  // Warlock\n    0.0f,     // ??\n    0.9720f   // Druid",
+        "    0.9830f,  // Warlock\n    0.9880f,  // Adventurer\n    0.9720f   // Druid",
+        "StatSystem diminishing k",
+    )
+    text = replace_once(
+        text,
+        "        16.00f,     // Warlock //?\n        0.0f,       // ??\n        16.00f      // Druid   //?",
+        "        16.00f,     // Warlock //?\n        16.00f,     // Adventurer\n        16.00f      // Druid   //?",
+        "StatSystem miss cap",
+    )
+    text = replace_once(
+        text,
+        "        0.0f,           // Warlock\n        0.0f,           // ??\n        0.0f            // Druid",
+        "        0.0f,           // Warlock\n        145.560408f,    // Adventurer\n        0.0f            // Druid",
+        "StatSystem parry cap",
+    )
+    text = replace_once(
+        text,
+        "        150.375940f,    // Warlock\n        0.0f,           // ??\n        116.890707f     // Druid",
+        "        150.375940f,    // Warlock\n        145.560408f,    // Adventurer\n        116.890707f     // Druid",
+        "StatSystem dodge cap",
+    )
+
+    clean_ranged = """        if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;
+        }"""
+    legacy_ranged = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+        {
+            // Classless ranged baseline: Hunter-style level scaling.
+            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;
+        }
+        else if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;
+        }"""
+    universal_ranged_95 = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+        {
+            // Universal ranged baseline: 95% of Hunter's native formula.
+            val2 = (level * 2.0f + GetStat(STAT_AGILITY) - 10.0f) * 0.95f;
+        }
+        else if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;
+        }"""
+    universal_ranged = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+        {
+            // Universal ranged baseline: 80% of Hunter's native formula. Heavy
+            // armor also reduces the Agility that contributes to physical output.
+            float armor = float(GetArmor());
+            float armorLevel = level;
+            if (armorLevel > 59.0f)
+                armorLevel += 4.5f * (armorLevel - 59.0f);
+            float armorFactor = 0.1f * armor / (8.5f * armorLevel + 40.0f);
+            float armorReduction = armorFactor > 0.0f ? armorFactor / (1.0f + armorFactor) : 0.0f;
+            if (armorReduction > 0.75f)
+                armorReduction = 0.75f;
+            float agilityPenalty = armorReduction * 0.50f;
+            if (agilityPenalty > 0.30f)
+                agilityPenalty = 0.30f;
+            float effectiveAgility = GetStat(STAT_AGILITY) * (1.0f - agilityPenalty);
+            val2 = (level * 2.0f + effectiveAgility - 10.0f) * 0.80f;
+        }
+        else if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;
+        }"""
+    text = replace_transitions(
+        text,
+        clean_ranged,
+        (legacy_ranged, universal_ranged_95),
+        universal_ranged,
+        "StatSystem Adventurer ranged attack power",
+    )
+
+    clean_melee = """        if (IsClass(CLASS_PALADIN, CLASS_CONTEXT_STATS) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+        }"""
+    legacy_melee = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+        {
+            // Classless melee baseline: hybrid Strength/Agility progression.
+            val2 = level * 2.0f + GetStat(STAT_STRENGTH) + GetStat(STAT_AGILITY) - 20.0f;
+        }
+        else if (IsClass(CLASS_PALADIN, CLASS_CONTEXT_STATS) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+        }"""
+    universal_melee_95 = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+        {
+            // Universal melee baseline: compare the two strongest native
+            // archetypes and keep 95% of whichever the current gear favours.
+            float strengthBaseline = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+            float hybridBaseline = level * 2.0f + GetStat(STAT_STRENGTH) + GetStat(STAT_AGILITY) - 20.0f;
+            val2 = (strengthBaseline > hybridBaseline ? strengthBaseline : hybridBaseline) * 0.95f;
+        }
+        else if (IsClass(CLASS_PALADIN, CLASS_CONTEXT_STATS) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+        }"""
+    universal_melee = """        if (IsClass(CLASS_ADVENTURER, CLASS_CONTEXT_STATS))
+        {
+            // Universal melee baseline: compare the two strongest native
+            // archetypes and keep 80% of whichever the current gear favours.
+            // Armor only penalizes the Agility component, never raw Strength.
+            float armor = float(GetArmor());
+            float armorLevel = level;
+            if (armorLevel > 59.0f)
+                armorLevel += 4.5f * (armorLevel - 59.0f);
+            float armorFactor = 0.1f * armor / (8.5f * armorLevel + 40.0f);
+            float armorReduction = armorFactor > 0.0f ? armorFactor / (1.0f + armorFactor) : 0.0f;
+            if (armorReduction > 0.75f)
+                armorReduction = 0.75f;
+            float agilityPenalty = armorReduction * 0.50f;
+            if (agilityPenalty > 0.30f)
+                agilityPenalty = 0.30f;
+            float effectiveAgility = GetStat(STAT_AGILITY) * (1.0f - agilityPenalty);
+            float strengthBaseline = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+            float hybridBaseline = level * 2.0f + GetStat(STAT_STRENGTH) + effectiveAgility - 20.0f;
+            val2 = (strengthBaseline > hybridBaseline ? strengthBaseline : hybridBaseline) * 0.80f;
+        }
+        else if (IsClass(CLASS_PALIN, CLASS_CONTEXT_STATS) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))
+        {
+            val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+        }"""
+    # Keep the native PALADIN token exact in the emitted source. Writing it this
+    # way also makes a typo in this package visible to the unit tests below.
+    universal_melee = universal_melee.replace("CLASS_PALIN", "CLASS_PALADIN")
+    return replace_transitions(
+        text,
+        clean_melee,
+        (legacy_melee, universal_melee_95),
+        universal_melee,
+        "StatSystem Adventurer melee attack power",
+    )
+
+
+def patch_custom_loader(text: str) -> str:
+    clean_decl = "// This is where scripts' loading functions should be declared:\n// void MyExampleScript()"
+    legacy_decl = clean_decl + "\nvoid AddAdventurerCoreScripts();"
+    current_decl = legacy_decl + "\nvoid AddAdventurerCollectionScripts();"
+    text = replace_transition(
+        text,
+        clean_decl,
+        legacy_decl,
+        current_decl,
+        "Custom script declarations",
+    )
+
+    clean_body = "void AddCustomScripts()\n{\n    // MyExampleScript()\n}"
+    legacy_body = "void AddCustomScripts()\n{\n    // MyExampleScript()\n    AddAdventurerCoreScripts();\n}"
+    current_body = "void AddCustomScripts()\n{\n    // MyExampleScript()\n    AddAdventurerCoreScripts();\n    AddAdventurerCollectionScripts();\n}"
+    return replace_transition(
+        text,
+        clean_body,
+        legacy_body,
+        current_body,
+        "Custom script registration",
+    )
+
+
+def patch_player_storage(text: str) -> str:
+    old_braced = """    if ((proto->AllowableClass & getClassMask()) == 0 || (proto->AllowableRace & getRaceMask()) == 0)
+    {
+        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+    }"""
+    new_braced = """    if (((proto->AllowableClass & getClassMask()) == 0 && getClass() != CLASS_ADVENTURER) ||
+        (proto->AllowableRace & getRaceMask()) == 0)
+    {
+        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
+    }"""
+    old_unbraced = """    if ((proto->AllowableClass & getClassMask()) == 0 || (proto->AllowableRace & getRaceMask()) == 0)
+        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;"""
+    new_unbraced = """    if (((proto->AllowableClass & getClassMask()) == 0 && getClass() != CLASS_ADVENTURER) ||
+        (proto->AllowableRace & getRaceMask()) == 0)
+        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;"""
+
+    clean_counts = (text.count(old_braced), text.count(old_unbraced))
+    patched_counts = (text.count(new_braced), text.count(new_unbraced))
+    if clean_counts == (1, 1) and patched_counts == (0, 0):
+        text = text.replace(old_braced, new_braced, 1)
+        text = text.replace(old_unbraced, new_unbraced, 1)
+    elif clean_counts == (0, 0) and patched_counts == (1, 1):
+        pass
+    else:
+        raise PatchError(
+            "PlayerStorage AllowableClass checks: expected one braced and one "
+            f"unbraced anchor in the same state, found clean={clean_counts}, patched={patched_counts}"
+        )
+
+    # Playerbots adds BotCanUseItem class gates that stock AzerothCore does not
+    # contain. Adapt those gates when the extension is present, but their absence
+    # is not a compatibility failure for a stock AzerothCore installation.
+    bot_relics = (
+        ("ITEM_SUBCLASS_ARMOR_IDOL", "CLASS_DRUID"),
+        ("ITEM_SUBCLASS_ARMOR_TOTEM", "CLASS_SHAMAN"),
+        ("ITEM_SUBCLASS_ARMOR_LIBRAM", "CLASS_PALADIN"),
+        ("ITEM_SUBCLASS_ARMOR_SIGIL", "CLASS_DEATH_KNIGHT"),
+    )
+    for subclass, native_class in bot_relics:
+        old_bot = (
+            f"    if (proto->Class == ITEM_CLASS_ARMOR && proto->SubClass == {subclass} && "
+            f"!IsClass({native_class}, CLASS_CONTEXT_EQUIP_RELIC))"
+        )
+        new_bot = (
+            f"    if (getClass() != CLASS_ADVENTURER && proto->Class == ITEM_CLASS_ARMOR && "
+            f"proto->SubClass == {subclass} && !IsClass({native_class}, CLASS_CONTEXT_EQUIP_RELIC))"
+        )
+        text = replace_optional_once(
+            text, old_bot, new_bot, f"PlayerStorage optional Playerbots relic gate {subclass}"
+        )
+
+    old_shield = """        if (proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD && !(
+            IsClass(CLASS_PALADIN, CLASS_CONTEXT_EQUIP_SHIELDS)
+            || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_EQUIP_SHIELDS)
+            || IsClass(CLASS_SHAMAN, CLASS_CONTEXT_EQUIP_SHIELDS)))"""
+    new_shield = """        if (getClass() != CLASS_ADVENTURER && proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD && !(
+            IsClass(CLASS_PALADIN, CLASS_CONTEXT_EQUIP_SHIELDS)
+            || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_EQUIP_SHIELDS)
+            || IsClass(CLASS_SHAMAN, CLASS_CONTEXT_EQUIP_SHIELDS)))"""
+    text = replace_once(text, old_shield, new_shield, "PlayerStorage Adventurer shield gate")
+
+    direct_relics = (
+        ("ITEM_SUBCLASS_ARMOR_LIBRAM", "CLASS_PALADIN"),
+        ("ITEM_SUBCLASS_ARMOR_IDOL", "CLASS_DRUID"),
+        ("ITEM_SUBCLASS_ARMOR_TOTEM", "CLASS_SHAMAN"),
+        ("ITEM_SUBCLASS_ARMOR_SIGIL", "CLASS_DEATH_KNIGHT"),
+    )
+    for subclass, native_class in direct_relics:
+        old_direct = (
+            f"        if (proto->SubClass == {subclass} && "
+            f"!IsClass({native_class}, CLASS_CONTEXT_EQUIP_RELIC))"
+        )
+        new_direct = (
+            f"        if (getClass() != CLASS_ADVENTURER && proto->SubClass == {subclass} && "
+            f"!IsClass({native_class}, CLASS_CONTEXT_EQUIP_RELIC))"
+        )
+        text = replace_once(text, old_direct, new_direct, f"PlayerStorage relic gate {subclass}")
+
+    old_armor_rank = """    if (proto->Class == ITEM_CLASS_ARMOR && proto->SubClass > ITEM_SUBCLASS_ARMOR_MISC && proto->SubClass < ITEM_SUBCLASS_ARMOR_BUCKLER &&
+        proto->InventoryType != INVTYPE_CLOAK)"""
+    new_armor_rank = """    if (getClass() != CLASS_ADVENTURER && proto->Class == ITEM_CLASS_ARMOR &&
+        proto->SubClass > ITEM_SUBCLASS_ARMOR_MISC && proto->SubClass < ITEM_SUBCLASS_ARMOR_BUCKLER &&
+        proto->InventoryType != INVTYPE_CLOAK)"""
+    text = replace_once(text, old_armor_rank, new_armor_rank, "PlayerStorage Adventurer armor hierarchy")
+
+    old_relic = """        case INVTYPE_RELIC:
+        {
+            switch (proto->SubClass)"""
+    new_relic = """        case INVTYPE_RELIC:
+        {
+            // Adventurer is classless: every relic subtype may use the ranged
+            // equipment slot. Native classes keep their stock restrictions.
+            if (getClass() == CLASS_ADVENTURER)
+            {
+                slots[0] = EQUIPMENT_SLOT_RANGED;
+                break;
+            }
+
+            switch (proto->SubClass)"""
+    return replace_once(text, old_relic, new_relic, "PlayerStorage Adventurer relic slot")
+
+
+def patch_player_cpp(text: str) -> str:
+    text = replace_once(
+        text,
+        "    if (!(pProto->AllowableClass & getClassMask()) && pProto->Bonding == BIND_WHEN_PICKED_UP && !IsGameMaster())",
+        "    if (getClass() != CLASS_ADVENTURER && !(pProto->AllowableClass & getClassMask()) && pProto->Bonding == BIND_WHEN_PICKED_UP && !IsGameMaster())",
+        "Player vendor AllowableClass check",
+    )
+
+    clean_base_dodge = """        0.024211f, // Warlock
+        0.0f,      // ??
+        0.056097f  // Druid"""
+    legacy_base_dodge = """        0.024211f, // Warlock
+        0.053292f, // Adventurer: 95% of Druid's strongest native base dodge
+        0.056097f  // Druid"""
+    universal_base_dodge_95 = """        0.024211f, // Warlock
+        0.053292f, // Adventurer fallback; runtime compares complete native formulas
+        0.056097f  // Druid"""
+    universal_base_dodge = """        0.024211f, // Warlock
+        0.044878f, // Adventurer 80% fallback; runtime compares complete native formulas
+        0.056097f  // Druid"""
+    text = replace_transitions(
+        text,
+        clean_base_dodge,
+        (legacy_base_dodge, universal_base_dodge_95),
+        universal_base_dodge,
+        "Player Adventurer base dodge",
+    )
+
+    clean_dodge_coefficient = """        0.97f / 1.15f,  // Warlock (?)
+        0.0f,           // ??
+        2.00f / 1.15f   // Druid"""
+    legacy_dodge_coefficient = """        0.97f / 1.15f,  // Warlock (?)
+        2.00f / 1.15f,  // Adventurer; its class-10 crit curve already carries the 95% scale
+        2.00f / 1.15f   // Druid"""
+    universal_dodge_coefficient = """        0.97f / 1.15f,  // Warlock (?)
+        2.00f / 1.15f,  // Adventurer fallback; runtime branch keeps native formulas intact
+        2.00f / 1.15f   // Druid"""
+    text = replace_transition(
+        text,
+        clean_dodge_coefficient,
+        legacy_dodge_coefficient,
+        universal_dodge_coefficient,
+        "Player Adventurer agility-to-dodge coefficient",
+    )
+
+    # These anchors intentionally include the blank separator present in the
+    # validated AzerothCore shape. Keeping the exact source shape makes a
+    # mismatch fail before mutation instead of silently patching another core.
+    melee_anchor = """    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+
+    GtChanceToMeleeCritBaseEntry const* critBase  = sGtChanceToMeleeCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToMeleeCritEntry     const* critRatio = sGtChanceToMeleeCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
+    melee_runtime_95 = """    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+
+    if (pclass == CLASS_ADVENTURER)
+    {
+        // Compare every native class as a complete formula; never mix a base
+        // from one class with the Agility coefficient from another.
+        float bestCrit = 0.0f;
+        bool found = false;
+        for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
+        {
+            if (nativeClass == CLASS_ADVENTURER)
+                continue;
+
+            GtChanceToMeleeCritBaseEntry const* nativeBase = sGtChanceToMeleeCritBaseStore.LookupEntry(nativeClass - 1);
+            GtChanceToMeleeCritEntry const* nativeRatio = sGtChanceToMeleeCritStore.LookupEntry((nativeClass - 1) * GT_MAX_LEVEL + level - 1);
+            if (!nativeBase || !nativeRatio)
+                continue;
+
+            float candidate = nativeBase->base + GetStat(STAT_AGILITY) * nativeRatio->ratio;
+            if (!found || candidate > bestCrit)
+            {
+                bestCrit = candidate;
+                found = true;
+            }
+        }
+        return (found ? bestCrit * 0.95f : 0.0f) * 100.0f;
+    }
+
+    GtChanceToMeleeCritBaseEntry const* critBase  = sGtChanceToMeleeCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToMeleeCritEntry     const* critRatio = sGtChanceToMeleeCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
+    melee_runtime = """    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+
+    if (pclass == CLASS_ADVENTURER)
+    {
+        // Armor trades away part of physical Agility without changing the raw
+        // stat or its Armor contribution, avoiding a recursive Armor/Agility loop.
+        float armor = float(GetArmor());
+        float armorLevel = float(GetLevel());
+        if (armorLevel > 59.0f)
+            armorLevel += 4.5f * (armorLevel - 59.0f);
+        float armorFactor = 0.1f * armor / (8.5f * armorLevel + 40.0f);
+        float armorReduction = armorFactor > 0.0f ? armorFactor / (1.0f + armorFactor) : 0.0f;
+        if (armorReduction > 0.75f)
+            armorReduction = 0.75f;
+        float agilityPenalty = armorReduction * 0.50f;
+        if (agilityPenalty > 0.30f)
+            agilityPenalty = 0.30f;
+        float effectiveAgility = GetStat(STAT_AGILITY) * (1.0f - agilityPenalty);
+
+        // Compare every native class as a complete formula; never mix a base
+        // from one class with the Agility coefficient from another.
+        float bestCrit = 0.0f;
+        bool found = false;
+        for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
+        {
+            if (nativeClass == CLASS_ADVENTURER)
+                continue;
+
+            GtChanceToMeleeCritBaseEntry const* nativeBase = sGtChanceToMeleeCritBaseStore.LookupEntry(nativeClass - 1);
+            GtChanceToMeleeCritEntry const* nativeRatio = sGtChanceToMeleeCritStore.LookupEntry((nativeClass - 1) * GT_MAX_LEVEL + level - 1);
+            if (!nativeBase || !nativeRatio)
+                continue;
+
+            float candidate = nativeBase->base + effectiveAgility * nativeRatio->ratio;
+            if (!found || candidate > bestCrit)
+            {
+                bestCrit = candidate;
+                found = true;
+            }
+        }
+        return (found ? bestCrit * 0.80f : 0.0f) * 100.0f;
+    }
+
+    GtChanceToMeleeCritBaseEntry const* critBase  = sGtChanceToMeleeCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToMeleeCritEntry     const* critRatio = sGtChanceToMeleeCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
+    text = replace_transitions(
+        text,
+        melee_anchor,
+        (melee_runtime_95,),
+        melee_runtime,
+        "Player Adventurer complete melee crit formula",
+    )
+
+    dodge_anchor = """    float base_agility = GetCreateStat(STAT_AGILITY) * GetPctModifierValue(UnitMods(UNIT_MOD_STAT_START + AsUnderlyingType(STAT_AGILITY)), BASE_PCT);
+    float bonus_agility = GetStat(STAT_AGILITY) - base_agility;
+
+    // calculate diminishing (green in char screen) and non-diminishing (white) contribution
+    diminishing = 100.0f * bonus_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1];
+    nondiminishing = 100.0f * (dodge_base[pclass - 1] + base_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1]);"""
+    dodge_runtime_95 = """    float base_agility = GetCreateStat(STAT_AGILITY) * GetPctModifierValue(UnitMods(UNIT_MOD_STAT_START + AsUnderlyingType(STAT_AGILITY)), BASE_PCT);
+    float bonus_agility = GetStat(STAT_AGILITY) - base_agility;
+
+    if (pclass == CLASS_ADVENTURER)
+    {
+        // Keep each native dodge model intact (base dodge plus that class's own
+        // Agility conversion), choose the best total, then apply the 5% penalty.
+        float bestDiminishing = 0.0f;
+        float bestNondiminishing = 0.0f;
+        float bestTotal = 0.0f;
+        bool found = false;
+        for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
+        {
+            if (nativeClass == CLASS_ADVENTURER)
+                continue;
+
+            GtChanceToMeleeCritEntry const* nativeRatio = sGtChanceToMeleeCritStore.LookupEntry((nativeClass - 1) * GT_MAX_LEVEL + level - 1);
+            if (!nativeRatio)
+                continue;
+
+            float candidateDiminishing = 100.0f * bonus_agility * nativeRatio->ratio * crit_to_dodge[nativeClass - 1];
+            float candidateNondiminishing = 100.0f * (dodge_base[nativeClass - 1] + base_agility * nativeRatio->ratio * crit_to_dodge[nativeClass - 1]);
+            float candidateTotal = candidateDiminishing + candidateNondiminishing;
+            if (!found || candidateTotal > bestTotal)
+            {
+                bestDiminishing = candidateDiminishing;
+                bestNondiminishing = candidateNondiminishing;
+                bestTotal = candidateTotal;
+                found = true;
+            }
+        }
+
+        diminishing = found ? bestDiminishing * 0.95f : 0.0f;
+        nondiminishing = found ? bestNondiminishing * 0.95f : 0.0f;
+        return;
+    }
+
+    // calculate diminishing (green in char screen) and non-diminishing (white) contribution
+    diminishing = 100.0f * bonus_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1];
+    nondiminishing = 100.0f * (dodge_base[pclass - 1] + base_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1]);"""
+    dodge_runtime = """    float base_agility = GetCreateStat(STAT_AGILITY) * GetPctModifierValue(UnitMods(UNIT_MOD_STAT_START + AsUnderlyingType(STAT_AGILITY)), BASE_PCT);
+    float bonus_agility = GetStat(STAT_AGILITY) - base_agility;
+
+    if (pclass == CLASS_ADVENTURER)
+    {
+        // Total Armor reduces only the Agility contribution used for physical
+        // avoidance/output: half of Armor DR, capped at a 30% Agility penalty.
+        float armor = float(GetArmor());
+        float armorLevel = float(GetLevel());
+        if (armorLevel > 59.0f)
+            armorLevel += 4.5f * (armorLevel - 59.0f);
+        float armorFactor = 0.1f * armor / (8.5f * armorLevel + 40.0f);
+        float armorReduction = armorFactor > 0.0f ? armorFactor / (1.0f + armorFactor) : 0.0f;
+        if (armorReduction > 0.75f)
+            armorReduction = 0.75f;
+        float agilityPenalty = armorReduction * 0.50f;
+        if (agilityPenalty > 0.30f)
+            agilityPenalty = 0.30f;
+        float agilityScale = 1.0f - agilityPenalty;
+        float effectiveBaseAgility = base_agility * agilityScale;
+        float effectiveBonusAgility = bonus_agility * agilityScale;
+
+        // Keep each native dodge model intact, choose the best complete model,
+        // then keep 80% of it as the Adventurer chassis baseline.
+        float bestDiminishing = 0.0f;
+        float bestNondiminishing = 0.0f;
+        float bestTotal = 0.0f;
+        bool found = false;
+        for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
+        {
+            if (nativeClass == CLASS_ADVENTURER)
+                continue;
+
+            GtChanceToMeleeCritEntry const* nativeRatio = sGtChanceToMeleeCritStore.LookupEntry((nativeClass - 1) * GT_MAX_LEVEL + level - 1);
+            if (!nativeRatio)
+                continue;
+
+            float candidateDiminishing = 100.0f * effectiveBonusAgility * nativeRatio->ratio * crit_to_dodge[nativeClass - 1];
+            float candidateNondiminishing = 100.0f * (dodge_base[nativeClass - 1] + effectiveBaseAgility * nativeRatio->ratio * crit_to_dodge[nativeClass - 1]);
+            float candidateTotal = candidateDiminishing + candidateNondiminishing;
+            if (!found || candidateTotal > bestTotal)
+            {
+                bestDiminishing = candidateDiminishing;
+                bestNondiminishing = candidateNondiminishing;
+                bestTotal = candidateTotal;
+                found = true;
+            }
+        }
+
+        diminishing = found ? bestDiminishing * 0.80f : 0.0f;
+        nondiminishing = found ? bestNondiminishing * 0.80f : 0.0f;
+        return;
+    }
+
+    // calculate diminishing (green in char screen) and non-diminishing (white) contribution
+    diminishing = 100.0f * bonus_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1];
+    nondiminishing = 100.0f * (dodge_base[pclass - 1] + base_agility * dodgeRatio->ratio * crit_to_dodge[pclass - 1]);"""
+    text = replace_transitions(
+        text,
+        dodge_anchor,
+        (dodge_runtime_95,),
+        dodge_runtime,
+        "Player Adventurer complete dodge formula",
+    )
+
+    spell_anchor = """    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+
+    GtChanceToSpellCritBaseEntry const* critBase  = sGtChanceToSpellCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToSpellCritEntry     const* critRatio = sGtChanceToSpellCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
+    spell_runtime_95 = """    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+
+    if (pclass == CLASS_ADVENTURER)
+    {
+        // Compare complete native spell-crit formulas against current Intellect.
+        float bestCrit = 0.0f;
+        bool found = false;
+        for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
+        {
+            if (nativeClass == CLASS_ADVENTURER)
+                continue;
+
+            GtChanceToSpellCritBaseEntry const* nativeBase = sGtChanceToSpellCritBaseStore.LookupEntry(nativeClass - 1);
+            GtChanceToSpellCritEntry const* nativeRatio = sGtChanceToSpellCritStore.LookupEntry((nativeClass - 1) * GT_MAX_LEVEL + level - 1);
+            if (!nativeBase || !nativeRatio)
+                continue;
+
+            float candidate = nativeBase->base + GetStat(STAT_INTELLECT) * nativeRatio->ratio;
+            if (!found || candidate > bestCrit)
+            {
+                bestCrit = candidate;
+                found = true;
+            }
+        }
+        return (found ? bestCrit * 0.95f : 0.0f) * 100.0f;
+    }
+
+    GtChanceToSpellCritBaseEntry const* critBase  = sGtChanceToSpellCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToSpellCritEntry     const* critRatio = sGtChanceToSpellCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
+    spell_runtime = """    if (level > GT_MAX_LEVEL)
+        level = GT_MAX_LEVEL;
+
+    if (pclass == CLASS_ADVENTURER)
+    {
+        // Compare complete native spell-crit formulas against current Intellect.
+        float bestCrit = 0.0f;
+        bool found = false;
+        for (uint32 nativeClass = CLASS_WARRIOR; nativeClass < MAX_CLASSES; ++nativeClass)
+        {
+            if (nativeClass == CLASS_ADVENTURER)
+                continue;
+
+            GtChanceToSpellCritBaseEntry const* nativeBase = sGtChanceToSpellCritBaseStore.LookupEntry(nativeClass - 1);
+            GtChanceToSpellCritEntry const* nativeRatio = sGtChanceToSpellCritStore.LookupEntry((nativeClass - 1) * GT_MAX_LEVEL + level - 1);
+            if (!nativeBase || !nativeRatio)
+                continue;
+
+            float candidate = nativeBase->base + GetStat(STAT_INTELLECT) * nativeRatio->ratio;
+            if (!found || candidate > bestCrit)
+            {
+                bestCrit = candidate;
+                found = true;
+            }
+        }
+        return (found ? bestCrit * 0.80f : 0.0f) * 100.0f;
+    }
+
+    GtChanceToSpellCritBaseEntry const* critBase  = sGtChanceToSpellCritBaseStore.LookupEntry(pclass - 1);
+    GtChanceToSpellCritEntry     const* critRatio = sGtChanceToSpellCritStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);"""
+    return replace_transitions(
+        text,
+        spell_anchor,
+        (spell_runtime_95,),
+        spell_runtime,
+        "Player Adventurer complete spell crit formula",
+    )
+
+
+TRANSFORMS = {
+    "src/server/shared/SharedDefines.h": patch_shared_defines,
+    "src/server/shared/enuminfo_SharedDefines.cpp": patch_enuminfo,
+    "src/server/game/Entities/Unit/StatSystem.cpp": patch_stat_system,
+    "src/server/game/Entities/Player/PlayerStorage.cpp": patch_player_storage,
+    "src/server/game/Entities/Player/Player.cpp": patch_player_cpp,
+    "src/server/scripts/Custom/custom_script_loader.cpp": patch_custom_loader,
+}
+
+PAYLOAD_FILES = (
+    "src/server/scripts/Custom/adventurer_core.cpp",
+    "src/server/scripts/Custom/adventurer_collections.cpp",
+)
+
+
+def plan(core: Path, payload_root: Path, *, allow_payload_replace: bool = False) -> list[PlannedFile]:
+    planned: list[PlannedFile] = []
+    for relative, transform in TRANSFORMS.items():
+        path = core / relative
+        if not path.is_file():
+            raise PatchError(f"Required AzerothCore source file is missing: {relative}")
+        original = path.read_bytes()
+        try:
+            source = original.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise PatchError(f"{relative}: expected UTF-8 source") from exc
+        patched = transform(source).encode("utf-8")
+        planned.append(PlannedFile(relative, original, patched))
+
+    for payload_rel in PAYLOAD_FILES:
+        payload = payload_root / payload_rel
+        if not payload.is_file():
+            raise PatchError(f"Installer payload is missing: {payload}")
+        destination = core / payload_rel
+        original = destination.read_bytes() if destination.exists() else None
+        patched = payload.read_bytes()
+        if original is not None and original != patched and not allow_payload_replace:
+            raise PatchError(
+                f"{payload_rel}: target already exists with content not owned by this package"
+            )
+        planned.append(PlannedFile(payload_rel, original, patched))
+    return planned

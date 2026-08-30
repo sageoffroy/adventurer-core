@@ -1,0 +1,141 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Python tools
+        run: python -m py_compile tools/*.py
+      - name: Test subclass integration
+        run: python tests/test_spelldraft_subclasses.py
+      - name: Test core patch fixtures
+        run: python tests/test_core_patch.py
+      - name: Test clean install contract
+        run: python tests/test_clean_install_contract.py
+      - name: Test client patch
+        run: python tests/test_client.py
+      - name: Test SpellDraft runtime installer
+        run: python tests/test_spelldraft_runtime.py
+      - name: Test SpellDraft design catalog
+        run: python tests/test_spelldraft_design_catalog.py
+      - name: Test SpellDraft v1 contract
+        run: python tests/test_spelldraft_v1.py
+      - name: Test legacy fixed-talent cleanup
+        run: python tests/test_legacy_talent_cleanup.py
+      - name: Test upgrade contract
+        run: python tests/test_upgrade.py
+      - name: Test blessing charges
+        run: python tests/test_bless_charges.py
+      - name: Test chassis audit
+        run: python tests/test_chassis_audit.py
+      - name: Test database tools
+        run: python tests/test_database.py
+      - name: Test DBC base patch
+        run: python tests/test_dbc.py
+      - name: Test installer safety
+        run: python tests/test_installer.py
+      - name: Test Playerbots runtime
+        run: python tests/test_playerbots_runtime.py
+      - name: Test Playerbots source patch
+        run: python tests/test_playerbots_source_patch.py
+      - name: Test resource HUD
+        run: python tests/test_resource_hud.py
+      - name: Test resource runtime
+        run: python tests/test_resources.py
+      - name: Test authoritative draft pool
+        run: python tests/test_spelldraft_authoritative_pool.py
+      - name: Test catalog sync
+        run: python tests/test_spelldraft_catalog_sync.py
+      - name: Test SpellDraft config
+        run: python tests/test_spelldraft_config.py
+      - name: Test generated characters
+        run: python tests/test_test_characters.py
+      - name: Test world migrations
+        run: python tests/test_world.py
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Check shell entry points
+        run: bash -n apply.sh preflight.sh verify.sh rollback.sh update.sh
+      - name: Require executable shell entry points
+        run: test -x apply.sh && test -x preflight.sh && test -x verify.sh && test -x rollback.sh && test -x update.sh
+      - name: Checkout supported Playerbots core baseline
+        uses: actions/checkout@v4
+        with:
+          repository: mod-playerbots/azerothcore-wotlk
+          ref: 9fb906bb7296212ff42fc95ff73a92aaf8554f0d
+          path: _supported-core
+          fetch-depth: 1
+      - name: Smoke-test clean core source patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / "tools"))
+          from core_patch import plan
+
+          core = (root / "_supported-core").resolve()
+          payload = (root / "payload" / "core").resolve()
+          planned = plan(core, payload)
+          runtime_rel = "src/server/scripts/Custom/adventurer_core.cpp"
+          collection_rel = "src/server/scripts/Custom/adventurer_collections.cpp"
+          runtime = next(item for item in planned if item.relative_path == runtime_rel)
+          collection = next(item for item in planned if item.relative_path == collection_rel)
+
+          assert len(planned) == 8
+          assert runtime.original is None
+          assert runtime.patched == (payload / runtime_rel).read_bytes()
+          assert collection.original is None
+          assert collection.patched == (payload / collection_rel).read_bytes()
+
+          text = runtime.patched.decode("utf-8")
+          assert "ADVENTURER_MAX_RAGE = 1000" in text
+          assert "ADVENTURER_MAX_ENERGY = 100" in text
+          assert 'ADVENTURER_COMBO_PREFIX[] = "AdventurerCP"' in text
+          assert 'ADVENTURER_DRAFT_PREFIX[] = "AdventurerDraft"' in text
+          assert "SelectWeightedCards" in text
+          assert "GetNextSpellInChain" in text
+          assert "character_settings" in text
+          for token in (
+              "CLASS_DEATH_KNIGHT",
+              "POWER_RUNIC_POWER",
+              "POWER_RUNE",
+              "MAX_RUNES",
+              "GetRuneCooldown",
+              "ResyncRunes",
+              "AddRunePower",
+              "PLAYERHOOK_ON_PLAYER_IS_CLASS",
+          ):
+              assert token not in text, token
+
+          collection_text = collection.patched.decode("utf-8")
+          assert 'TALENT_COLLECTION_REQUEST[] = "ADRAFT_TALENTS"' in collection_text
+          assert 'ADVENTURER_SUBCLASS_SKILLS[] = {900, 901, 902, 903}' in collection_text
+          assert '"card_subclasses.csv"' in collection_text
+          assert 'payload << "T|C|"' in collection_text
+
+          player_h = (core / "src/server/game/Entities/Player/Player.h").read_text(encoding="utf-8")
+          spell_mgr_h = (core / "src/server/game/Spells/SpellMgr.h").read_text(encoding="utf-8")
+          player_script_h = (core / "src/server/game/Scripting/ScriptDefines/PlayerScript.h").read_text(encoding="utf-8")
+          settings_h = (core / "src/server/game/Entities/Player/PlayerSettings.h").read_text(encoding="utf-8")
+
+          assert "void SetAcceptWhispers(bool on)" in player_h
+          assert "void SetFreeTalentPoints(uint32 points);" in player_h
+          assert "void removeSpell(uint32 spellId, uint8 removeSpecMask, bool onlyTemporary);" in player_h
+          assert "uint32 GetFirstSpellInChain(uint32 spell_id) const;" in spell_mgr_h
+          assert "uint32 GetNextSpellInChain(uint32 spell_id) const;" in spell_mgr_h
+          assert "PLAYERHOOK_CAN_PLAYER_USE_PRIVATE_CHAT" in player_script_h
+          assert "std::string& /*msg*/, Player* /*receiver*/" in player_script_h
+          assert 'existing "source" row from character_settings' in settings_h
+
+          print("Supported clean-core no-DK + SpellDraft API smoke test OK")
+          PY

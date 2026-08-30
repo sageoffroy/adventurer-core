@@ -1,0 +1,201 @@
+id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unlocks;replaces_previous;name
+1;battle_stance;active;1;common;100;2457+100;;;24,25,26,27;0;Actitud de batalla
+2;fireball;active;1;common;100;133;;;104;0;Bola de Fuego
+3;frostbolt;active;4;common;100;116;;;105;0;Descarga de Escarcha
+4;shadow_bolt;active;1;common;100;686;;;;0;Descarga de las Sombras
+5;smite;active;1;common;100;585;;;;0;Punición
+6;lightning_bolt;active;1;common;100;403;;;;0;Descarga de relámpagos
+7;wrath;active;1;common;100;5176;;;;0;Cólera
+8;heroic_strike;active;1;common;110;78;;;107;0;Golpe heroico
+9;rejuvenation;active;4;common;100;774;;;;0;Rejuvenecimiento
+10;stealth;active;1;uncommon;120;1784+921+6770;;;;0;Sigilo
+12;arcane_intellect;active;1;common;90;1459;;;;0;Intelecto Arcano
+13;healing_wave;active;1;common;100;331;;;;0;Ola de sanación
+14;sinister_strike;active;1;common;100;1752;;;50,55;0;Golpe siniestro
+15;defensive_stance;active;10;common;100;71+355;;;24,25;0;Actitud defensiva
+16;healing_touch;active;1;common;100;5185;;;;0;Toque de sanación
+17;mark_of_the_wild;active;1;uncommon;100;1126;;;;0;Marca de lo salvaje
+18;moonfire;active;4;uncommon;100;8921;;;;0;Fuego lunar
+19;thorns;active;6;common;100;467;;;;0;Espinas
+20;entangling_roots;active;8;uncommon;100;339;;;;0;Raíces enredadoras
+21;bear_form;active;10;rare;100;5487+6807+6795+99;;;;0;Forma de oso
+22;teleport_moonglade;active;10;common;80;18960;;;;0;Teletransporte: Claro de la Luna
+23;battle_shout;active;1;common;100;6673;;;;0;Grito de batalla
+24;rend;active;4;common;100;772;;1:1|15:1;;0;Desgarrar
+25;thunder_clap;active;6;common;100;6343;;1:1|15:1;;0;Atronar
+26;victory_rush;active;6;common;100;34428;1:1;;;0;Ataque de la victoria
+27;hamstring;active;8;common;100;1715;1:1;;;0;Seccionar
+28;bloodrage;active;10;common;100;2687;;;;0;Ira sangrienta
+29;sunder_armor;active;10;common;100;7386;;;;0;Hender armadura
+30;holy_light;active;1;common;100;635;;;;0;Luz Sagrada
+31;seal_of_righteousness;active;1;common;100;21084;;;34;0;Sello de rectitud
+32;devotion_aura;active;1;common;100;465;;;;0;Aura de devoción
+33;blessing_of_might;active;4;common;100;19740;;;;0;Bendición de poderío
+34;judgement_of_light;active;4;common;100;20271;31:1;;;0;Sentencia de Luz
+35;divine_protection;active;6;common;100;498;;;;0;Protección divina
+36;hammer_of_justice;active;8;common;100;853;;;;0;Martillo de Justicia
+37;purify;active;8;common;100;1152;;;;0;Purificar
+38;hand_of_protection;active;10;common;100;1022;;;;0;Mano de protección
+39;lay_on_hands;active;10;common;100;633;;;;0;Imposición de manos
+40;raptor_strike;active;1;common;100;2973;;;;0;Golpe de raptor
+41;track_beasts;active;1;common;90;1494;;;;0;Rastrear bestias
+42;aspect_of_the_monkey;active;4;common;100;13163;;;;0;Aspecto del mono
+43;serpent_sting;active;4;common;100;1978;;;;0;Picadura de serpiente
+44;arcane_shot;active;6;common;100;3044;;;;0;Disparo Arcano
+45;hunters_mark;active;6;common;90;1130;;;;0;Marca del cazador
+46;concussive_shot;active;8;common;100;5116;;;;0;Disparo de conmoción
+47;aspect_of_the_hawk;active;10;common;100;13165;;;;0;Aspecto del halcón
+48;track_humanoids;active;10;common;90;19883;;;;0;Rastrear humanoides
+49;tame_beast;active;10;epic;100;1515+883+2641+6991+982;;;;0;Domesticar bestia
+50;eviscerate;active;1;common;100;2098;;14:1|51:1|53:1;;0;Eviscerar
+51;backstab;active;4;common;100;53;;;50,55;0;Puñalada
+53;gouge;active;6;common;100;1776;;;50,55;0;Gubia
+54;evasion;active;8;common;100;5277;;;;0;Evasión
+55;slice_and_dice;active;10;common;100;5171;;14:1|51:1|53:1;;0;Hacer picadillo
+56;sprint;active;10;common;100;2983;;;;0;Sprint
+57;lesser_heal;active;1;common;100;2050;;;;0;Sanación inferior
+58;power_word_fortitude;active;1;common;100;1243;;;;0;Palabra de poder: entereza
+59;shadow_word_pain;active;4;common;100;589;;;;0;Palabra de las Sombras: dolor
+60;power_word_shield;active;6;common;100;17;;;;0;Palabra de poder: escudo
+61;fade;active;8;common;90;586;;;;0;Desvanecerse
+62;renew;active;8;common;100;139;;;;0;Renovar
+63;mind_blast;active;10;common;100;8092;;;;0;Explosión mental
+64;resurrection;active;10;common;80;2006;;;;0;Resurrección
+65;rockbiter_weapon;active;1;common;100;8017;;;;0;Arma Muerdepiedras
+66;earth_shock;active;4;common;100;8042;;;;0;Choque de tierra
+67;stoneskin_totem;active;4;common;100;8071;;;;0;Tótem Piel de piedra
+68;earthbind_totem;active;6;common;100;2484;;;;0;Tótem Nexo terrestre
+69;lightning_shield;active;8;common;100;324;;;;0;Escudo de relámpagos
+70;stoneclaw_totem;active;8;common;100;5730;;;;0;Tótem Garra de piedra
+71;flame_shock;active;10;common;100;8050;;;;0;Choque de llamas
+72;flametongue_weapon;active;10;common;100;8024;;;;0;Arma Lengua de Fuego
+73;searing_totem;active;10;common;100;3599;;;;0;Tótem abrasador
+74;strength_of_earth_totem;active;10;common;100;8075;;;;0;Tótem Fuerza de la tierra
+75;frost_armor;active;1;common;100;168;;;;0;Armadura de Escarcha
+76;conjure_water;active;4;common;80;5504;;;;0;Crear agua
+77;conjure_food;active;6;common;80;587;;;;0;Crear comida
+78;fire_blast;active;6;common;100;2136;;;;0;Explosión de Fuego
+79;arcane_missiles;active;8;common;100;5143;;;;0;Misiles Arcanos
+80;polymorph;active;8;common;100;118;;;;0;Polimorfia
+81;frost_nova;active;10;common;100;122;;;;0;Nova de Escarcha
+82;demon_skin;active;1;common;100;687;;;;0;Piel de demonio
+83;immolate;active;1;common;100;348;;;;0;Inmolar
+84;summon_imp;active;1;common;100;688;;;;0;Invocar diablillo
+85;corruption;active;4;common;100;172;;;;0;Corrupción
+86;curse_of_weakness;active;4;common;100;702;;;;0;Maldición de debilidad
+87;life_tap;active;6;common;100;1454;;;;0;Transfusión de vida
+88;curse_of_agony;active;8;common;100;980;;;;0;Maldición de agonía
+89;fear;active;8;common;100;5782;;;;0;Miedo
+90;drain_soul;active;10;common;100;1120;;;91,92;0;Drenar alma
+91;create_healthstone;active;10;common;90;6201;90:1;;;0;Crear piedra de salud
+92;summon_voidwalker;active;10;common;100;697;90:1;;;0;Invocar abisario
+108;regrowth;active;12;common;100;8936;;;;0;Recrecimiento
+109;enrage;active;12;common;100;5229;21:1;;;0;Enfurecer
+110;revive;active;12;uncommon;100;50769;;;;0;Revivir
+111;cure_poison;active;14;uncommon;100;8946;;;;0;Curar envenenamiento
+112;bash;active;14;common;100;5211;21:1;;;0;Azote
+113;aquatic_form;active;16;uncommon;100;1066;;;;0;Forma acuática
+114;swipe_bear;active;16;common;100;779;21:1;;;0;Flagelo (oso)
+115;faerie_fire;active;18;uncommon;100;770;;;;0;Fuego feérico
+116;faerie_fire_feral;active;18;uncommon;100;16857;;21:1|118:1;;0;Fuego feérico (feral)
+117;hibernate;active;18;rare;100;2637;;;;0;Hibernar
+118;cat_form;active;20;rare;100;768+1082+5215+1079;;;;0;Forma felina
+119;rebirth;active;20;legendary;100;20484;;;;0;Renacer
+120;starfire;active;20;common;100;2912;;;;0;Fuego estelar
+121;overpower;active;12;uncommon;100;7384;1:1;;;0;Abrumar
+122;shield_bash;active;12;uncommon;100;72;;1:1|15:1;;0;Azote de escudo
+123;revenge;active;14;uncommon;100;6572;15:1;;;0;Revancha
+124;demoralizing_shout;active;14;common;100;1160;;;;0;Grito desmoralizador
+125;shield_block;active;16;rare;100;2565;15:1;;;0;Bloquear con escudo
+126;mocking_blow;active;16;uncommon;100;694;;1:1|15:1;;0;Falsa arremetida
+127;disarm;active;18;rare;100;676;15:1;;;0;Desarmar
+128;cleave;active;20;common;100;845;;;;0;Rajar
+129;retaliation;active;20;epic;100;20230;1:1;;;0;Represalias
+130;redemption;active;12;uncommon;100;7328;;;;0;Redención
+131;judgement_of_wisdom;active;12;common;100;53408;31:1;;;0;Sentencia de sabiduría
+132;blessing_of_wisdom;active;14;common;100;19742;;;;0;Bendición de sabiduría
+133;righteous_defense;active;14;uncommon;100;31789;;;;0;Defensa recta
+134;hand_of_reckoning;active;16;uncommon;100;62124;;;;0;Mano de expiación
+135;righteous_fury;active;16;uncommon;100;25780;;;;0;Furia recta
+136;retribution_aura;active;16;uncommon;100;7294;;;;0;Aura de reprensión
+137;hand_of_freedom;active;18;rare;100;1044;;;;0;Mano de libertad
+138;consecration;active;20;rare;100;26573;;;;0;Consagración
+139;exorcism;active;20;common;100;879;;;;0;Exorcismo
+140;flash_of_light;active;20;common;100;19750;;;;0;Destello de Luz
+141;track_undead_paladin;active;20;uncommon;100;5502;;;;0;Detectar no-muertos
+142;blessing_of_kings;active;20;rare;100;20217;;;;0;Bendición de reyes
+143;mend_pet;active;12;common;100;136;49:1;;;0;Aliviar mascota
+144;wing_clip;active;12;common;100;2974;;;;0;Cortar alas
+145;distracting_shot;active;12;uncommon;100;20736;;;;0;Disparo de distracción
+146;eagle_eye;active;14;uncommon;100;6197;;;;0;Ojo de águila
+147;scare_beast;active;14;rare;100;1513;;;;0;Asustar bestia
+148;eyes_of_the_beast;active;14;uncommon;100;1002;49:1;;;0;Ojos de la bestia
+149;aspect_of_the_cheetah;active;16;rare;100;5118;;;;0;Aspecto del guepardo
+150;immolation_trap;active;16;uncommon;100;13795;;;;0;Trampa de inmolación
+151;mongoose_bite;active;16;common;100;1495;;;;0;Mordedura de mangosta
+152;multi_shot;active;18;rare;100;2643;;;;0;Multidisparo
+153;track_undead_hunter;active;18;common;100;19884;;;;0;Rastrear no-muertos
+154;aspect_of_the_viper;active;20;rare;100;34074;;;;0;Aspecto de la víbora
+155;disengage;active;20;rare;100;781;;;;0;Separación
+156;freezing_trap;active;20;epic;100;1499;;;;0;Trampa congelante
+157;kick;active;12;common;100;1766;;;;0;Patada
+158;garrote;active;14;uncommon;100;703;10:1;;;0;Garrote
+159;expose_armor;active;14;uncommon;100;8647;;14:1|51:1|53:1;;0;Exponer armadura
+160;feint;active;16;uncommon;100;1966;;;;0;Amago
+161;pick_lock;active;16;common;100;1804;;;;0;Forzar cerradura
+162;ambush;active;18;common;100;8676;10:1;;;0;Emboscada
+163;dismantle;active;20;uncommon;100;51722;;;;0;Desmantelar
+164;rupture;active;20;uncommon;100;1943;;14:1|51:1|53:1;;0;Ruptura
+165;inner_fire;active;12;common;100;588;;;;0;Fuego interno
+166;cure_disease;active;14;common;100;528;;;;0;Curar enfermedad
+167;psychic_scream;active;14;rare;100;8122;;;;0;Alarido psíquico
+168;heal;active;16;common;100;2054;;;;0;Sanación
+169;dispel_magic;active;18;uncommon;100;527;;;;0;Disipar magia
+170;fear_ward;active;20;common;100;6346;;;;0;Resguardo de miedo
+171;flash_heal;active;20;uncommon;100;2061;;;;0;Sanación relámpago
+172;holy_fire;active;20;uncommon;100;14914;;;;0;Fuego Sagrado
+173;holy_nova;active;20;epic;100;15237;;;;0;Nova Sagrada
+174;devouring_plague;active;20;rare;100;2944;;;;0;Peste devoradora
+175;soothe_mind;active;20;uncommon;100;453;;;;0;Calmar mente
+176;shackle_undead;active;20;rare;100;9484;;;;0;Encadenar no-muerto
+177;ancestral_spirit;active;12;uncommon;100;2008;;;;0;Espíritu ancestral
+178;fire_nova;active;12;uncommon;100;1535;73:1;;;0;Nova de Fuego
+179;purge;active;12;uncommon;100;370;;;;0;Purgar
+180;cure_toxins;active;16;common;100;526;;;;0;Curar toxinas
+181;ghost_wolf;active;16;rare;100;2645;;;;0;Lobo fantasmal
+182;wind_shear;active;16;rare;100;57994;;;;0;Corte de viento
+183;tremor_totem;active;18;rare;100;8143;;;;0;Tótem de tremor
+184;frost_shock;active;20;rare;100;8056;;;;0;Choque de Escarcha
+185;frostbrand_weapon;active;20;uncommon;100;8033;;;;0;Arma Estigma de Escarcha
+186;healing_stream_totem;active;20;uncommon;100;5394;;;;0;Tótem Corriente de sanación
+187;lesser_healing_wave;active;20;common;100;8004;;;;0;Ola de sanación inferior
+188;water_shield;active;20;rare;100;52127;;;;0;Escudo de agua
+189;dampen_magic;active;12;uncommon;100;604;;;;0;Atenuar magia
+190;slow_fall;active;12;uncommon;100;130;;;;0;Caída lenta
+191;arcane_explosion;active;14;uncommon;100;1449;;;;0;Deflagración Arcana
+192;flamestrike;active;16;rare;100;2120;;;;0;Fogonazo
+193;amplify_magic;active;18;uncommon;100;1008;;;;0;Amplificar magia
+194;remove_curse;active;18;common;100;475;;;;0;Eliminar maldición
+195;blink;active;20;rare;100;1953;;;;0;Traslación
+196;blizzard;active;20;rare;100;10;;;;0;Ventisca
+197;evocation;active;20;epic;100;12051;;;;0;Evocación
+198;fire_ward;active;20;uncommon;100;543;;;;0;Resguardo contra el Fuego
+199;mana_shield;active;20;rare;100;1463;;;;0;Escudo de maná
+200;health_funnel;active;12;common;100;755;;84:1|92:1|208:1;;0;Cauce de salud
+201;curse_of_recklessness;active;14;uncommon;100;704;;;;0;Maldición de temeridad
+202;drain_life;active;14;uncommon;100;689;;;;0;Drenar vida
+203;unending_breath;active;16;common;100;5697;;;;0;Aliento inagotable
+204;create_soulstone;active;18;epic;100;693;90:1;;;0;Crear piedra de alma
+205;searing_pain;active;18;uncommon;100;5676;;;;0;Dolor abrasador
+206;demon_armor;active;20;rare;100;706;;;;0;Armadura demoníaca
+207;ritual_of_summoning;active;20;rare;100;698;90:1;;;0;Ritual de invocación
+208;summon_succubus;active;20;epic;100;712;90:1;;;0;Invocar súcubo
+209;rain_of_fire;active;20;rare;100;5740;;;;0;Lluvia de Fuego
+210;felsteed;active;20;rare;100;5784;;;;0;Corcel nefasto
+101;cruelty;talent;10;common;120;12320/12852/12853/12855/12856;;;;1;Crueldad
+102;deflection;talent;10;common;100;16462/16463/16464/16465/16466;;;;1;Desvío
+103;anticipation;talent;10;common;90;12297/12750/12751/12752/12753;;;;1;Anticipación
+104;improved_fireball;talent;10;uncommon;180;11069/12338/12339/12340/12341;2:1;;;1;Bola de Fuego mejorada
+105;improved_frostbolt;talent;10;uncommon;180;11070/12473/16763/16765/16766;3:1;;;1;Descarga de Escarcha mejorada
+106;tactical_mastery;talent;10;uncommon;250;12295/12676/12677;1:1;;;1;Maestría táctica
+107;improved_heroic_strike;talent;10;uncommon;180;12282/12663/12664;8:1;;;1;Golpe heroico mejorado
