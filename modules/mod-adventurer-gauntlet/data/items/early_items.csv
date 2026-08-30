@@ -5,7 +5,7 @@ enabled;entry;source_entry;display_id;set_key;name;quality;required_level;item_l
 1;911103;799;;cuero_oso;Jubon de cuero de oso;blue;1;4;2;2;2;;;;;;;;;;;;;;
 1;911110;840;;monje_errante;Zapatos del Monje Errante;blue;1;4;;1;1;;1;;;;;;;;;;;;
 1;911111;839;;monje_errante;Guantes del Monje Errante;blue;1;4;1;;1;1;;;;;;;;;;;;;
-1;911112;838;;monje_errante;Pantalones del Monje Errante;blue;1;4;;1;2;2;;;;;;;;;;;;;
+1;911112;838;;monje_errante;Pantalones del Monje Errante;blue;1;4;;1;2;2;;;;;;;;;;;;
 1;911113;837;;monje_errante;Jubon del Monje Errante;blue;1;4;;2;2;;2;;;;;;;;;;;;
 1;911114;3589;;monje_errante;Cinturon del Monje Errante;blue;1;4;1;;1;;1;;;;;;;;;;;;
 1;911115;3590;;monje_errante;Brazales del Monje Errante;blue;1;4;;;1;1;1;;;;;;;;;;;;
@@ -45,3 +45,40 @@ enabled;entry;source_entry;display_id;set_key;name;quality;required_level;item_l
 1;911153;8708;;;Martillo del Aprendiz Proscrito;blue;8;11;2;;2;;;;;1;;;;9;15;2100;;;Nadie recuerda por que su primer dueno fue expulsado.
 1;911154;871;;;Hacha del Torrente Gris;blue;9;12;;2;2;;;;;;;1;;7;12;1500;;;Rapida como agua entre piedras.
 1;911155;2100;;;Bocarda del Cartografo Perdido;blue;10;13;;2;2;;;;;;1;;;8;14;1500;;;Tiene grabados caminos que no aparecen en ningun mapa.
+1;911156;943;;;Baston de las Cenizas Quietas;blue;1;4;;;;1;1;;;;;;;6;9;2400;;;
+1;911157;2291;;;Segadora del Juramento Gris;blue;2;5;1;;1;;;;;;;;;10;16;3600;;;
+1;911158;809;;;Filo de la Sangre Marchita;blue;3;6;1;;1;;;;;;;;;9;13;2700;;;
+1;911159;2915;;;Quebrantahielos del Exilio;blue;4;7;2;;1;;;;;;;;;8;13;2300;;;
+1;911160;2824;;;Arco de la Tormenta Lejana;blue;5;8;;2;1;;;;;;;;;7;10;1600;;;
+1;911161;2163;;;Daga del Susurro Negro;blue;6;9;;2;1;;;;;;;;;7;9;1400;;;
+1;911162;810;;;Martillo del Viento Cautivo;blue;7;10;2;;1;;;2;;;;;;11;16;2100;;;
+1;911163;17780;;;Puñal de la Noche Eterna;blue;8;11;;3;2;;;;;;1;;;8;12;1500;;;
+1;911164;9372;;;Espadon del Azote Silencioso;blue;9;12;3;;2;;;2;;;;;;15;23;2600;;;
+1;911165;2244;;;Hoja del Cuervo Errante;blue;10;13;3;;2;;;2;;;;;;18;26;2800;;;
+1;911166;10847;;;Filo del Dragon Dormido;blue;1;4;1;;1;;;;;;;;;6;9;2500;;;
+1;911167;811;;;Hacha del Bosque Umbrio;blue;2;5;1;;1;;;;;;;;;8;11;2700;;;
+1;911168;647;;;Espada del Destino Roto;blue;3;6;1;;1;;;;;;;;;8;13;2600;;;
+1;911169;2099;;;Culebrina del Vigia de Hierro;blue;4;7;;2;1;;;;;;;;;11;16;2900;;;
+1;911170;11684;;;Maza del Emperador Caido;blue;5;8;2;;1;;;;;;;;;10;15;2400;;;
+1;911171;1263;;;Hacha del Pensamiento Roto;blue;6;9;2;;1;;;;;;;;;9;15;2100;;;
+1;911172;2243;;;Martillo de la Mano Extrana;blue;7;10;2;;1;;;2;;;;;;8;12;1600;;;
+1;911173;13937;;;Baston del Rector Olvidado;blue;8;11;;;;3;2;;1;;;;;15;24;2900;;;
+1;911174;12590;;;Daga del Pacto Vil;blue;9;12;;3;2;;;;;;1;;;10;15;1700;;;
+1;911175;12592;;;Espadon de Shahram Marchito;blue;10;13;3;;2;;;2;;;;;;22;34;3500;;;
+1;911176;13505;;;Hojarruna del Baron Perdido;blue;1;4;1;;1;;;;;;;;;8;13;3600;;;
+1;911177;22384;;;Persuasor del Proscrito;blue;2;5;1;;1;;;;;;;;;8;11;2700;;;
+1;911178;18538;;;Hacha del Terror del Bosque;blue;3;6;1;;1;;;;;;;;;11;17;3400;;;
+1;911179;14555;;;Navaja del Sol Velado;blue;4;7;;2;1;;;;;;;;;5;7;1300;;;
+1;911180;20698;;;Hoja de los Cuatro Elementos;blue;5;8;2;;1;;;;;;;;;9;13;2100;;;
+1;911181;17074;;;Lanza de la Sombra Profunda;blue;6;9;2;;1;;;;;;;;;14;22;3100;;;
+1;911182;17223;;;Tridente del Trueno Lejano;blue;7;10;2;;1;;;2;;;;;;15;24;3100;;;
+1;911183;17077;;;Varita del Rubi Marchito;blue;8;11;;;;3;2;;1;;;;;11;16;2000;;;
+1;911184;2801;;;Espadon de Hanna Renacido;blue;9;12;3;;2;;;2;;;;;;12;19;2100;;;
+1;911185;22383;;;Hoja del Sabio Errante;blue;10;13;3;;2;;;2;;;;;;12;17;1800;;;
+1;911186;22691;;;Crematoria del Juramento Roto;blue;1;4;1;;1;;;;;;;;;8;13;3600;;;
+1;911187;17193;;;Martillo de la Forja Antigua;blue;2;5;1;;1;;;;;;;;;10;16;3700;;;
+1;911188;18822;;;Hoja de Obsidiana Velada;blue;3;6;1;;1;;;;;;;;;11;17;3400;;;
+1;911189;1728;;;Tizona de la Brasa Azul;blue;4;7;2;;1;;;;;;;;;11;16;2900;;;
+1;911190;19852;;;Hacha del Sangrador Antiguo;blue;5;8;2;;1;;;;;;;;;9;12;2000;;;
+1;911191;23577;;;Filo del Frio Insaciable;blue;6;9;2;;1;;;;;;;;;7;10;1500;;;
+1;911192;18608;;;Baston de la Oracion Perdida;blue;7;10;;;;2;1;;1;;;;;15;23;3000;;;
