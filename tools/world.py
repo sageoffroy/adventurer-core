@@ -42,7 +42,8 @@ class WorldUpdate:
 # for classless totem spells; 007 owns the shared Adventurer start setup; 008
 # adds the Goldshire introduction; 009 continues it through Remen's contraband;
 # 010 adds two Adventurer-owned low-level rare contraband items; 011 replaces
-# the temporary native green assortment with the custom contraband starter set.
+# the temporary native green assortment with the custom contraband starter set;
+# 012 adds cloth gloves, a shield, and cloth/leather/mail belts.
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
@@ -75,6 +76,10 @@ WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "011_adventurer_contraband_set.sql",
         "rev_1787446800000000008.sql",
+    ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "012_adventurer_contraband_accessories.sql",
+        "rev_1787446800000000009.sql",
     ),
 )
 
