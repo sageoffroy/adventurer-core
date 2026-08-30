@@ -1,7 +1,7 @@
 # Adventurer Gauntlet
 
 AdventurerGauntlet.Enable = 1
-AdventurerGauntlet.StartLevel = 1
+AdventurerGauntlet.StartLevel = 3
 AdventurerGauntlet.MinPlayers = 1
 AdventurerGauntlet.MaxPlayers = 5
 
