@@ -18,27 +18,29 @@ MAGIC = b"WDBC"
 HEADER = struct.Struct("<4sIIII")
 ITEM_DBC = "Item.dbc"
 
-# Custom Adventurer contraband entry -> (native Item.dbc chassis, inventory override).
-# None keeps the chassis inventory type.  The two dagger entries intentionally
-# force main-hand/off-hand client metadata to match item_template.
-CONTRABAND_ITEMS: dict[int, tuple[int, int | None]] = {
-    910200: (1917, None),
-    910201: (1195, None),
-    910210: (25, None),
-    910211: (8178, None),
-    910212: (2092, 21),
-    910213: (2092, 22),
-    910214: (2504, None),
-    910215: (1372, None),
-    910216: (85, None),
-    910217: (2392, None),
-    910218: (2125, None),
-    910219: (2397, None),
-    910220: (2119, None),
-    910221: (2133, None),
-    910222: (3599, None),
-    910223: (2122, None),
-    910224: (2393, None),
+# Custom Adventurer contraband entry -> native Item.dbc chassis.
+# Inventory type and all other client-side item classification fields are cloned
+# exactly from the native chassis. In particular, both custom daggers remain
+# normal one-hand daggers (InventoryType 13); hand selection is left to the
+# native equip rules instead of forcing main-hand/off-hand metadata.
+CONTRABAND_ITEMS: dict[int, int] = {
+    910200: 1917,
+    910201: 1195,
+    910210: 25,
+    910211: 8178,
+    910212: 2092,
+    910213: 2092,
+    910214: 2504,
+    910215: 1372,
+    910216: 85,
+    910217: 2392,
+    910218: 2125,
+    910219: 2397,
+    910220: 2119,
+    910221: 2133,
+    910222: 3599,
+    910223: 2122,
+    910224: 2393,
 }
 
 
@@ -78,7 +80,7 @@ def patch_item_dbc(path) -> bool:
     stock = {_u32(row, 0): row for row in records if _u32(row, 0) not in owned}
     rebuilt = list(stock.values())
 
-    for entry, (source_entry, inventory_override) in CONTRABAND_ITEMS.items():
+    for entry, source_entry in CONTRABAND_ITEMS.items():
         source = stock.get(source_entry)
         if source is None:
             raise client.ClientError(
@@ -86,8 +88,6 @@ def patch_item_dbc(path) -> bool:
             )
         row = bytearray(source)
         _set_u32(row, 0, entry)
-        if inventory_override is not None:
-            _set_u32(row, 6, inventory_override)
         rebuilt.append(row)
 
     rebuilt.sort(key=lambda row: _u32(row, 0))
