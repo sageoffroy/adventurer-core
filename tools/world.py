@@ -40,7 +40,8 @@ class WorldUpdate:
 # world migrations. 003 is immutable installation history; 005 rebases the
 # chassis from 95% to 80%; 006 gives non-Shaman races visual fallback models
 # for classless totem spells; 007 owns the shared Adventurer start setup; 008
-# adds the Goldshire introduction; 009 continues it through Remen's contraband.
+# adds the Goldshire introduction; 009 continues it through Remen's contraband;
+# 010 adds two Adventurer-owned low-level rare contraband items.
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
@@ -65,6 +66,10 @@ WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "009_adventurer_goldshire_contraband.sql",
         "rev_1787446800000000006.sql",
+    ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "010_adventurer_remen_rare_goods.sql",
+        "rev_1787446800000000007.sql",
     ),
 )
 
