@@ -724,18 +724,22 @@ local function IsPlayerInCombat()
     return UnitAffectingCombat and UnitAffectingCombat("player")
 end
 
--- Leave room for a native close button immediately to the right of Pool debug.
+-- Keep the close button visually attached to Pool debug instead of positioning
+-- both controls independently against the outer frame.
 debugButton:ClearAllPoints()
-debugButton:SetPoint("TOPRIGHT", DraftFrame, "TOPRIGHT", -46, -19)
+debugButton:SetPoint("TOPRIGHT", DraftFrame, "TOPRIGHT", -42, -19)
 
 local closeDraft = CreateFrame("Button", "AdventurerDraftCloseButton", DraftFrame, "UIPanelCloseButton")
-closeDraft:SetPoint("TOPRIGHT", DraftFrame, "TOPRIGHT", -5, -9)
+closeDraft:SetPoint("LEFT", debugButton, "RIGHT", 0, 0)
 
+-- Use the native minimap-button proportions and border offsets. Anchoring the
+-- button center on the minimap's left edge keeps it seated on the circular rim
+-- instead of floating inside the map at a resolution-dependent offset.
 local minimapButton = CreateFrame("Button", "AdventurerDraftMinimapButton", Minimap)
-minimapButton:SetWidth(32)
-minimapButton:SetHeight(32)
+minimapButton:SetWidth(31)
+minimapButton:SetHeight(31)
 minimapButton:SetFrameStrata("MEDIUM")
-minimapButton:SetPoint("TOPLEFT", Minimap, "TOPLEFT", -6, -52)
+minimapButton:SetPoint("CENTER", Minimap, "LEFT", 0, 0)
 minimapButton:EnableMouse(true)
 
 minimapButton.icon = minimapButton:CreateTexture(nil, "ARTWORK")
@@ -743,11 +747,12 @@ minimapButton.icon:SetWidth(20)
 minimapButton.icon:SetHeight(20)
 minimapButton.icon:SetPoint("CENTER", minimapButton, "CENTER", 0, 0)
 minimapButton.icon:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
+minimapButton.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
 minimapButton.border = minimapButton:CreateTexture(nil, "OVERLAY")
-minimapButton.border:SetWidth(54)
-minimapButton.border:SetHeight(54)
-minimapButton.border:SetPoint("TOPLEFT", minimapButton, "TOPLEFT", 0, 0)
+minimapButton.border:SetWidth(53)
+minimapButton.border:SetHeight(53)
+minimapButton.border:SetPoint("TOPLEFT", minimapButton, "TOPLEFT", -11, 11)
 minimapButton.border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
 
 minimapButton:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
