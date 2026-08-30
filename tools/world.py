@@ -43,7 +43,8 @@ class WorldUpdate:
 # adds the Goldshire introduction; 009 continues it through Remen's contraband;
 # 010 adds two Adventurer-owned low-level rare contraband items; 011 replaces
 # the temporary native green assortment with the custom contraband starter set;
-# 012 adds cloth gloves, a shield, and cloth/leather/mail belts.
+# 012 adds cloth gloves, a shield, and cloth/leather/mail belts; 013 turns the
+# two Goldshire hand-offs into real 0/1 talk objectives.
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
@@ -80,6 +81,10 @@ WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "012_adventurer_contraband_accessories.sql",
         "rev_1787446800000000009.sql",
+    ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "013_adventurer_goldshire_objectives.sql",
+        "rev_1787446800000000010.sql",
     ),
 )
 
