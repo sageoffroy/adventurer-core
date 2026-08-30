@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Apply Adventurer Core with client Item.dbc metadata for contraband items.
 
-This wrapper deliberately patches the existing client builder at runtime instead
-of introducing a second MPQ ownership path.  The normal Adventurer transaction,
-server DBC install, client patch ownership, verification and rollback state all
-remain authoritative.
+The custom item rows are built from stock Item.dbc chassis and the exact final
+Item.dbc installed for worldserver is then written back into both staged Z MPQs
+before they are copied to the client. This keeps server/client item metadata
+byte-identical and prevents custom items from degrading to '?' icons.
 """
 
 from __future__ import annotations
@@ -12,17 +12,19 @@ from __future__ import annotations
 import struct
 
 import client
+import mpq
 
 
 MAGIC = b"WDBC"
 HEADER = struct.Struct("<4sIIII")
+MPQ_HEADER = struct.Struct("<4sIIHHIIII")
 ITEM_DBC = "Item.dbc"
+ITEM_INTERNAL = "DBFilesClient\\Item.dbc"
 
 # Custom Adventurer contraband entry -> native Item.dbc chassis.
 # Inventory type and all other client-side item classification fields are cloned
-# exactly from the native chassis. In particular, both custom daggers remain
-# normal one-hand daggers (InventoryType 13); hand selection is left to the
-# native equip rules instead of forcing main-hand/off-hand metadata.
+# exactly from the native chassis. Both custom daggers therefore remain normal
+# one-hand daggers (InventoryType 13).
 CONTRABAND_ITEMS: dict[int, int] = {
     910200: 1917,
     910201: 1195,
@@ -103,9 +105,71 @@ def patch_item_dbc(path) -> bool:
     return True
 
 
-# Extend the existing atomic Adventurer client/server DBC bundle.  Item.dbc is
-# duplicated in both root and locale archives for the same reason as the native
-# talent bundle: 3.3.5a patch stacks can resolve DBFilesClient files differently.
+def _decrypt(words: list[int], key: int) -> list[int]:
+    seed = 0xEEEEEEEE
+    output: list[int] = []
+    for cipher in words:
+        seed = (seed + mpq._CRYPT[0x400 + (key & 0xFF)]) & 0xFFFFFFFF
+        plain = cipher ^ ((key + seed) & 0xFFFFFFFF)
+        output.append(plain)
+        key = (((~key << 0x15) + 0x11111111) | (key >> 0x0B)) & 0xFFFFFFFF
+        seed = (plain + seed + (seed << 5) + 3) & 0xFFFFFFFF
+    return output
+
+
+def _replace_raw_mpq_file(path, internal_name: str, payload: bytes) -> None:
+    """Replace one raw file in an MPQ produced by tools/mpq.py.
+
+    Our writer stores files uncompressed. The generated Item.dbc has a stable
+    size because custom rows replace the same reserved entries on every update,
+    so replacing the block in-place is both deterministic and preserves every
+    other file in patch-Z.
+    """
+    raw = bytearray(path.read_bytes())
+    if len(raw) < MPQ_HEADER.size:
+        raise client.ClientError(f"{path}: MPQ is too small")
+
+    magic, _header_size, _archive_size, _version, _block_shift, hash_pos, block_pos, hash_size, block_count = MPQ_HEADER.unpack_from(raw)
+    if magic != b"MPQ\x1a":
+        raise client.ClientError(f"{path}: invalid MPQ header")
+
+    hash_words = list(struct.unpack_from(f"<{hash_size * 4}I", raw, hash_pos))
+    hash_words = _decrypt(hash_words, mpq._hash_string("(hash table)", 3))
+    block_words = list(struct.unpack_from(f"<{block_count * 4}I", raw, block_pos))
+    block_words = _decrypt(block_words, mpq._hash_string("(block table)", 3))
+
+    wanted_a = mpq._hash_string(internal_name, 1)
+    wanted_b = mpq._hash_string(internal_name, 2)
+    index = mpq._hash_string(internal_name, 0) & (hash_size - 1)
+    block_index = None
+    for _ in range(hash_size):
+        a, b, _locale, candidate = hash_words[index * 4:index * 4 + 4]
+        if candidate == 0xFFFFFFFF:
+            break
+        if a == wanted_a and b == wanted_b:
+            block_index = candidate
+            break
+        index = (index + 1) & (hash_size - 1)
+
+    if block_index is None or block_index >= block_count:
+        raise client.ClientError(f"{path}: {internal_name} is missing from staged Z patch")
+
+    offset, stored_size, file_size, flags = block_words[block_index * 4:block_index * 4 + 4]
+    if not (flags & 0x80000000):
+        raise client.ClientError(f"{path}: {internal_name} block is not an active MPQ file")
+    if stored_size != file_size or file_size != len(payload):
+        raise client.ClientError(
+            f"{path}: cannot safely replace {internal_name}: MPQ={stored_size}/{file_size}, payload={len(payload)}"
+        )
+
+    raw[offset:offset + file_size] = payload
+    path.write_bytes(raw)
+    if payload not in path.read_bytes():
+        raise client.ClientError(f"{path}: {internal_name} readback verification failed")
+
+
+# Extend the existing atomic Adventurer client/server DBC bundle. Item.dbc is
+# duplicated in both root and locale Z archives.
 client.CLASS_DBCS = client.CLASS_DBCS + (ITEM_DBC,)
 client.DBC_NAMES = client.CLASS_DBCS + client.TALENT_DBCS
 client.DBC_SOURCE_NAMES = client.DBC_NAMES + client.TALENT_SOURCE_ONLY_DBCS
@@ -121,6 +185,31 @@ def _patch_dbc_copy(source, work):
 
 
 client.patch_dbc_copy = _patch_dbc_copy
+
+# install_server_dbcs runs after build_patch but before install_patch. At this
+# exact point the final server Item.dbc is known and the client Z files are still
+# staged, so force both client archives to contain the identical final bytes.
+_original_install_server_dbcs = client.install_server_dbcs
+
+
+def _install_server_dbcs(build_dir, server_dbc_dir):
+    result = _original_install_server_dbcs(build_dir, server_dbc_dir)
+    final_item = (server_dbc_dir / ITEM_DBC).read_bytes()
+
+    root_patch = build_dir / "Data" / f"patch-{client.PROJECT_SUFFIX}.mpq"
+    locale_candidates = list((build_dir / "Data").glob(f"*/patch-*-{client.PROJECT_SUFFIX.lower()}.mpq"))
+    if not root_patch.is_file() or len(locale_candidates) != 1:
+        raise client.ClientError(
+            "Staged Adventurer Z patches are incomplete while syncing Item.dbc"
+        )
+
+    _replace_raw_mpq_file(root_patch, ITEM_INTERNAL, final_item)
+    _replace_raw_mpq_file(locale_candidates[0], ITEM_INTERNAL, final_item)
+    print(f"Contraband Item.dbc synchronized into both Z patches ({len(final_item)} bytes).")
+    return result
+
+
+client.install_server_dbcs = _install_server_dbcs
 
 # Keep the source-layer universal chassis at 75% while accepting an existing
 # owned 75% install on future upgrades.
