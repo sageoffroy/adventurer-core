@@ -51,9 +51,9 @@ CHARSTART_ITEM_IDS_OFFSET = 8
 CHARSTART_DISPLAY_IDS_OFFSET = CHARSTART_ITEM_IDS_OFFSET + MAX_OUTFIT_ITEMS * 4
 CHARSTART_INVENTORY_TYPES_OFFSET = CHARSTART_DISPLAY_IDS_OFFSET + MAX_OUTFIT_ITEMS * 4
 CHARSTART_FULL_RECORD_SIZE = CHARSTART_INVENTORY_TYPES_OFFSET + MAX_OUTFIT_ITEMS * 4
-ADVENTURER_STARTER_ITEMS = (25, 2362, 2504, 2512)
+ADVENTURER_STARTER_ITEMS = (20921, 4907, 61)
 REPLACED_COMBAT_INVENTORY_TYPES = {13, 14, 15, 17, 21, 22, 23, 24, 25, 26, 28}
-STARTER_ITEM_FALLBACK_INVENTORY_TYPE = {25: 13, 2362: 14, 2504: 15, 2512: 24}
+STARTER_ITEM_FALLBACK_INVENTORY_TYPE = {20921: 8, 4907: 5, 61: 7}
 
 
 class DBCError(RuntimeError):
@@ -146,8 +146,6 @@ def patch_chrclasses(path: Path) -> bool:
             LOCALE_ESES: dbc.append_string(es_es),
             LOCALE_ESMX: dbc.append_string(es_mx),
         }
-        # Do not inherit "Warrior" from the template in unsupported locales.
-        # English is a safe fallback; Spanish gets first-class locale strings.
         for locale in range(16):
             set_u32(target, block + locale, spanish_offsets.get(locale, english_offset))
 
@@ -207,25 +205,13 @@ def collect_outfit_item_metadata(records: list[bytearray]) -> dict[int, tuple[in
 
 
 def apply_starter_outfit(row: bytearray, metadata: dict[int, tuple[int, int]]) -> None:
-    preserved: list[tuple[int, int, int]] = []
-    for index in range(MAX_OUTFIT_ITEMS):
-        item_id, display_id, inventory_type = read_outfit_entry(row, index)
-        if item_id <= 0 or item_id in ADVENTURER_STARTER_ITEMS:
-            continue
-        if inventory_type in REPLACED_COMBAT_INVENTORY_TYPES:
-            continue
-        preserved.append((item_id, display_id, inventory_type))
-
     starter = [
         (item_id, *metadata.get(item_id, (0, STARTER_ITEM_FALLBACK_INVENTORY_TYPE[item_id])))
         for item_id in ADVENTURER_STARTER_ITEMS
     ]
-    entries = preserved + starter
-    if len(entries) > MAX_OUTFIT_ITEMS:
-        raise DBCError(f"Adventurer starter outfit exceeds {MAX_OUTFIT_ITEMS} items")
     for index in range(MAX_OUTFIT_ITEMS):
         write_outfit_entry(row, index, 0, 0, 0)
-    for index, entry in enumerate(entries):
+    for index, entry in enumerate(starter):
         write_outfit_entry(row, index, *entry)
 
 
