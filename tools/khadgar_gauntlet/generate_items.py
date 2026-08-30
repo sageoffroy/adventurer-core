@@ -181,7 +181,7 @@ def generate_row(row, line: int) -> str:
             f"`spelltrigger_{index}` = 1",
         ])
 
-    description = row["description"].strip()
+    description = (row.get("description") or "").strip()
     updates.append(f"`description` = {sql_string(description)}")
     updates.append("`VerifiedBuild` = 0")
 
