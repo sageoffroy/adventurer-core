@@ -12,14 +12,14 @@ SET @OLD_PACK_MULE_ENTRY := 16225;
 
 -- Remove any previous persistent placements of the custom entry NPC/chest.
 DELETE FROM `creature`
-WHERE `id1` = @GAUNTLET_KHADGAR_ENTRY;
+WHERE `id` = @GAUNTLET_KHADGAR_ENTRY;
 
 DELETE FROM `gameobject`
 WHERE `id` = @GAUNTLET_CHEST_ENTRY;
 
 -- Remove the leftover development Pack Mule only around Goldshire.
 DELETE FROM `creature`
-WHERE `id1` = @OLD_PACK_MULE_ENTRY
+WHERE `id` = @OLD_PACK_MULE_ENTRY
   AND `map` = 0
   AND `position_x` BETWEEN -9525.0 AND -9420.0
   AND `position_y` BETWEEN -80.0 AND 80.0
@@ -28,7 +28,7 @@ WHERE `id1` = @OLD_PACK_MULE_ENTRY
 -- Hidden challenge corner in the Lion's Pride Inn cellar.
 SET @CGUID := (SELECT COALESCE(MAX(`guid`), 0) + 1 FROM `creature`);
 INSERT INTO `creature`
-(`guid`, `id1`, `map`, `position_x`, `position_y`, `position_z`, `orientation`, `spawntimesecs`, `MovementType`)
+(`guid`, `id`, `map`, `position_x`, `position_y`, `position_z`, `orientation`, `spawntimesecs`, `MovementType`)
 VALUES
 (@CGUID, @GAUNTLET_KHADGAR_ENTRY, 0, -9472.8000, -5.32661, 49.87780, 5.55015, 300, 0);
 
