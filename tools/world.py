@@ -41,7 +41,8 @@ class WorldUpdate:
 # chassis from 95% to 80%; 006 gives non-Shaman races visual fallback models
 # for classless totem spells; 007 owns the shared Adventurer start setup; 008
 # adds the Goldshire introduction; 009 continues it through Remen's contraband;
-# 010 adds two Adventurer-owned low-level rare contraband items.
+# 010 adds two Adventurer-owned low-level rare contraband items; 011 replaces
+# the temporary native green assortment with the custom contraband starter set.
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
@@ -70,6 +71,10 @@ WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "010_adventurer_remen_rare_goods.sql",
         "rev_1787446800000000007.sql",
+    ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "011_adventurer_contraband_set.sql",
+        "rev_1787446800000000008.sql",
     ),
 )
 
