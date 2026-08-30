@@ -39,7 +39,7 @@ class WorldUpdate:
 # Talents are exclusively SpellDraft cards and therefore have no fixed-tree
 # world migrations. 003 is immutable installation history; 005 rebases the
 # chassis from 95% to 80%; 006 gives non-Shaman races visual fallback models
-# for classless totem spells without replacing any pre-existing custom rows.
+# for classless totem spells; 007 owns the shared Adventurer start setup.
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
@@ -52,6 +52,10 @@ WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "006_adventurer_totem_models.sql",
         "rev_1787446800000000003.sql",
+    ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "007_adventurer_start.sql",
+        "rev_1787446800000000004.sql",
     ),
 )
 
