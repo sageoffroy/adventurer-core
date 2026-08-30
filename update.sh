@@ -39,6 +39,12 @@ python3 "$ROOT/tools/upgrade_apply.py" "$@"
 # automatically learned higher ranks never fall back into another spell tab.
 python3 "$ROOT/tools/spell_rank_tabs.py" install "$@"
 
+# spell_rank_tabs rebuilds both owned Z archives from the installed server DBC
+# bundle. Preserve the Adventurer custom Item.dbc in that final rebuilt client
+# payload and refresh ownership hashes so client/server item metadata stays
+# byte-identical after every update.
+python3 "$ROOT/tools/sync_item_dbc.py" "$@"
+
 # Class 10 needs Playerbots-specific guards only when the external module exists.
 if (( has_playerbots == 1 )); then
     python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir"
