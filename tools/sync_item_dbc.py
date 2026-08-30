@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""Synchronize the installed Adventurer Item.dbc into both owned Z client patches."""
+"""Rebuild both owned Z client patches from the final installed server DBC bundle."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import tempfile
 from pathlib import Path
 
+# Import first: this extends client.DBC_NAMES/ROOT_SHARED_DBCS with Item.dbc.
+from adventurer_apply import ITEM_DBC  # noqa: F401
 from adventurer import load_state, save_state, sha256_file, verify_state
-from adventurer_apply import ITEM_DBC, ITEM_INTERNAL, _replace_raw_mpq_file
-from client import OWNER_MANIFEST
+from client import DBC_NAMES, OWNER_MANIFEST, build_archive_files
+from mpq import write_mpq
 
 
 class SyncItemDbcError(RuntimeError):
@@ -19,12 +23,19 @@ class SyncItemDbcError(RuntimeError):
 def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
     core = core_dir.expanduser().resolve()
     data = server_data_dir.expanduser().resolve()
-    client = client_dir.expanduser().resolve()
+    client_dir = client_dir.expanduser().resolve()
+    server_dbc = data / "dbc"
 
-    item_path = data / "dbc" / ITEM_DBC
-    if not item_path.is_file():
-        raise SyncItemDbcError(f"Installed server Item.dbc not found: {item_path}")
-    payload = item_path.read_bytes()
+    if not server_dbc.is_dir():
+        raise SyncItemDbcError(f"Installed server DBC directory not found: {server_dbc}")
+
+    missing = [name for name in DBC_NAMES if not (server_dbc / name).is_file()]
+    if missing:
+        raise SyncItemDbcError(
+            "Installed server DBC bundle is incomplete: " + ", ".join(missing)
+        )
+
+    item_payload = (server_dbc / ITEM_DBC).read_bytes()
 
     state = load_state(core)
     client_state = state.get("client") or {}
@@ -34,32 +45,61 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
     if not root_relative or not locale_relative:
         raise SyncItemDbcError("Adventurer client ownership state is incomplete")
 
-    root_patch = client / root_relative
-    locale_patch = client / locale_relative
-    owner_path = client / OWNER_MANIFEST
+    root_target = client_dir / root_relative
+    locale_target = client_dir / locale_relative
+    owner_path = client_dir / OWNER_MANIFEST
     for path, label in (
-        (root_patch, "root Z patch"),
-        (locale_patch, "locale Z patch"),
+        (root_target, "root Z patch"),
+        (locale_target, "locale Z patch"),
         (owner_path, "client ownership manifest"),
     ):
         if not path.is_file():
             raise SyncItemDbcError(f"Missing {label}: {path}")
 
-    _replace_raw_mpq_file(root_patch, ITEM_INTERNAL, payload)
-    _replace_raw_mpq_file(locale_patch, ITEM_INTERNAL, payload)
+    with tempfile.TemporaryDirectory(prefix="adventurer-final-z-") as td:
+        temp = Path(td)
+        work = temp / "dbc"
+        work.mkdir()
 
-    # The MPQ writer stores Adventurer payloads raw, so this is a direct final
-    # readback check on the actual files WoW will mount.
-    if payload not in root_patch.read_bytes() or payload not in locale_patch.read_bytes():
-        raise SyncItemDbcError("Final Z patch Item.dbc readback verification failed")
+        # Use the final runtime DBCs as the single source of truth. At this point
+        # they already contain the Adventurer class, SpellDraft rank metadata and
+        # contraband Item.dbc rows, so rebuilding Z cannot silently discard any
+        # earlier update stage.
+        for name in DBC_NAMES:
+            shutil.copy2(server_dbc / name, work / name)
 
-    root_hash = sha256_file(root_patch)
-    locale_hash = sha256_file(locale_patch)
+        root_files, locale_files = build_archive_files(work)
+        built_root = temp / "patch-Z.mpq"
+        built_locale = temp / "patch-locale-z.mpq"
+        write_mpq(built_root, root_files)
+        write_mpq(built_locale, locale_files)
+
+        # Our MPQ writer stores payloads raw; verify the exact final Item.dbc is
+        # present before replacing the client-owned archives.
+        if item_payload not in built_root.read_bytes():
+            raise SyncItemDbcError("Rebuilt root Z patch does not contain final Item.dbc")
+        if item_payload not in built_locale.read_bytes():
+            raise SyncItemDbcError("Rebuilt locale Z patch does not contain final Item.dbc")
+
+        shutil.copy2(built_root, root_target)
+        shutil.copy2(built_locale, locale_target)
+
+    # Verify the actual files WoW will mount, not only the temporary build.
+    if item_payload not in root_target.read_bytes():
+        raise SyncItemDbcError("Installed root Z patch lost final Item.dbc")
+    if item_payload not in locale_target.read_bytes():
+        raise SyncItemDbcError("Installed locale Z patch lost final Item.dbc")
+
+    root_hash = sha256_file(root_target)
+    locale_hash = sha256_file(locale_target)
 
     owner = json.loads(owner_path.read_text(encoding="utf-8"))
     owner["root_sha256"] = root_hash
     owner["locale_sha256"] = locale_hash
-    owner_path.write_text(json.dumps(owner, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    owner_path.write_text(
+        json.dumps(owner, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
     installed["root_sha256"] = root_hash
     installed["locale_sha256"] = locale_hash
@@ -70,10 +110,13 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
     problems = verify_state(core, state)
     if problems:
         raise SyncItemDbcError(
-            "Final Item.dbc synchronization verification failed:\n  " + "\n  ".join(problems)
+            "Final Z rebuild verification failed:\n  " + "\n  ".join(problems)
         )
 
-    print(f"Final Item.dbc preserved in both Z patches ({len(payload)} bytes).")
+    print(
+        f"Final Z patches rebuilt from installed server DBCs; "
+        f"Item.dbc preserved ({len(item_payload)} bytes)."
+    )
 
 
 def main() -> int:
