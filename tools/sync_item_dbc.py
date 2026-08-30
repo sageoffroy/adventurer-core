@@ -13,6 +13,8 @@ from pathlib import Path
 from adventurer_apply import ITEM_DBC  # noqa: F401
 from adventurer import load_state, save_state, sha256_file, verify_state
 from client import DBC_NAMES, OWNER_MANIFEST, build_archive_files
+from khadgar_gauntlet.patch_item_dbc import load_mapping as load_gauntlet_item_mapping
+from khadgar_gauntlet.patch_item_dbc import patch as patch_gauntlet_item_dbc
 from mpq import write_mpq
 
 
@@ -34,6 +36,14 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
         raise SyncItemDbcError(
             "Installed server DBC bundle is incomplete: " + ", ".join(missing)
         )
+
+    # When the Gauntlet module is installed, its generated catalog is authoritative
+    # for entries 911100-911399. Re-apply those rows after every normal Adventurer
+    # update so a refreshed server Item.dbc cannot silently discard Gauntlet items.
+    gauntlet_catalog = core / "modules/mod-adventurer-gauntlet/data/items/early_items.csv"
+    if gauntlet_catalog.is_file():
+        mapping = load_gauntlet_item_mapping(gauntlet_catalog)
+        patch_gauntlet_item_dbc(server_dbc / ITEM_DBC, mapping)
 
     item_payload = (server_dbc / ITEM_DBC).read_bytes()
 
@@ -62,9 +72,8 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
         work.mkdir()
 
         # Use the final runtime DBCs as the single source of truth. At this point
-        # they already contain the Adventurer class, SpellDraft rank metadata and
-        # contraband Item.dbc rows, so rebuilding Z cannot silently discard any
-        # earlier update stage.
+        # they contain Adventurer, SpellDraft, contraband and (when installed)
+        # Gauntlet Item.dbc rows, so rebuilding Z cannot discard an earlier stage.
         for name in DBC_NAMES:
             shutil.copy2(server_dbc / name, work / name)
 
@@ -74,8 +83,6 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
         write_mpq(built_root, root_files)
         write_mpq(built_locale, locale_files)
 
-        # Our MPQ writer stores payloads raw; verify the exact final Item.dbc is
-        # present before replacing the client-owned archives.
         if item_payload not in built_root.read_bytes():
             raise SyncItemDbcError("Rebuilt root Z patch does not contain final Item.dbc")
         if item_payload not in built_locale.read_bytes():
@@ -84,7 +91,6 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
         shutil.copy2(built_root, root_target)
         shutil.copy2(built_locale, locale_target)
 
-    # Verify the actual files WoW will mount, not only the temporary build.
     if item_payload not in root_target.read_bytes():
         raise SyncItemDbcError("Installed root Z patch lost final Item.dbc")
     if item_payload not in locale_target.read_bytes():
@@ -128,7 +134,7 @@ def main() -> int:
 
     try:
         sync(args.core_dir, args.server_data_dir, args.client_dir)
-    except (SyncItemDbcError, OSError, ValueError, json.JSONDecodeError) as exc:
+    except (SyncItemDbcError, OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
         parser.error(str(exc))
         return 2
     return 0
