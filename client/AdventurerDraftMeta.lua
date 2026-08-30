@@ -698,3 +698,156 @@ MetaEventFrame:SetScript("OnEvent", function(self, event, ...)
         RefreshMetaUI()
     end
 end)
+
+-- ---------------------------------------------------------------------------
+-- SpellDraft v2 chooser UX: minimize, combat suppression and minimap access.
+-- ---------------------------------------------------------------------------
+local draftUxText
+if isSpanish then
+    draftUxText = {
+        pending = "SpellDraft pendiente",
+        open = "Clic para abrir las elecciones pendientes.",
+        combat = "No se abre durante el combate.",
+    }
+else
+    draftUxText = {
+        pending = "SpellDraft pending",
+        open = "Click to open pending choices.",
+        combat = "Cannot open during combat.",
+    }
+end
+
+local hasPendingOffer = false
+local userMinimized = false
+
+local function IsPlayerInCombat()
+    return UnitAffectingCombat and UnitAffectingCombat("player")
+end
+
+-- Leave room for a native close button immediately to the right of Pool debug.
+debugButton:ClearAllPoints()
+debugButton:SetPoint("TOPRIGHT", DraftFrame, "TOPRIGHT", -46, -19)
+
+local closeDraft = CreateFrame("Button", "AdventurerDraftCloseButton", DraftFrame, "UIPanelCloseButton")
+closeDraft:SetPoint("TOPRIGHT", DraftFrame, "TOPRIGHT", -5, -9)
+
+local minimapButton = CreateFrame("Button", "AdventurerDraftMinimapButton", Minimap)
+minimapButton:SetWidth(32)
+minimapButton:SetHeight(32)
+minimapButton:SetFrameStrata("MEDIUM")
+minimapButton:SetPoint("TOPLEFT", Minimap, "TOPLEFT", -6, -52)
+minimapButton:EnableMouse(true)
+
+minimapButton.icon = minimapButton:CreateTexture(nil, "ARTWORK")
+minimapButton.icon:SetWidth(20)
+minimapButton.icon:SetHeight(20)
+minimapButton.icon:SetPoint("CENTER", minimapButton, "CENTER", 0, 0)
+minimapButton.icon:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
+
+minimapButton.border = minimapButton:CreateTexture(nil, "OVERLAY")
+minimapButton.border:SetWidth(54)
+minimapButton.border:SetHeight(54)
+minimapButton.border:SetPoint("TOPLEFT", minimapButton, "TOPLEFT", 0, 0)
+minimapButton.border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+
+minimapButton:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+minimapButton:Hide()
+
+local function RefreshDraftMinimapButton()
+    if IsAdventurer() and hasPendingOffer then
+        minimapButton:Show()
+    else
+        minimapButton:Hide()
+    end
+end
+
+local function MinimizeDraftChooser()
+    if not hasPendingOffer then
+        return
+    end
+    userMinimized = true
+    DraftFrame:Hide()
+    RefreshDraftMinimapButton()
+    RefreshMetaUI()
+end
+
+local function OpenDraftChooser()
+    if not hasPendingOffer then
+        return
+    end
+    if IsPlayerInCombat() then
+        return
+    end
+    userMinimized = false
+    DraftFrame:Show()
+    RefreshDraftMinimapButton()
+    RefreshMetaUI()
+end
+
+closeDraft:SetScript("OnClick", MinimizeDraftChooser)
+
+minimapButton:SetScript("OnClick", function()
+    OpenDraftChooser()
+end)
+minimapButton:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    GameTooltip:AddLine(draftUxText.pending, 1, 0.82, 0)
+    if IsPlayerInCombat() then
+        GameTooltip:AddLine(draftUxText.combat, 1, 0.35, 0.35, true)
+    else
+        GameTooltip:AddLine(draftUxText.open, 1, 1, 1, true)
+    end
+    GameTooltip:Show()
+end)
+minimapButton:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+end)
+
+-- This tracker is intentionally separate from the base chooser event handler.
+-- The base handler remains authoritative for parsing/building offers; this layer
+-- only decides whether the already-built frame should be visible right now.
+local DraftUxEventFrame = CreateFrame("Frame", "AdventurerDraftUxEventFrame", UIParent)
+DraftUxEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+DraftUxEventFrame:RegisterEvent("CHAT_MSG_ADDON")
+DraftUxEventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+DraftUxEventFrame:SetScript("OnEvent", function(self, event, ...)
+    if event == "PLAYER_ENTERING_WORLD" then
+        if not IsAdventurer() then
+            hasPendingOffer = false
+            userMinimized = false
+            minimapButton:Hide()
+        end
+        return
+    end
+
+    if event == "PLAYER_REGEN_DISABLED" then
+        if hasPendingOffer then
+            userMinimized = true
+            DraftFrame:Hide()
+            RefreshDraftMinimapButton()
+            RefreshMetaUI()
+        end
+        return
+    end
+
+    local prefix, message = ...
+    if not IsAdventurer() or prefix ~= DRAFT_PREFIX or not message then
+        return
+    end
+
+    if string.sub(message, 1, 2) == "O|" then
+        hasPendingOffer = true
+        RefreshDraftMinimapButton()
+        if userMinimized or IsPlayerInCombat() then
+            if IsPlayerInCombat() then
+                userMinimized = true
+            end
+            DraftFrame:Hide()
+            RefreshMetaUI()
+        end
+    elseif message == "C" then
+        hasPendingOffer = false
+        userMinimized = false
+        minimapButton:Hide()
+    end
+end)
