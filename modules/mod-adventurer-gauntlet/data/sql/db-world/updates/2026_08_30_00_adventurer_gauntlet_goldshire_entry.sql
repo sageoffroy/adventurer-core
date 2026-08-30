@@ -25,18 +25,17 @@ WHERE `id` = @OLD_PACK_MULE_ENTRY
   AND `position_y` BETWEEN -80.0 AND 80.0
   AND `position_z` BETWEEN 40.0 AND 80.0;
 
--- Hidden challenge corner in the Lion's Pride Inn cellar.
+-- Correct player-measured point in the Lion's Pride Inn cellar.
 SET @CGUID := (SELECT COALESCE(MAX(`guid`), 0) + 1 FROM `creature`);
 INSERT INTO `creature`
 (`guid`, `id`, `map`, `position_x`, `position_y`, `position_z`, `orientation`, `spawntimesecs`, `MovementType`)
 VALUES
-(@CGUID, @GAUNTLET_KHADGAR_ENTRY, 0, -9472.8000, -5.32661, 49.87780, 5.55015, 300, 0);
+(@CGUID, @GAUNTLET_KHADGAR_ENTRY, 0, -9471.7130, 5.2467003, 49.794514, 4.9018545, 300, 0);
 
--- Keep the expedition chest close to Khadgar, tucked beside the barrels rather
--- than in the player's normal path through the cellar.
+-- Keep the expedition chest beside Khadgar without stacking the two objects.
 SET @OGUID := (SELECT COALESCE(MAX(`guid`), 0) + 1 FROM `gameobject`);
 INSERT INTO `gameobject`
 (`guid`, `id`, `map`, `position_x`, `position_y`, `position_z`, `orientation`, `rotation0`, `rotation1`, `rotation2`, `rotation3`, `spawntimesecs`, `animprogress`, `state`)
 VALUES
-(@OGUID, @GAUNTLET_CHEST_ENTRY, 0, -9474.0000, -4.65000, 49.87780, 5.55015,
- 0.0, 0.0, 0.3583666, -0.9335810, 300, 255, 1);
+(@OGUID, @GAUNTLET_CHEST_ENTRY, 0, -9473.0000, 5.6500000, 49.794514, 4.9018545,
+ 0.0, 0.0, 0.6376700, -0.7703090, 300, 255, 1);
