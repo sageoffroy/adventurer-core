@@ -37,6 +37,11 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
             "Installed server DBC bundle is incomplete: " + ", ".join(missing)
         )
 
+    # Load ownership before mutating Item.dbc. If Gauntlet is installed, the
+    # resulting Item.dbc is still Adventurer-owned and its authoritative hash
+    # must be refreshed after the generated rows are re-applied.
+    state = load_state(core)
+
     # When the Gauntlet module is installed, its generated catalog is authoritative
     # for entries 911100-911399. Re-apply those rows after every normal Adventurer
     # update so a refreshed server Item.dbc cannot silently discard Gauntlet items.
@@ -46,8 +51,12 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
         patch_gauntlet_item_dbc(server_dbc / ITEM_DBC, mapping)
 
     item_payload = (server_dbc / ITEM_DBC).read_bytes()
+    item_hash = sha256_file(server_dbc / ITEM_DBC)
 
-    state = load_state(core)
+    dbc_state = state.get("dbc")
+    if dbc_state and ITEM_DBC in dbc_state.get("files", {}):
+        dbc_state["files"][ITEM_DBC] = item_hash
+
     client_state = state.get("client") or {}
     installed = client_state.get("installed") or {}
     root_relative = installed.get("root_patch")
