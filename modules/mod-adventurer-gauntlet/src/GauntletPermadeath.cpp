@@ -29,6 +29,15 @@ void PersistGauntletSetting(Player* player, uint32 index, uint32 value)
     player->UpdatePlayerSetting(GauntletSettingsSource, index, value);
     PlayerSettingsStore::UpdateSetting(player->GetGUID().GetCounter(), GauntletSettingsSource, index, value);
 }
+
+void SendPledgeStatus(Player* player)
+{
+    if (!player)
+        return;
+
+    ChatHandler(player->GetSession()).SendSysMessage(
+        "|cffb048f8Juramento del Ultimo Aliento|r: el pacto de Khadgar sigue vigente. Tu proxima muerte sera definitiva.");
+}
 }
 
 class AdventurerGauntletPermadeathScript : public PlayerScript
@@ -38,12 +47,18 @@ public:
 
     void OnPlayerMapChanged(Player* player) override
     {
-        if (!player || !IsGauntletMap(player->GetMapId()) || HasGauntletSetting(player, GauntletSettingPledged))
+        if (!player || !IsGauntletMap(player->GetMapId()))
             return;
 
-        PersistGauntletSetting(player, GauntletSettingPledged, 1);
-        ChatHandler(player->GetSession()).SendSysMessage(
-            "|cffffd100El pacto de Khadgar ha quedado sellado.|r Desde este momento, si caes, ninguna magia podra devolverte a la vida.");
+        if (!HasGauntletSetting(player, GauntletSettingPledged))
+        {
+            PersistGauntletSetting(player, GauntletSettingPledged, 1);
+            ChatHandler(player->GetSession()).SendSysMessage(
+                "|cffffd100El pacto de Khadgar ha quedado sellado.|r Desde este momento, si caes, ninguna magia podra devolverte a la vida.");
+        }
+
+        if (!HasGauntletSetting(player, GauntletSettingFallen))
+            SendPledgeStatus(player);
     }
 
     void OnPlayerJustDied(Player* player) override
@@ -70,8 +85,14 @@ public:
 
     void OnPlayerLogin(Player* player) override
     {
-        if (!player || !HasGauntletSetting(player, GauntletSettingFallen))
+        if (!player || !HasGauntletSetting(player, GauntletSettingPledged))
             return;
+
+        if (!HasGauntletSetting(player, GauntletSettingFallen))
+        {
+            SendPledgeStatus(player);
+            return;
+        }
 
         if (player->IsAlive())
             player->KillPlayer();
