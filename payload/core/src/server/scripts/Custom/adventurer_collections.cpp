@@ -238,6 +238,7 @@ void GiveAdventurerStartingMoney(Player* player)
     uint32 silver = urand(1, 99);
     uint32 copper = urand(1, 99);
     player->SetMoney(gold * 10000u + silver * 100u + copper);
+    player->SaveToDB(false, false);
 }
 
 class AdventurerCollectionsScript final : public PlayerScript
@@ -245,7 +246,7 @@ class AdventurerCollectionsScript final : public PlayerScript
 public:
     AdventurerCollectionsScript() : PlayerScript("AdventurerCollectionsScript") { }
 
-    void OnPlayerCreate(Player* player) override
+    void OnPlayerFirstLogin(Player* player) override
     {
         GiveAdventurerStartingMoney(player);
     }
