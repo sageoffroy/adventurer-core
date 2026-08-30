@@ -40,7 +40,7 @@ class WorldUpdate:
 # world migrations. 003 is immutable installation history; 005 rebases the
 # chassis from 95% to 80%; 006 gives non-Shaman races visual fallback models
 # for classless totem spells; 007 owns the shared Adventurer start setup; 008
-# adds the Goldshire introduction quest and Tharynn's early green stock.
+# adds the Goldshire introduction; 009 continues it through Remen's contraband.
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
@@ -61,6 +61,10 @@ WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "008_adventurer_goldshire_intro.sql",
         "rev_1787446800000000005.sql",
+    ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "009_adventurer_goldshire_contraband.sql",
+        "rev_1787446800000000006.sql",
     ),
 )
 
