@@ -118,7 +118,7 @@ void CleanupEmptyGauntletInstance(Player* player, uint32 mapId)
 
     if (Map* map = sMapMgr->FindMap(mapId, instanceId))
     {
-        if (!map->GetPlayers().empty())
+        if (map->GetPlayers().getFirst())
             return;
 
         if (!map->ToInstanceMap()->Reset(INSTANCE_RESET_ALL))
