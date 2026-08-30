@@ -1,7 +1,9 @@
 AC_ADD_SCRIPT("${CMAKE_CURRENT_LIST_DIR}/src/AdventurerGauntlet.cpp")
+AC_ADD_SCRIPT("${CMAKE_CURRENT_LIST_DIR}/src/GauntletPermadeath.cpp")
 AC_ADD_SCRIPT("${CMAKE_CURRENT_LIST_DIR}/src/KhadgarCelebration.cpp")
 AC_ADD_SCRIPT("${CMAKE_CURRENT_LIST_DIR}/src/SetBonuses.cpp")
 AC_ADD_SCRIPT_LOADER("AdventurerGauntlet" "${CMAKE_CURRENT_LIST_DIR}/src/loader.h")
+AC_ADD_SCRIPT_LOADER("AdventurerGauntletPermadeath" "${CMAKE_CURRENT_LIST_DIR}/src/loader.h")
 AC_ADD_SCRIPT_LOADER("AdventurerGauntletCelebration" "${CMAKE_CURRENT_LIST_DIR}/src/loader.h")
 AC_ADD_SCRIPT_LOADER("AdventurerGauntletSets" "${CMAKE_CURRENT_LIST_DIR}/src/loader.h")
 
