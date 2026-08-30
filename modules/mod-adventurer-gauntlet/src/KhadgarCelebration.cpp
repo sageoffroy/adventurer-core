@@ -36,7 +36,6 @@ struct RewardPools
 {
     std::vector<uint32> GreenItems;
     std::vector<uint32> SetItems;
-    std::vector<uint32> PurpleItems;
 };
 
 bool IsEquippableReward(ItemTemplate const& item, uint8 playerLevel)
@@ -83,8 +82,6 @@ RewardPools BuildRewardPools(uint8 playerLevel)
 
         if (item.Quality == ITEM_QUALITY_UNCOMMON)
             pools.GreenItems.push_back(entry);
-        else if (item.Quality == ITEM_QUALITY_EPIC)
-            pools.PurpleItems.push_back(entry);
     }
 
     return pools;
@@ -150,15 +147,10 @@ void FillAdventurerGauntletBossLoot(Creature* boss, bool finalBoss)
 
     AddLootItem(boss, SelectUniqueItem(pools.SetItems, usedEntries));
 
-    // The final boss adds a high-rarity reward. If no level-appropriate epic exists,
-    // the fallback is a second blue Gauntlet set piece instead of an empty slot.
+    // Until special weapons and true epic rewards are curated for the Gauntlet,
+    // the final boss grants a second blue custom set piece instead of stock epics.
     if (finalBoss)
-    {
-        uint32 extraReward = SelectUniqueItem(pools.PurpleItems, usedEntries);
-        if (!extraReward)
-            extraReward = SelectUniqueItem(pools.SetItems, usedEntries);
-        AddLootItem(boss, extraReward);
-    }
+        AddLootItem(boss, SelectUniqueItem(pools.SetItems, usedEntries));
 
     if (!boss->loot.empty())
         boss->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
