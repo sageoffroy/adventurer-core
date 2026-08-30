@@ -30,7 +30,9 @@ fi
 # Upgrade only Adventurer-owned source/runtime/client state. The original clean
 # installation backups remain untouched, so rollback still returns all the way
 # to the pre-Adventurer server rather than merely to the previous package build.
-python3 "$ROOT/tools/upgrade.py" "$@"
+# The wrapper also applies the current Item.dbc contraband metadata and 75%
+# universal-chassis transform as part of the same owned upgrade transaction.
+python3 "$ROOT/tools/upgrade_apply.py" "$@"
 
 # Active spell ranks are upgraded by AzerothCore from db_world.spell_ranks.
 # Mirror that exact server chain into the four custom SkillLineAbility tabs so
