@@ -35,3 +35,13 @@ enabled;entry;source_entry;display_id;set_key;name;quality;required_level;item_l
 1;911143;10213;;alba_serena;Brazales del Solsticio;blue;1;4;;;;1;1;;;;;;;;;;;;
 1;911144;10211;;alba_serena;Botas del Solsticio;blue;2;5;;;1;1;2;;;;;;;;;;;;
 1;911145;10216;;alba_serena;Cinturon del Solsticio;blue;1;4;;;1;1;1;;;;;;;;;;;;
+1;911146;870;;;Hacha de la Brasa Errante;blue;1;4;1;;1;;;;;;;;;7;11;2900;;;Una hoja marcada por el fuego de una expedicion olvidada.
+1;911147;31667;;;Martillo de los Juramentos Rotos;blue;2;5;1;;2;;;;;;;;;10;16;3700;;;Demasiado pesado para una promesa ligera.
+1;911148;869;;;Filo del Alba Velada;blue;3;6;;1;1;;;;;;1;;;5;9;1700;;;Su brillo desaparece en cuanto comienza el combate.
+1;911149;2825;;;Arco de Ceniza Susurrante;blue;4;7;;2;1;;;;;;;;;9;15;2700;;;La cuerda vibra como si recordara incendios lejanos.
+1;911150;868;;;Maza del Vigia Escarlata;blue;5;8;1;;2;;;;;1;;;;8;13;2100;;;Una vieja insignia fue arrancada de su empunadura.
+1;911151;1982;;;Espadon de la Noche Sin Luna;blue;6;9;2;;2;;;;;;;;;14;23;2800;;;La hoja parece absorber la luz a su alrededor.
+1;911152;2164;;;Daga del Ultimo Paso;blue;7;10;;2;1;;;;;;1;;;7;12;1800;;;Equilibrada para quien nunca mira hacia atras.
+1;911153;8708;;;Martillo del Aprendiz Proscrito;blue;8;11;2;;2;;;;;1;;;;9;15;2100;;;Nadie recuerda por que su primer dueno fue expulsado.
+1;911154;871;;;Hacha del Torrente Gris;blue;9;12;;2;2;;;;;;;1;;7;12;1500;;;Rapida como agua entre piedras.
+1;911155;2100;;;Bocarda del Cartografo Perdido;blue;10;13;;2;2;;;;;;1;;;8;14;1500;;;Tiene grabados caminos que no aparecen en ningun mapa.
