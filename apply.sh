@@ -31,9 +31,11 @@ fi
 python3 "$ROOT/tools/database.py" prepare "$@"
 
 # Core compatibility is determined by exact source anchors/APIs, not a frozen
-# Git SHA. This supports both stock AzerothCore and mod-playerbots revisions.
+# Git SHA. The wrapper keeps the normal Adventurer transaction but also extends
+# the atomic client/server DBC bundle with Item.dbc rows for our custom
+# contraband equipment.
 status=0
-python3 "$ROOT/tools/adventurer.py" apply "$@" || status=$?
+python3 "$ROOT/tools/adventurer_apply.py" apply "$@" || status=$?
 
 # Active spell ranks are upgraded by AzerothCore from db_world.spell_ranks.
 # Mirror that exact server chain into the four custom SkillLineAbility tabs so
