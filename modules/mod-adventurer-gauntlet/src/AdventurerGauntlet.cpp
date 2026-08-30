@@ -49,6 +49,9 @@ constexpr float RagefireX = 3.81f;
 constexpr float RagefireY = -14.82f;
 constexpr float RagefireZ = -17.84f;
 constexpr float RagefireO = 4.39f;
+constexpr uint32 RagefireOggleflintEntry = 11517;
+constexpr uint32 RagefireJergoshEntry = 11518;
+constexpr uint32 RagefireBazzalanEntry = 11519;
 constexpr uint32 RagefireFinalBossEntry = 11520;
 
 constexpr uint32 DeadminesMapId = 36;
@@ -70,6 +73,20 @@ constexpr std::array<char const*, 12> CompanyPlaces = {
 bool IsGauntletDungeon(uint32 mapId)
 {
     return mapId == RagefireMapId || mapId == DeadminesMapId;
+}
+
+bool IsRagefireBossEntry(uint32 entry)
+{
+    switch (entry)
+    {
+        case RagefireOggleflintEntry:
+        case RagefireJergoshEntry:
+        case RagefireBazzalanEntry:
+        case RagefireFinalBossEntry:
+            return true;
+        default:
+            return false;
+    }
 }
 
 char const* GetGauntletDungeonName(uint32 mapId)
@@ -96,7 +113,10 @@ bool IsRareCreature(Creature const* creature)
 
 bool IsRewardCreature(Creature const* creature)
 {
-    return creature && (creature->IsDungeonBoss() || IsRareCreature(creature));
+    return creature && (
+        creature->IsDungeonBoss() ||
+        IsRareCreature(creature) ||
+        (creature->GetMapId() == RagefireMapId && IsRagefireBossEntry(creature->GetEntry())));
 }
 
 std::string GenerateCompanyName()
@@ -332,6 +352,24 @@ void ReturnFallenAdventurer(Player* player)
         "Khadgar te ha devuelto, pero este Aventurero no puede volver a participar.");
 }
 
+Creature* SummonRagefireCheckpointKhadgar(Creature* boss)
+{
+    if (!boss || boss->GetMapId() != RagefireMapId)
+        return nullptr;
+
+    Creature* khadgar = boss->SummonCreature(
+        KhadgarEntry,
+        boss->GetPositionX() + 2.5f,
+        boss->GetPositionY() + 1.5f,
+        boss->GetPositionZ(),
+        boss->GetOrientation());
+
+    if (khadgar && boss->GetEntry() != RagefireFinalBossEntry)
+        khadgar->ReplaceAllNpcFlags(UNIT_NPC_FLAG_NONE);
+
+    return khadgar;
+}
+
 void FinishRagefireAndSummonKhadgar(Creature* finalBoss)
 {
     if (!finalBoss || finalBoss->GetMapId() != RagefireMapId || finalBoss->GetEntry() != RagefireFinalBossEntry)
@@ -342,12 +380,7 @@ void FinishRagefireAndSummonKhadgar(Creature* finalBoss)
     if (survivors.empty())
         return;
 
-    Creature* khadgar = finalBoss->SummonCreature(
-        KhadgarEntry,
-        finalBoss->GetPositionX() + 2.5f,
-        finalBoss->GetPositionY() + 1.5f,
-        finalBoss->GetPositionZ(),
-        finalBoss->GetOrientation());
+    Creature* khadgar = SummonRagefireCheckpointKhadgar(finalBoss);
 
     for (Player* player : survivors)
     {
@@ -447,9 +480,10 @@ public:
         if (!creature || !IsActiveRunCreature(creature))
             return;
 
-        bool finalBoss = creature->GetMapId() == RagefireMapId && creature->GetEntry() == RagefireFinalBossEntry;
+        bool ragefireBoss = creature->GetMapId() == RagefireMapId && IsRagefireBossEntry(creature->GetEntry());
+        bool finalBoss = ragefireBoss && creature->GetEntry() == RagefireFinalBossEntry;
 
-        if (creature->IsDungeonBoss())
+        if (creature->IsDungeonBoss() || ragefireBoss)
             FillAdventurerGauntletBossLoot(creature, finalBoss);
         else if (!IsRewardCreature(creature))
         {
@@ -459,6 +493,8 @@ public:
 
         if (finalBoss)
             FinishRagefireAndSummonKhadgar(creature);
+        else if (ragefireBoss)
+            SummonRagefireCheckpointKhadgar(creature);
     }
 };
 
