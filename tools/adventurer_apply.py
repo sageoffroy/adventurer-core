@@ -122,8 +122,12 @@ def _patch_dbc_copy(source, work):
 
 client.patch_dbc_copy = _patch_dbc_copy
 
-# Import only after the client module contract above has been extended so the
-# front-end captures the complete DBC list and uses the patched build function.
+# Keep the source-layer universal chassis at 75% while accepting an existing
+# owned 75% install on future upgrades.
+import chassis_75  # noqa: E402,F401
+
+# Import only after the client/core contracts above have been extended so the
+# front-end captures the complete DBC list and patched source transforms.
 import adventurer  # noqa: E402
 
 
