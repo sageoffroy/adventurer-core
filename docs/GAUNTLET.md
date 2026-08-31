@@ -44,7 +44,7 @@ lobo_solitario.blp
 
 The Libro de Objetos is Gauntlet account progression, not SpellDraft progression.
 
-- Custom Gauntlet items in the controlled range `911100-911399` are discovered when looted.
+- Current custom Adventurer equipment in `910200-910224` and Gauntlet reward equipment in `911100-911399` are eligible for discovery when actually looted.
 - Discovery is persisted by `account_id`, independently of the character that found the item.
 - Character death or deletion does not remove a discovery.
 - The client receives only discovered entries; undiscovered objects are not exposed by the book UI.
