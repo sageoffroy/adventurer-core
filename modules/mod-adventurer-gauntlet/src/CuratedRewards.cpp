@@ -1,4 +1,3 @@
-#include "Config.h"
 #include "Creature.h"
 #include "GameObject.h"
 #include "ItemTemplate.h"
@@ -25,9 +24,17 @@ constexpr uint32 RagefireBazzalanEntry = 11519;
 constexpr uint32 GauntletItemMin = 911100;
 constexpr uint32 GauntletItemMax = 911399;
 
+enum RewardPool : uint8
+{
+    REWARD_GREEN = 0,
+    REWARD_BLUE = 1,
+    REWARD_EPIC = 2,
+    REWARD_LEGENDARY = 3,
+};
+
 struct RewardPools
 {
-    std::array<std::vector<uint32>, 3> Items;
+    std::array<std::vector<uint32>, 4> Items;
 };
 
 std::unordered_set<ObjectGuid::LowType> ProcessedChests;
@@ -53,7 +60,7 @@ bool PassesCommonRewardRules(ItemTemplate const& item, uint8 playerLevel)
         return false;
 
     uint32 minItemLevel = playerLevel > 3 ? playerLevel - 3 : 1;
-    uint32 maxItemLevel = playerLevel + 7;
+    uint32 maxItemLevel = playerLevel + 10;
     if (item.ItemLevel < minItemLevel || item.ItemLevel > maxItemLevel)
         return false;
 
@@ -79,64 +86,52 @@ RewardPools BuildControlledPools(uint8 playerLevel)
 
         bool customGauntletItem = entry >= GauntletItemMin && entry <= GauntletItemMax;
 
+        // Uncommon rewards remain unpredictable stock AzerothCore equipment.
         if (item.Quality == ITEM_QUALITY_UNCOMMON)
         {
             if (!customGauntletItem)
-                pools.Items[0].push_back(entry);
+                pools.Items[REWARD_GREEN].push_back(entry);
             continue;
         }
 
+        // Rare, epic and legendary rewards are Gauntlet-only discoveries.
         if (!customGauntletItem)
             continue;
+
         if (item.Quality == ITEM_QUALITY_RARE)
-            pools.Items[1].push_back(entry);
+            pools.Items[REWARD_BLUE].push_back(entry);
         else if (item.Quality == ITEM_QUALITY_EPIC)
-            pools.Items[2].push_back(entry);
+            pools.Items[REWARD_EPIC].push_back(entry);
+        else if (item.Quality == ITEM_QUALITY_LEGENDARY)
+            pools.Items[REWARD_LEGENDARY].push_back(entry);
     }
 
     return pools;
 }
 
-uint8 RollRewardPoolIndex()
+uint32 SelectFromPool(std::vector<uint32> const& candidates, std::unordered_set<uint32>& usedEntries)
 {
-    uint32 greenWeight = sConfigMgr->GetOption<uint32>("AdventurerGauntlet.RewardGreenWeight", 70);
-    uint32 blueWeight = sConfigMgr->GetOption<uint32>("AdventurerGauntlet.RewardBlueWeight", 25);
-    uint32 purpleWeight = sConfigMgr->GetOption<uint32>("AdventurerGauntlet.RewardPurpleWeight", 5);
-    uint32 totalWeight = greenWeight + blueWeight + purpleWeight;
-    if (!totalWeight)
+    if (candidates.empty())
         return 0;
 
-    uint32 roll = urand(1, totalWeight);
-    if (roll <= greenWeight)
-        return 0;
-    if (roll <= greenWeight + blueWeight)
-        return 1;
-    return 2;
-}
-
-uint32 SelectReward(RewardPools const& pools, std::unordered_set<uint32>& usedEntries)
-{
-    uint8 preferred = RollRewardPoolIndex();
-    for (uint8 offset = 0; offset < 3; ++offset)
+    uint32 attempts = std::min<uint32>(static_cast<uint32>(candidates.size()), 32);
+    for (uint32 attempt = 0; attempt < attempts; ++attempt)
     {
-        uint8 index = (preferred + offset) % 3;
-        auto const& candidates = pools.Items[index];
-        if (candidates.empty())
-            continue;
-
-        uint32 attempts = std::min<uint32>(static_cast<uint32>(candidates.size()), 32);
-        for (uint32 attempt = 0; attempt < attempts; ++attempt)
-        {
-            uint32 entry = candidates[urand(0, static_cast<uint32>(candidates.size() - 1))];
-            if (usedEntries.insert(entry).second)
-                return entry;
-        }
+        uint32 entry = candidates[urand(0, static_cast<uint32>(candidates.size() - 1))];
+        if (usedEntries.insert(entry).second)
+            return entry;
     }
 
-    for (auto const& candidates : pools.Items)
-        if (!candidates.empty())
-            return candidates[urand(0, static_cast<uint32>(candidates.size() - 1))];
-    return 0;
+    return candidates[urand(0, static_cast<uint32>(candidates.size() - 1))];
+}
+
+void AddLootItem(Loot& loot, uint32 itemEntry)
+{
+    if (!itemEntry)
+        return;
+
+    LootStoreItem lootItem(itemEntry, 0, 100.0f, false, LOOT_MODE_DEFAULT, 0, 1, 1);
+    loot.AddItem(lootItem);
 }
 
 bool GetRewardContext(Map* map, uint32& survivorCount, uint8& rewardLevel)
@@ -151,6 +146,7 @@ bool GetRewardContext(Map* map, uint32& survivorCount, uint8& rewardLevel)
         Player* player = ref.GetSource();
         if (!player || !player->IsAlive())
             continue;
+
         ++survivorCount;
         rewardLevel = rewardLevel == 0 ? player->GetLevel() : std::min<uint8>(rewardLevel, player->GetLevel());
     }
@@ -158,7 +154,41 @@ bool GetRewardContext(Map* map, uint32& survivorCount, uint8& rewardLevel)
     return survivorCount && rewardLevel;
 }
 
-bool FillControlledLoot(Loot& loot, Map* map, bool preserveGold)
+void AddCheckpointExtraRoll(Loot& loot, RewardPools const& pools, std::unordered_set<uint32>& usedEntries)
+{
+    // One group-wide bonus roll: 50% nothing, 30% uncommon, 10% rare,
+    // 9% epic, 1% legendary.
+    uint32 roll = urand(1, 100);
+    if (roll <= 50)
+        return;
+    if (roll <= 80)
+        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_GREEN], usedEntries));
+    else if (roll <= 90)
+        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_BLUE], usedEntries));
+    else if (roll <= 99)
+        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_EPIC], usedEntries));
+    else
+        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_LEGENDARY], usedEntries));
+}
+
+void AddFinalExtraRoll(Loot& loot, RewardPools const& pools, std::unordered_set<uint32>& usedEntries)
+{
+    // One group-wide bonus roll: 25% nothing, 50% uncommon, 15% rare,
+    // 7% epic, 3% legendary.
+    uint32 roll = urand(1, 100);
+    if (roll <= 25)
+        return;
+    if (roll <= 75)
+        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_GREEN], usedEntries));
+    else if (roll <= 90)
+        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_BLUE], usedEntries));
+    else if (roll <= 97)
+        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_EPIC], usedEntries));
+    else
+        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_LEGENDARY], usedEntries));
+}
+
+bool FillCheckpointLoot(Loot& loot, Map* map)
 {
     uint32 survivorCount = 0;
     uint8 rewardLevel = 0;
@@ -167,35 +197,43 @@ bool FillControlledLoot(Loot& loot, Map* map, bool preserveGold)
 
     RewardPools pools = BuildControlledPools(rewardLevel);
     std::unordered_set<uint32> usedEntries;
-    uint32 gold = preserveGold ? loot.gold : 0;
+    uint32 gold = loot.gold;
 
     loot.clear();
     loot.loot_type = LOOT_CORPSE;
     loot.gold = gold;
 
+    // Guaranteed base reward: one uncommon stock item per living survivor.
     for (uint32 reward = 0; reward < survivorCount; ++reward)
-    {
-        uint32 itemEntry = SelectReward(pools, usedEntries);
-        if (!itemEntry)
-            break;
-        LootStoreItem lootItem(itemEntry, 0, 100.0f, false, LOOT_MODE_DEFAULT, 0, 1, 1);
-        loot.AddItem(lootItem);
-    }
+        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_GREEN], usedEntries));
 
-    return !loot.empty() || loot.gold;
+    AddCheckpointExtraRoll(loot, pools, usedEntries);
+    return !loot.empty();
 }
 
-bool RefillChest(GameObject* chest)
+bool FillFinalChest(GameObject* chest)
 {
     if (!chest || !chest->GetMap())
         return false;
 
-    if (!FillControlledLoot(chest->loot, chest->GetMap(), false))
+    uint32 survivorCount = 0;
+    uint8 rewardLevel = 0;
+    if (!GetRewardContext(chest->GetMap(), survivorCount, rewardLevel))
         return false;
+
+    RewardPools pools = BuildControlledPools(rewardLevel);
+    std::unordered_set<uint32> usedEntries;
+
+    chest->loot.clear();
+    chest->loot.loot_type = LOOT_CORPSE;
+
+    // Final boss base reward: exactly one controlled rare item for the group.
+    AddLootItem(chest->loot, SelectFromPool(pools.Items[REWARD_BLUE], usedEntries));
+    AddFinalExtraRoll(chest->loot, pools, usedEntries);
 
     chest->SetLootRecipient(chest->GetMap());
     chest->SetLootGenerationTime();
-    return true;
+    return !chest->loot.empty();
 }
 
 void RefillCheckpointBossAfterDeath(Creature* boss)
@@ -207,7 +245,7 @@ void RefillCheckpointBossAfterDeath(Creature* boss)
     if (!key || ProcessedBosses.find(key) != ProcessedBosses.end())
         return;
 
-    if (FillControlledLoot(boss->loot, boss->GetMap(), true))
+    if (FillCheckpointLoot(boss->loot, boss->GetMap()))
     {
         boss->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
         ProcessedBosses.insert(key);
@@ -230,7 +268,7 @@ public:
         if (ProcessedChests.find(guid) != ProcessedChests.end())
             return;
 
-        if (RefillChest(go))
+        if (FillFinalChest(go))
             ProcessedChests.insert(guid);
     }
 
