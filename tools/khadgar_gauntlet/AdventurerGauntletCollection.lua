@@ -93,8 +93,8 @@ local function Refresh()
 
     countText:SetText("Descubiertos: " .. #SORTED)
     pageText:SetText("Página " .. PAGE .. " / " .. pages)
-    prev:SetEnabled(PAGE > 1)
-    nextButton:SetEnabled(PAGE < pages)
+    if PAGE > 1 then prev:Enable() else prev:Disable() end
+    if PAGE < pages then nextButton:Enable() else nextButton:Disable() end
 end
 
 prev:SetScript("OnClick", function()
