@@ -1,5 +1,4 @@
 #include "Creature.h"
-#include "GameObject.h"
 #include "ItemTemplate.h"
 #include "LootMgr.h"
 #include "Map.h"
@@ -16,11 +15,11 @@
 
 namespace
 {
-constexpr uint32 ExpeditionChestEntry = 910001;
 constexpr uint32 RagefireMapId = 389;
 constexpr uint32 RagefireOggleflintEntry = 11517;
 constexpr uint32 RagefireJergoshEntry = 11518;
 constexpr uint32 RagefireBazzalanEntry = 11519;
+constexpr uint32 RagefireFinalBossEntry = 11520;
 constexpr uint32 GauntletItemMin = 911100;
 constexpr uint32 GauntletItemMax = 911399;
 
@@ -37,12 +36,16 @@ struct RewardPools
     std::array<std::vector<uint32>, 4> Items;
 };
 
-std::unordered_set<ObjectGuid::LowType> ProcessedChests;
 std::unordered_set<uint64> ProcessedBosses;
 
 bool IsRagefireCheckpointBoss(uint32 entry)
 {
     return entry == RagefireOggleflintEntry || entry == RagefireJergoshEntry || entry == RagefireBazzalanEntry;
+}
+
+bool IsRagefireRewardBoss(uint32 entry)
+{
+    return IsRagefireCheckpointBoss(entry) || entry == RagefireFinalBossEntry;
 }
 
 uint64 GetBossKey(Creature const* boss)
@@ -86,7 +89,6 @@ RewardPools BuildControlledPools(uint8 playerLevel)
 
         bool customGauntletItem = entry >= GauntletItemMin && entry <= GauntletItemMax;
 
-        // Uncommon rewards remain unpredictable stock AzerothCore equipment.
         if (item.Quality == ITEM_QUALITY_UNCOMMON)
         {
             if (!customGauntletItem)
@@ -94,7 +96,6 @@ RewardPools BuildControlledPools(uint8 playerLevel)
             continue;
         }
 
-        // Rare, epic and legendary rewards are Gauntlet-only discoveries.
         if (!customGauntletItem)
             continue;
 
@@ -156,8 +157,6 @@ bool GetRewardContext(Map* map, uint32& survivorCount, uint8& rewardLevel)
 
 void AddCheckpointExtraRoll(Loot& loot, RewardPools const& pools, std::unordered_set<uint32>& usedEntries)
 {
-    // One group-wide bonus roll: 50% nothing, 30% uncommon, 10% rare,
-    // 9% epic, 1% legendary.
     uint32 roll = urand(1, 100);
     if (roll <= 50)
         return;
@@ -173,8 +172,6 @@ void AddCheckpointExtraRoll(Loot& loot, RewardPools const& pools, std::unordered
 
 void AddFinalExtraRoll(Loot& loot, RewardPools const& pools, std::unordered_set<uint32>& usedEntries)
 {
-    // One group-wide bonus roll: 25% nothing, 50% uncommon, 15% rare,
-    // 7% epic, 3% legendary.
     uint32 roll = urand(1, 100);
     if (roll <= 25)
         return;
@@ -203,7 +200,6 @@ bool FillCheckpointLoot(Loot& loot, Map* map)
     loot.loot_type = LOOT_CORPSE;
     loot.gold = gold;
 
-    // Guaranteed base reward: one uncommon stock item per living survivor.
     for (uint32 reward = 0; reward < survivorCount; ++reward)
         AddLootItem(loot, SelectFromPool(pools.Items[REWARD_GREEN], usedEntries));
 
@@ -211,73 +207,46 @@ bool FillCheckpointLoot(Loot& loot, Map* map)
     return !loot.empty();
 }
 
-bool FillFinalChest(GameObject* chest)
+bool FillFinalBossLoot(Loot& loot, Map* map)
 {
-    if (!chest || !chest->GetMap())
-        return false;
-
     uint32 survivorCount = 0;
     uint8 rewardLevel = 0;
-    if (!GetRewardContext(chest->GetMap(), survivorCount, rewardLevel))
+    if (!GetRewardContext(map, survivorCount, rewardLevel))
         return false;
 
     RewardPools pools = BuildControlledPools(rewardLevel);
     std::unordered_set<uint32> usedEntries;
+    uint32 gold = loot.gold;
 
-    chest->loot.clear();
-    chest->loot.loot_type = LOOT_CORPSE;
+    loot.clear();
+    loot.loot_type = LOOT_CORPSE;
+    loot.gold = gold;
 
-    // Final boss base reward: exactly one controlled rare item for the group.
-    AddLootItem(chest->loot, SelectFromPool(pools.Items[REWARD_BLUE], usedEntries));
-    AddFinalExtraRoll(chest->loot, pools, usedEntries);
-
-    chest->SetLootRecipient(chest->GetMap());
-    chest->SetLootGenerationTime();
-    return !chest->loot.empty();
+    AddLootItem(loot, SelectFromPool(pools.Items[REWARD_BLUE], usedEntries));
+    AddFinalExtraRoll(loot, pools, usedEntries);
+    return !loot.empty();
 }
 
-void RefillCheckpointBossAfterDeath(Creature* boss)
+void RefillBossAfterDeath(Creature* boss)
 {
-    if (!boss || boss->IsAlive() || boss->GetMapId() != RagefireMapId || !IsRagefireCheckpointBoss(boss->GetEntry()))
+    if (!boss || boss->IsAlive() || boss->GetMapId() != RagefireMapId || !IsRagefireRewardBoss(boss->GetEntry()))
         return;
 
     uint64 key = GetBossKey(boss);
     if (!key || ProcessedBosses.find(key) != ProcessedBosses.end())
         return;
 
-    if (FillCheckpointLoot(boss->loot, boss->GetMap()))
+    bool filled = boss->GetEntry() == RagefireFinalBossEntry
+        ? FillFinalBossLoot(boss->loot, boss->GetMap())
+        : FillCheckpointLoot(boss->loot, boss->GetMap());
+
+    if (filled)
     {
         boss->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
         ProcessedBosses.insert(key);
     }
 }
 }
-
-class AdventurerGauntletCuratedRewardsScript : public AllGameObjectScript
-{
-public:
-    AdventurerGauntletCuratedRewardsScript()
-        : AllGameObjectScript("AdventurerGauntletCuratedRewardsScript") { }
-
-    void OnGameObjectUpdate(GameObject* go, uint32 /*diff*/) override
-    {
-        if (!go || go->GetEntry() != ExpeditionChestEntry || go->GetMapId() != RagefireMapId)
-            return;
-
-        ObjectGuid::LowType guid = go->GetGUID().GetCounter();
-        if (ProcessedChests.find(guid) != ProcessedChests.end())
-            return;
-
-        if (FillFinalChest(go))
-            ProcessedChests.insert(guid);
-    }
-
-    void OnGameObjectRemoveWorld(GameObject* go) override
-    {
-        if (go && go->GetEntry() == ExpeditionChestEntry)
-            ProcessedChests.erase(go->GetGUID().GetCounter());
-    }
-};
 
 class AdventurerGauntletBossRewardsScript : public AllCreatureScript
 {
@@ -287,12 +256,12 @@ public:
 
     void OnAllCreatureUpdate(Creature* creature, uint32 /*diff*/) override
     {
-        RefillCheckpointBossAfterDeath(creature);
+        RefillBossAfterDeath(creature);
     }
 
     void OnCreatureRemoveWorld(Creature* creature) override
     {
-        if (!creature || creature->GetMapId() != RagefireMapId || !IsRagefireCheckpointBoss(creature->GetEntry()))
+        if (!creature || creature->GetMapId() != RagefireMapId || !IsRagefireRewardBoss(creature->GetEntry()))
             return;
 
         uint64 key = GetBossKey(creature);
@@ -303,6 +272,5 @@ public:
 
 void AddAdventurerGauntletCuratedRewardsScripts()
 {
-    new AdventurerGauntletCuratedRewardsScript();
     new AdventurerGauntletBossRewardsScript();
 }
