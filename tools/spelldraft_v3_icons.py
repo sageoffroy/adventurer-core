@@ -27,7 +27,7 @@ SPELLICON_FIELDS = 2
 SPELLICON_RECORD_SIZE = 8
 SPELLICON_PATH_FIELD = 1
 CUSTOM_ICON_MIN = 910000
-CUSTOM_ICON_MAX = 919999
+CUSTOM_ICON_MAX = 0xFFFFFFFF
 LONE_WOLF_ICON_ID = 910000
 LONE_WOLF_FILENAME = "spell_hunter_lonewolf.blp"
 LONE_WOLF_DBC_PATH = "Interface\\Icons\\spell_hunter_lonewolf"
@@ -109,7 +109,7 @@ def patch_spell_icon(path: Path, icons: list[tuple[Path, str, str]]) -> dict[str
             while next_id in used_ids:
                 next_id += 1
             if next_id > CUSTOM_ICON_MAX:
-                raise DBCError("SpellDraft v3 custom SpellIcon ID range exhausted")
+                raise DBCError("SpellDraft v3 custom SpellIcon ID space exhausted")
             icon_id = next_id
             next_id += 1
 
