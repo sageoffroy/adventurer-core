@@ -8,6 +8,35 @@ The card is the unit of progression. A card can grant one spell, several related
 
 SpellDraft is the progression system for the native Adventurer class. Talents are obtained as SpellDraft cards rather than through a fixed native talent tree.
 
+## SpellDraft v3 visual layer
+
+SpellDraft v3 adds a managed custom icon pack to the normal Adventurer client pipeline.
+
+Source icons live in:
+
+```text
+client/icons/
+```
+
+After copying or changing `.blp` files, rebuild the stable icon catalogue with:
+
+```bash
+python3 tools/icon_pack.py catalog
+```
+
+The resulting `client/icons/catalog.csv` assigns persistent custom `SpellIcon.dbc` IDs beginning at `910000`. Existing filename-to-ID assignments are preserved when the catalogue is regenerated.
+
+During `apply.sh` / `update.sh` the v3 client pipeline:
+
+1. includes the custom BLP files in the Adventurer `patch-Z` root archive under `Interface\\Icons\\`;
+2. makes `SpellIcon.dbc` part of the managed client/server DBC bundle;
+3. adds catalogue rows for custom icons;
+4. preserves the icon bundle when SpellDraft rank metadata rebuilds the client patch.
+
+A custom BLP whose path/name matches a Blizzard icon overrides that icon through normal patch priority. New icon names remain available to custom spells through their assigned `SpellIcon.dbc` IDs.
+
+The clean Blizzard MPQs and clean DBC source are not edited manually.
+
 ## Card data
 
 Packaged card data lives in `config/spelldraft/cards.csv`.
