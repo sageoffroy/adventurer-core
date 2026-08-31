@@ -29,7 +29,8 @@ SPELLICON_PATH_FIELD = 1
 CUSTOM_ICON_MIN = 910000
 CUSTOM_ICON_MAX = 919999
 LONE_WOLF_ICON_ID = 910000
-LONE_WOLF_FILENAME = "lobo_solitario.blp"
+LONE_WOLF_FILENAME = "spell_hunter_lonewolf.blp"
+LONE_WOLF_DBC_PATH = "Interface\\Icons\\spell_hunter_lonewolf"
 
 
 def dbc_string(dbc: DBC, offset: int) -> str:
@@ -195,13 +196,13 @@ def main() -> int:
             client.install_server_dbcs(build_dir, args.server_data_dir / "dbc")
             client.install_patch(args.client_dir, build_dir, args.locale)
 
-        lone_key = normalized_path("Interface\\Icons\\lobo_solitario")
+        lone_key = normalized_path(LONE_WOLF_DBC_PATH)
         lone_id = assigned.get(lone_key)
         print(f"SpellDraft v3 icon pack installed: {len(icons)} BLP textures.")
         if lone_id is not None:
-            print(f"Lobo solitario icon registered as SpellIcon ID {lone_id}.")
+            print(f"Lobo solitario icon registered as SpellIcon ID {lone_id} ({LONE_WOLF_FILENAME}).")
         else:
-            print("WARNING: lobo_solitario.blp not present in the icon pack yet.")
+            print(f"WARNING: {LONE_WOLF_FILENAME} not present in the icon pack yet.")
         return 0
     except (DBCError, client.ClientError, OSError, ValueError) as exc:
         print(f"ERROR: {exc}")
