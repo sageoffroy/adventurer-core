@@ -18,6 +18,10 @@ QUALITY = {
     "violet": 4,
     "violeta": 4,
     "epic": 4,
+    "5": 5,
+    "orange": 5,
+    "legendary": 5,
+    "legendario": 5,
 }
 
 STAT_COLUMNS = [
@@ -91,7 +95,7 @@ def generate_row(row, line: int) -> str:
 
     quality_key = row["quality"].strip().lower()
     if quality_key not in QUALITY:
-        raise ValueError(f"line {line}: quality must be green/blue/purple (or 2/3/4)")
+        raise ValueError(f"line {line}: quality must be green/blue/purple/legendary (or 2/3/4/5)")
     quality = QUALITY[quality_key]
 
     required_level = parse_int(row["required_level"].strip(), "required_level", line, minimum=0, maximum=80)
@@ -158,8 +162,6 @@ def generate_row(row, line: int) -> str:
     if delay is not None:
         updates.append(f"`delay` = {delay}")
 
-    # Curated gauntlet items should not accidentally inherit use/equip effects from
-    # their visual source. Effects are opt-in through equip_spell1/equip_spell2.
     for index in range(1, 6):
         updates.extend([
             f"`spellid_{index}` = 0",
@@ -190,7 +192,7 @@ def generate_row(row, line: int) -> str:
         f"CREATE TEMPORARY TABLE `{temp}` AS SELECT * FROM `item_template` WHERE `entry` = {source};",
         f"UPDATE `{temp}` SET\n    " + ",\n    ".join(updates) + ";",
         f"INSERT INTO `item_template` SELECT * FROM `{temp}`;",
-        f"DROP TEMPORARY TABLE `{temp}`;",
+        f"DROP TEMPORARY TABLE IF EXISTS `{temp}`;",
     ])
 
 
