@@ -13,6 +13,9 @@ CATALOG_BUILDER="$ROOT_DIR/tools/khadgar_gauntlet/build_catalog.py"
 ITEM_GENERATOR="$ROOT_DIR/tools/khadgar_gauntlet/generate_items.py"
 SET_GENERATOR="$ROOT_DIR/tools/khadgar_gauntlet/generate_sets.py"
 DBC_PATCHER="$ROOT_DIR/tools/khadgar_gauntlet/patch_item_dbc.py"
+SPELL_PATCHER="$ROOT_DIR/tools/khadgar_gauntlet/patch_spell_dbc.py"
+STASH_ADDON_SOURCE="$ROOT_DIR/tools/khadgar_gauntlet/AdventurerGauntletStash.lua"
+MINIMAP_FIX_SOURCE="$ROOT_DIR/tools/khadgar_gauntlet/AdventurerMinimapFix.lua"
 ITEM_SQL="$DST_DIR/data/sql/db-world/updates/2026_08_30_02_adventurer_gauntlet_items.generated.sql"
 SET_INCLUDE="$DST_DIR/src/GeneratedGauntletSets.inc"
 
@@ -26,9 +29,9 @@ if [[ ! -d "$SRC_DIR" ]]; then
   exit 1
 fi
 
-for required in "$CATALOG_BUILDER" "$ITEM_GENERATOR" "$SET_GENERATOR" "$DBC_PATCHER"; do
+for required in "$CATALOG_BUILDER" "$ITEM_GENERATOR" "$SET_GENERATOR" "$DBC_PATCHER" "$SPELL_PATCHER" "$STASH_ADDON_SOURCE" "$MINIMAP_FIX_SOURCE"; do
   if [[ ! -f "$required" ]]; then
-    echo "ERROR: required Gauntlet generator not found: $required" >&2
+    echo "ERROR: required Gauntlet file not found: $required" >&2
     exit 1
   fi
 done
@@ -54,29 +57,41 @@ python3 "$SET_GENERATOR" \
   --sets "$SET_CATALOG" \
   --output "$SET_INCLUDE"
 
-# The server and client must know the same custom Item.dbc rows or Gauntlet
-# rewards degrade to red '?' icons. Patch the final runtime DBC and rebuild the
-# already-owned Adventurer Z patches when the normal local installation exists.
-if [[ -f "$SERVER_DATA_DIR/dbc/Item.dbc" && -d "$CLIENT_DIR" ]]; then
+if [[ -f "$SERVER_DATA_DIR/dbc/Item.dbc" && -f "$SERVER_DATA_DIR/dbc/Spell.dbc" && -d "$CLIENT_DIR" ]]; then
   python3 "$DBC_PATCHER" \
     --catalog "$ITEM_CATALOG" \
     --dbc "$SERVER_DATA_DIR/dbc/Item.dbc"
+
+  python3 "$SPELL_PATCHER" \
+    --dbc "$SERVER_DATA_DIR/dbc/Spell.dbc"
 
   python3 "$ROOT_DIR/tools/sync_item_dbc.py" \
     --core-dir "$CORE_DIR" \
     --server-data-dir "$SERVER_DATA_DIR" \
     --client-dir "$CLIENT_DIR"
 else
-  echo "WARNING: runtime Item.dbc/client not found; Gauntlet client item metadata was not installed." >&2
+  echo "WARNING: runtime DBC/client not found; Gauntlet client metadata was not installed." >&2
 fi
+
+ADDON_DIR="$CLIENT_DIR/Interface/AddOns/AdventurerGauntlet"
+mkdir -p "$ADDON_DIR"
+cat > "$ADDON_DIR/AdventurerGauntlet.toc" <<'EOF'
+## Interface: 30300
+## Title: Adventurer Gauntlet
+## Notes: Account stash and minimap integration for Aventureros de Azeroth.
+AdventurerGauntletStash.lua
+AdventurerMinimapFix.lua
+EOF
+cp "$STASH_ADDON_SOURCE" "$ADDON_DIR/AdventurerGauntletStash.lua"
+cp "$MINIMAP_FIX_SOURCE" "$ADDON_DIR/AdventurerMinimapFix.lua"
 
 echo
 echo "Adventurer Gauntlet installed into: $DST_DIR"
 echo "Khadgar template entry: 910000"
-echo "Expedition chest entry: 910001"
+echo "Expedition reward chest entry: 910001"
+echo "Account stash entry: 910002"
 echo "Controlled custom rewards: 300 (100 set pieces, blue/purple only)"
 echo "Green rewards: random stock world pool"
 echo "Custom item range used: 911100-911399"
-echo "Generated item catalog: $ITEM_CATALOG"
-echo "Generated set catalog: $SET_CATALOG"
-echo "Next: build with make -j2, make install, then start worldserver to apply the new item migration."
+echo "Account stash + minimap integration installed into Interface/AddOns/AdventurerGauntlet"
+echo "Next: build with make -j2, make install, then start worldserver to apply pending migrations."
