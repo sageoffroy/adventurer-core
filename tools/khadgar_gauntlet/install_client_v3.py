@@ -4,10 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import sys
 import tempfile
 from pathlib import Path
-
-import sys
 
 TOOLS_DIR = Path(__file__).resolve().parent.parent
 if str(TOOLS_DIR) not in sys.path:
@@ -20,6 +19,7 @@ from khadgar_gauntlet.patch_spell_dbc import patch as patch_gauntlet_spells
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--core-dir", required=True, type=Path)
     parser.add_argument("--dbc-src", required=True, type=Path)
     parser.add_argument("--server-data-dir", required=True, type=Path)
     parser.add_argument("--client-dir", required=True, type=Path)
@@ -28,8 +28,13 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
+        spell_ranks = (
+            args.core_dir.expanduser().resolve()
+            / "data" / "sql" / "base" / "db_world" / "spell_ranks.sql"
+        )
         icons, assigned = spelldraft_v3_icons.install_wrappers(
-            args.icon_pack_dir.expanduser().resolve()
+            args.icon_pack_dir.expanduser().resolve(),
+            spell_ranks,
         )
         original_patch_dbc_copy = client.patch_dbc_copy
 
@@ -37,7 +42,10 @@ def main() -> int:
             changed = original_patch_dbc_copy(source, work)
             before = (work / "Spell.dbc").read_bytes()
             patch_gauntlet_spells(work / "Spell.dbc")
-            changed["Spell.dbc"] = (work / "Spell.dbc").read_bytes() != before or changed.get("Spell.dbc", False)
+            changed["Spell.dbc"] = (
+                (work / "Spell.dbc").read_bytes() != before
+                or changed.get("Spell.dbc", False)
+            )
             return changed
 
         client.patch_dbc_copy = patch_dbc_copy
@@ -58,7 +66,7 @@ def main() -> int:
         print(f"Gauntlet v3 client bundle installed with {len(icons)} icon textures.")
         print("Lobo solitario client spell: 910501 / SpellIcon: 910000.")
         return 0
-    except (Exception,) as exc:
+    except Exception as exc:
         print(f"ERROR: {exc}")
         return 1
 
