@@ -140,6 +140,10 @@ def generate_row(row, line: int) -> str:
         f"`Quality` = {quality}",
         f"`RequiredLevel` = {required_level}",
         f"`ItemLevel` = {item_level}",
+        # Gauntlet rewards are classless Aventurero gear. Stock source items can
+        # carry Rogue/Warrior/etc. masks; never inherit those restrictions.
+        "`AllowableClass` = -1",
+        "`AllowableRace` = -1",
         "`itemset` = 0",
     ]
 
