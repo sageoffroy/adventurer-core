@@ -17,6 +17,7 @@ constexpr uint32 GauntletSettingPledged = 0;
 constexpr uint32 RagefireMapId = 389;
 constexpr uint32 DeadminesMapId = 36;
 constexpr uint32 LoneWolfSpellId = 910501;
+constexpr uint32 LoneWolfDamagePct = 120;
 
 constexpr std::array<uint32, 5> TrashHealthPct = { 50, 150, 200, 250, 300 };
 constexpr std::array<uint32, 5> RareHealthPct  = { 50, 160, 225, 290, 355 };
@@ -120,7 +121,17 @@ void ApplyHealthScaling(Creature* creature)
 
 uint32 ScaleOutgoingDamage(Unit* attacker, uint32 damage)
 {
-    Creature* creature = attacker ? attacker->ToCreature() : nullptr;
+    if (!attacker)
+        return damage;
+
+    if (Player* player = attacker->ToPlayer())
+    {
+        if (player->HasAura(LoneWolfSpellId))
+            return uint32((uint64(damage) * LoneWolfDamagePct) / 100);
+        return damage;
+    }
+
+    Creature* creature = attacker->ToCreature();
     if (!creature || !IsGauntletMap(creature->GetMapId()) || creature->IsPet() || creature->IsTrigger())
         return damage;
 

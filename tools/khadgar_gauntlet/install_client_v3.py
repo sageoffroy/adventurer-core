@@ -56,15 +56,20 @@ def main() -> int:
             client.install_server_dbcs(build_dir, args.server_data_dir / "dbc")
             client.install_patch(args.client_dir, build_dir, args.locale)
 
-        lone_key = spelldraft_v3_icons.normalized_path("Interface\\Icons\\lobo_solitario")
+        lone_key = spelldraft_v3_icons.normalized_path(
+            spelldraft_v3_icons.LONE_WOLF_DBC_PATH
+        )
         lone_id = assigned.get(lone_key)
         if lone_id != spelldraft_v3_icons.LONE_WOLF_ICON_ID:
             raise RuntimeError(
-                "lobo_solitario.blp must be a new custom icon and resolve to SpellIcon ID 910000"
+                f"{spelldraft_v3_icons.LONE_WOLF_FILENAME} must resolve to SpellIcon ID 910000"
             )
 
         print(f"Gauntlet v3 client bundle installed with {len(icons)} icon textures.")
-        print("Lobo solitario client spell: 910501 / SpellIcon: 910000.")
+        print(
+            "Lobo solitario client spell: 910501 / SpellIcon: 910000 "
+            f"({spelldraft_v3_icons.LONE_WOLF_FILENAME})."
+        )
         return 0
     except Exception as exc:
         print(f"ERROR: {exc}")

@@ -19,10 +19,15 @@ LONE_WOLF_ICON_ID = 910000
 BASE_BUFF_SPELL_ID = 1126
 PLEDGE_ICON_SOURCE_SPELL_ID = 48743
 
+SPELL_EFFECT_APPLY_AURA = 6
+SPELL_AURA_MOD_INCREASE_SPEED = 31
+SPELL_AURA_MOD_MELEE_RANGED_HASTE = 192
+SPELL_AURA_HASTE_SPELLS = 216
+
 PLEDGE_NAME = "Juramento del Último Aliento"
 PLEDGE_DESCRIPTION = "El pacto de Khadgar sigue vigente. Si mueres, este personaje no podrá volver a la vida."
 LONE_WOLF_NAME = "Lobo solitario"
-LONE_WOLF_DESCRIPTION = "Has entrado solo al Desafío de Khadgar. Esta marca permanece mientras afrontes la expedición sin compañeros."
+LONE_WOLF_DESCRIPTION = "+20% de daño infligido, +10% de celeridad y +20% de velocidad de movimiento mientras afrontas solo el Desafío de Khadgar."
 
 
 def _set_localized(dbc: DBC, row: bytearray, start_field: int, text: str) -> None:
@@ -75,6 +80,15 @@ def _build_marker_aura(
     return row
 
 
+def _set_aura_effect(row: bytearray, index: int, aura_type: int, amount_pct: int) -> None:
+    if index < 0 or index > 2:
+        raise ValueError(f"invalid spell effect index: {index}")
+    set_u32(row, 71 + index, SPELL_EFFECT_APPLY_AURA)
+    set_u32(row, 80 + index, amount_pct - 1)
+    set_u32(row, 86 + index, 1)
+    set_u32(row, 95 + index, aura_type)
+
+
 def patch(path: Path) -> bool:
     dbc = DBC.read(path)
     if dbc.fields != SPELL_FIELDS or dbc.record_size != SPELL_RECORD_SIZE:
@@ -107,6 +121,11 @@ def patch(path: Path) -> bool:
         LONE_WOLF_NAME,
         LONE_WOLF_DESCRIPTION,
     )
+    for field in range(71, 131):
+        set_u32(lone_wolf, field, 0)
+    _set_aura_effect(lone_wolf, 0, SPELL_AURA_MOD_INCREASE_SPEED, 20)
+    _set_aura_effect(lone_wolf, 1, SPELL_AURA_MOD_MELEE_RANGED_HASTE, 10)
+    _set_aura_effect(lone_wolf, 2, SPELL_AURA_HASTE_SPELLS, 10)
 
     dbc.records = base_rows + [pledge, lone_wolf]
     dbc.records.sort(key=lambda record: u32(record, 0))
