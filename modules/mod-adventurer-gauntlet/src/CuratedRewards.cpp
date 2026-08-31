@@ -1,4 +1,5 @@
 #include "Config.h"
+#include "Creature.h"
 #include "GameObject.h"
 #include "ItemTemplate.h"
 #include "LootMgr.h"
@@ -18,6 +19,9 @@ namespace
 {
 constexpr uint32 ExpeditionChestEntry = 910001;
 constexpr uint32 RagefireMapId = 389;
+constexpr uint32 RagefireOggleflintEntry = 11517;
+constexpr uint32 RagefireJergoshEntry = 11518;
+constexpr uint32 RagefireBazzalanEntry = 11519;
 constexpr uint32 GauntletItemMin = 911100;
 constexpr uint32 GauntletItemMax = 911399;
 
@@ -27,6 +31,12 @@ struct RewardPools
 };
 
 std::unordered_set<ObjectGuid::LowType> ProcessedChests;
+std::unordered_set<uint64> ProcessedBosses;
+
+bool IsRagefireCheckpointBoss(uint32 entry)
+{
+    return entry == RagefireOggleflintEntry || entry == RagefireJergoshEntry || entry == RagefireBazzalanEntry;
+}
 
 bool PassesCommonRewardRules(ItemTemplate const& item, uint8 playerLevel)
 {
@@ -64,7 +74,6 @@ RewardPools BuildControlledPools(uint8 playerLevel)
 
         bool customGauntletItem = entry >= GauntletItemMin && entry <= GauntletItemMax;
 
-        // Greens stay unpredictable and come from AzerothCore's stock world pool.
         if (item.Quality == ITEM_QUALITY_UNCOMMON)
         {
             if (!customGauntletItem)
@@ -72,8 +81,6 @@ RewardPools BuildControlledPools(uint8 playerLevel)
             continue;
         }
 
-        // Blue and purple rewards are deliberately restricted to our curated
-        // Gauntlet catalog. Stock rares/epics can no longer leak into the chest.
         if (!customGauntletItem)
             continue;
         if (item.Quality == ITEM_QUALITY_RARE)
@@ -127,14 +134,14 @@ uint32 SelectReward(RewardPools const& pools, std::unordered_set<uint32>& usedEn
     return 0;
 }
 
-bool RefillChest(GameObject* chest)
+bool GetRewardContext(Map* map, uint32& survivorCount, uint8& rewardLevel)
 {
-    if (!chest || !chest->GetMap())
+    survivorCount = 0;
+    rewardLevel = 0;
+    if (!map)
         return false;
 
-    uint32 survivorCount = 0;
-    uint8 rewardLevel = 0;
-    for (auto const& ref : chest->GetMap()->GetPlayers())
+    for (auto const& ref : map->GetPlayers())
     {
         Player* player = ref.GetSource();
         if (!player || !player->IsAlive())
@@ -142,26 +149,61 @@ bool RefillChest(GameObject* chest)
         ++survivorCount;
         rewardLevel = rewardLevel == 0 ? player->GetLevel() : std::min<uint8>(rewardLevel, player->GetLevel());
     }
-    if (!survivorCount || !rewardLevel)
+
+    return survivorCount && rewardLevel;
+}
+
+bool FillControlledLoot(Loot& loot, Map* map, bool preserveGold)
+{
+    uint32 survivorCount = 0;
+    uint8 rewardLevel = 0;
+    if (!GetRewardContext(map, survivorCount, rewardLevel))
         return false;
 
     RewardPools pools = BuildControlledPools(rewardLevel);
     std::unordered_set<uint32> usedEntries;
+    uint32 gold = preserveGold ? loot.gold : 0;
 
-    chest->loot.clear();
-    chest->loot.loot_type = LOOT_CORPSE;
+    loot.clear();
+    loot.loot_type = LOOT_CORPSE;
+    loot.gold = gold;
+
     for (uint32 reward = 0; reward < survivorCount; ++reward)
     {
         uint32 itemEntry = SelectReward(pools, usedEntries);
         if (!itemEntry)
             break;
         LootStoreItem lootItem(itemEntry, 0, 100.0f, false, LOOT_MODE_DEFAULT, 0, 1, 1);
-        chest->loot.AddItem(lootItem);
+        loot.AddItem(lootItem);
     }
+
+    return !loot.empty() || loot.gold;
+}
+
+bool RefillChest(GameObject* chest)
+{
+    if (!chest || !chest->GetMap())
+        return false;
+
+    if (!FillControlledLoot(chest->loot, chest->GetMap(), false))
+        return false;
 
     chest->SetLootRecipient(chest->GetMap());
     chest->SetLootGenerationTime();
     return true;
+}
+
+void RefillCheckpointBoss(Creature* boss)
+{
+    if (!boss || boss->GetMapId() != RagefireMapId || !IsRagefireCheckpointBoss(boss->GetEntry()))
+        return;
+
+    uint64 key = (uint64(boss->GetInstanceId()) << 32) | uint64(boss->GetGUID().GetCounter());
+    if (!ProcessedBosses.insert(key).second)
+        return;
+
+    if (FillControlledLoot(boss->loot, boss->GetMap(), true))
+        boss->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
 }
 }
 
@@ -180,9 +222,6 @@ public:
         if (ProcessedChests.find(guid) != ProcessedChests.end())
             return;
 
-        // The original celebration fills the chest immediately after summoning
-        // it. The first world update runs afterward, so replacing the loot here
-        // is deterministic and leaves the celebration/portal flow untouched.
         if (RefillChest(go))
             ProcessedChests.insert(guid);
     }
@@ -194,7 +233,21 @@ public:
     }
 };
 
+class AdventurerGauntletBossRewardsScript : public UnitScript
+{
+public:
+    AdventurerGauntletBossRewardsScript()
+        : UnitScript("AdventurerGauntletBossRewardsScript") { }
+
+    void OnUnitDeath(Unit* unit, Unit* /*killer*/) override
+    {
+        if (Creature* boss = unit ? unit->ToCreature() : nullptr)
+            RefillCheckpointBoss(boss);
+    }
+};
+
 void AddAdventurerGauntletCuratedRewardsScripts()
 {
     new AdventurerGauntletCuratedRewardsScript();
+    new AdventurerGauntletBossRewardsScript();
 }
