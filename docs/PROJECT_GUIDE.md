@@ -9,16 +9,16 @@ Read `AI_CONTEXT.md` first for working rules. For SpellDraft internals read `SPE
 Aventureros de Azeroth has two technical layers in this repository:
 
 ```text
-stable/spelldraft-v2
-  = native Adventurer class + SpellDraft v2
+stable/spelldraft-v3
+  = native Adventurer class + SpellDraft v3 + managed icon layer
 
-stable/gauntlet-v2
-  = stable/spelldraft-v2 + mod-adventurer-gauntlet
+stable/gauntlet-v3
+  = stable/spelldraft-v3 + mod-adventurer-gauntlet
 ```
 
 The dependency direction is one-way: Gauntlet depends on the matching stable SpellDraft major version; SpellDraft does not depend on Gauntlet.
 
-Gauntlet-only evolution may advance as `v2.1`, `v2.2`, etc. When the stable SpellDraft base becomes v3, integrate that base into Gauntlet and continue as `stable/gauntlet-v3`.
+Gauntlet-only evolution may advance as `v3.1`, `v3.2`, etc. A future SpellDraft major version is integrated once into Gauntlet and creates the corresponding Gauntlet major line.
 
 Old `feature/khadgar-gauntlet-*` branches and `aventurerosdeazeroth/feature/mod-dungeon-master` are historical development references only.
 
@@ -26,8 +26,8 @@ Old `feature/khadgar-gauntlet-*` branches and `aventurerosdeazeroth/feature/mod-
 
 ### Root entrypoints
 
-- `apply.sh` — clean Adventurer/SpellDraft installation entrypoint. Coordinates preflight, source patching, DB/DBC/client/runtime installation and transaction state.
-- `update.sh` — updates an existing Adventurer installation using the same pipeline and preserves editable runtime files where supported.
+- `apply.sh` — clean Adventurer/SpellDraft installation entrypoint. Coordinates preflight, source patching, DB/DBC/client/runtime installation and transaction state. In v3 it routes the client stage through the icon-pack adapter.
+- `update.sh` — updates an existing Adventurer installation using the same pipeline and preserves editable runtime files where supported. In v3 it rebuilds the managed icon bundle as part of the normal update.
 - `rollback.sh` — reverses Adventurer-owned installation state using the repository's current rollback mechanism.
 - `preflight.sh` — read-only compatibility/preflight entrypoint.
 - `verify.sh` — verification entrypoint for the installed state.
@@ -59,8 +59,11 @@ Client-side source material installed into the WotLK client by the existing clie
 - `AdventurerPlayerFrame.xml` — FrameXML layout/registration for Adventurer-specific player UI pieces.
 - `AdventurerResources.lua` — client display logic for Adventurer resources.
 - `art/` — client art assets owned by the project.
+- `icons/` — SpellDraft v3 custom BLP source pack. `catalog.csv` gives added icons stable custom `SpellIcon.dbc` IDs. A BLP matching a stock Blizzard icon path/name overrides that icon through normal patch priority.
 - `baseline/CharacterCreate.lua` — baseline Blizzard client file used by the patching process for character-creation changes.
 - `baseline/FrameXML.toc` — baseline client TOC used by the client patch process.
+
+The custom icon pack is packaged into the project-owned `patch-Z` archive; do not manually replace Blizzard MPQs.
 
 ### `payload/`
 
@@ -78,15 +81,17 @@ Server-side Gauntlet / Dungeon Master module. This directory is intentionally se
 - `src/AdventurerGauntlet.cpp` — main dungeon-run orchestration and mode behavior.
 - `src/GauntletScaling.cpp` — Gauntlet creature/group scaling.
 - `src/GauntletPermadeath.cpp` — permanent-death/run-death behavior.
+- `src/LoneWolf.cpp` — Gauntlet v3 `Lobo solitario` solo-entry aura handling.
 - `src/CuratedRewards.cpp` — controlled boss rewards. Current Ragefire rewards are written directly to boss corpse loot.
 - `src/AccountStash.cpp` — persistent account stash behavior.
+- `src/AccountCollection.cpp` — account-wide discovery persistence for the Gauntlet Libro de Objetos.
 - `src/SetBonuses.cpp` — custom Gauntlet set-bonus handling.
 - `src/KhadgarCelebration.cpp` — Khadgar-related presentation/celebration behavior.
 - `src/loader.h` — module script registration.
 - `conf/` — Gauntlet runtime configuration distribution.
 - `data/items/early_items.csv` — curated/custom reward item catalogue.
 - `data/items/sets.csv` — Gauntlet set definitions.
-- `data/sql/` — Gauntlet-owned world/characters database updates.
+- `data/sql/` — Gauntlet-owned world/characters database updates, including account stash and object-discovery persistence.
 - `README.md` — module-specific behavior/install notes; it must agree with `docs/GAUNTLET.md`.
 
 ### `sql/`
@@ -107,6 +112,12 @@ Python implementation behind the shell entrypoints.
 
 - `adventurer.py` — common installer/orchestration utilities, target validation, transaction/state helpers and shared filesystem logic.
 - `adventurer_apply.py` — Adventurer apply wrapper and narrow project-specific native transforms, including the SpellDraft Tame Beast class gate.
+- `adventurer_apply_v3.py` — v3 bootstrap that preserves the existing apply architecture while ensuring icon/client adapters are registered before the installer snapshots imported client functions.
+- `upgrade_apply_v3.py` — equivalent v3 import-order adapter for the existing upgrade flow.
+- `spell_rank_tabs_v3.py` — runs the existing rank-tab rebuild with v3 client adapters enabled so rebuilding rank metadata cannot drop the icon pack.
+- `icon_pack.py` — scans `client/icons/`, preserves stable icon IDs in `catalog.csv`, patches `SpellIcon.dbc`, and exposes BLP payloads for the client patch.
+- `icon_client.py` — attaches the v3 icon/SpellIcon behavior to the existing `tools/client.py` pipeline. On the Gauntlet v3 branch it also layers Gauntlet-owned custom Spell.dbc rows into the same server/client bundle.
+- `gauntlet_spells.py` — Gauntlet v3 source of truth for custom `Spell.dbc` rows such as Juramento (`910500`) and Lobo solitario (`910501`).
 - `adopt_source.py` — explicitly adopts approved pre-existing native source files into the installer ownership/rollback state when a stable update begins owning them.
 - `core_patch.py` — exact-anchor transformations applied to native AzerothCore source files.
 - `database.py` — database install/snapshot/restore support used by the current pipeline.
@@ -131,14 +142,15 @@ Python implementation behind the shell entrypoints.
 
 Gauntlet-specific installation, generation and client tooling.
 
-- `install.sh` — installs/updates the Gauntlet module into the target AzerothCore checkout.
+- `install.sh` — installs/updates the Gauntlet module into the target AzerothCore checkout and uses `env/dist/data` as the runtime data default.
 - `AdventurerGauntletStash.lua` — Gauntlet stash client UI/runtime integration.
+- `AdventurerGauntletCollection.lua` — Gauntlet v3 Libro de Objetos UI. Only server-reported discoveries are rendered; `/objetos` and `/librodeobjetos` open it.
 - `AdventurerMinimapFix.lua` — Gauntlet client minimap compatibility fix.
 - `build_catalog.py` — builds/normalizes Gauntlet reward catalogue data.
 - `generate_items.py` — generates custom Gauntlet item data.
 - `generate_sets.py` — generates custom Gauntlet set definitions/server include data.
 - `patch_item_dbc.py` — Gauntlet item DBC helper.
-- `patch_spell_dbc.py` — Gauntlet spell DBC helper where required by module content.
+- `patch_spell_dbc.py` — thin installer entrypoint that delegates to `tools/gauntlet_spells.py` so there is one custom-spell definition path.
 
 The directory keeps the historical `khadgar_gauntlet` name to avoid needless path churn. Khadgar is only one part of the Gauntlet module.
 
@@ -154,9 +166,9 @@ Current documentation sources:
 
 - `AI_CONTEXT.md` — durable working rules and branch model for new AI/developer sessions.
 - `PROJECT_GUIDE.md` — this repository map and flow reference.
-- `SPELLDRAFT.md` — current Adventurer/SpellDraft model.
+- `SPELLDRAFT.md` — current Adventurer/SpellDraft model and v3 icon pipeline.
 - `SPELL_WORKFLOW.md` — operational spell-adaptation process.
-- `GAUNTLET.md` — Gauntlet boundaries, versioning and install/update flow.
+- `GAUNTLET.md` — Gauntlet boundaries, versioning, v3 systems and install/update flow.
 - `ROLLBACK.md` — detailed current rollback behavior.
 - `ARCHITECTURE.md` — compatibility pointer to this guide plus Gauntlet documentation.
 
@@ -171,8 +183,9 @@ apply.sh
   -> stage Adventurer-owned source + native core transformations
   -> stage/apply world database changes
   -> build/stage server DBC changes
+  -> SpellDraft v3 icon/SpellIcon adapter
   -> install SpellDraft runtime/config/catalogue
-  -> build/install client patch + client DBC/files
+  -> build/install client patch + client DBC/files/icons
   -> optional Playerbots integration when present
   -> record current installer state for verify/update/rollback
 ```
@@ -186,20 +199,37 @@ update.sh
   -> inspect existing Adventurer state
   -> adopt explicitly approved newly-owned native source when required
   -> plan current source/data changes
-  -> apply the existing upgrade/ownership rules
+  -> apply the existing upgrade/ownership rules with v3 client adapters loaded first
+  -> rebuild SpellDraft rank tabs without dropping the v3 icon bundle
   -> refresh packaged runtime defaults while preserving editable runtime copies where supported
   -> update server DBC/client payload
   -> update transaction/install state
 ```
 
-### 3. Gauntlet install/update
+### 3. SpellDraft v3 icon flow
 
 ```text
-checkout stable/gauntlet-vN
-  -> run normal Adventurer update/apply for the matching SpellDraft base
+copy .blp files -> client/icons/
+  -> python3 tools/icon_pack.py catalog
+  -> stable filename-to-SpellIcon ID assignments
+  -> apply.sh/update.sh
+  -> patch SpellIcon.dbc
+  -> package Interface\\Icons\\... in patch-Z
+  -> same managed DBC/client bundle survives rank rebuilds
+```
+
+Matching stock filenames override stock visual icons through patch priority. Additional filenames are available to custom spells via the generated `SpellIcon.dbc` entries.
+
+### 4. Gauntlet install/update
+
+```text
+checkout stable/gauntlet-v3
+  -> run normal Adventurer update/apply for SpellDraft v3
   -> tools/khadgar_gauntlet/install.sh
   -> copy/install mod-adventurer-gauntlet
-  -> generate/install Gauntlet items/sets/client pieces
+  -> generate/install Gauntlet items/sets/client addon pieces
+  -> install Libro de Objetos persistence/UI
+  -> install Gauntlet custom spell rows in the same client/server DBC model
   -> shared final Item.dbc synchronization where required
   -> make -j2 && make install
   -> start worldserver
@@ -208,7 +238,21 @@ checkout stable/gauntlet-vN
 
 Gauntlet-only fixes stay on the Gauntlet line. Do not merge them back into SpellDraft unless the change is genuinely a base Adventurer/SpellDraft change.
 
-### 4. Native core C++ change
+### 5. Libro de Objetos flow
+
+```text
+character loots current custom Adventurer/Gauntlet equipment
+  -> PlayerScript loot hook
+  -> INSERT IGNORE by account_id + item_entry
+  -> discovery survives character death/deletion
+  -> /objetos requests account state
+  -> server sends discovered item IDs only
+  -> AdventurerGauntletCollection.lua renders discovered entries
+```
+
+The book is discovery history, not storage. The Baul de Expediciones remains a separate mechanic.
+
+### 6. Native core C++ change
 
 ```text
 requested gameplay behavior
@@ -223,13 +267,13 @@ requested gameplay behavior
 
 Do not create a second patcher.
 
-### 5. DBC/client data change
+### 7. DBC/client data change
 
 ```text
 source config/catalogue
   -> tools/dbc.py and/or existing generator
   -> staged server DBC
-  -> tools/client.py client payload
+  -> tools/client.py plus registered adapters
   -> same intended DBC/game data reaches server and client where required
   -> restart client/server as required
   -> test in game
@@ -237,7 +281,7 @@ source config/catalogue
 
 DBC edits to native spell IDs may be global. Do not assume an edit is Adventurer-private unless the implementation actually creates/uses a private copy.
 
-### 6. SpellDraft runtime flow
+### 8. SpellDraft runtime flow
 
 ```text
 config/spelldraft/cards.csv + spelldraft.conf + metadata
@@ -251,7 +295,7 @@ config/spelldraft/cards.csv + spelldraft.conf + metadata
 
 See `SPELLDRAFT.md` for current progression and meta mechanics.
 
-### 7. Spell adaptation flow
+### 9. Spell adaptation flow
 
 ```text
 existing native spell + desired Adventurer behavior
@@ -267,7 +311,7 @@ existing native spell + desired Adventurer behavior
 
 See `SPELL_WORKFLOW.md`.
 
-### 8. Playerbots flow
+### 10. Playerbots flow
 
 ```text
 installer detects modules/mod-playerbots
@@ -278,7 +322,7 @@ installer detects modules/mod-playerbots
 
 Playerbots is optional and must not become a requirement for core Adventurer installation.
 
-### 9. Rollback flow
+### 11. Rollback flow
 
 ```text
 rollback.sh
@@ -290,7 +334,7 @@ rollback.sh
 
 Detailed safeguards and exact DB behavior live in `ROLLBACK.md`. Gameplay work should not add new rollback layers by default.
 
-### 10. Normal gameplay validation
+### 12. Normal gameplay validation
 
 ```text
 make minimal change
