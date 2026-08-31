@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Attach the SpellDraft v3 icon pack to the existing client/DBC pipeline."""
+"""Attach SpellDraft v3 icons and Gauntlet v3 DBC rows to the client pipeline."""
 
 from __future__ import annotations
 
 import client
+import gauntlet_spells
 import icon_pack
 
 SPELL_ICON_DBC = "SpellIcon.dbc"
@@ -31,6 +32,8 @@ def enable() -> None:
     def patch_dbc_copy(source, work):
         changed = original_patch_dbc_copy(source, work)
         changed[SPELL_ICON_DBC] = icon_pack.patch_spell_icon(work / SPELL_ICON_DBC)
+        gauntlet_changed = gauntlet_spells.patch(work / "Spell.dbc")
+        changed["Spell.dbc"] = gauntlet_changed or changed.get("Spell.dbc", False)
         return changed
 
     client.patch_dbc_copy = patch_dbc_copy
