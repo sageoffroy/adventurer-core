@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import struct
 from pathlib import Path
 
 from dbc import DBC, DBCError, set_u32, u32
@@ -10,8 +9,8 @@ from dbc import DBC, DBCError, set_u32, u32
 SPELL_FIELDS = 234
 SPELL_RECORD_SIZE = SPELL_FIELDS * 4
 PLEDGE_SPELL_ID = 910500
-BASE_BUFF_SPELL_ID = 1126      # Mark of the Wild: ordinary positive aura shell.
-ICON_SOURCE_SPELL_ID = 48743   # Death Pact: icon only.
+BASE_BUFF_SPELL_ID = 1126
+ICON_SOURCE_SPELL_ID = 48743
 
 NAME = "Juramento del Último Aliento"
 DESCRIPTION = "El pacto de Khadgar sigue vigente. Si mueres, este personaje no podrá volver a la vida."
@@ -41,21 +40,19 @@ def patch(path: Path) -> bool:
     row = bytearray(base)
     set_u32(row, 0, PLEDGE_SPELL_ID)
 
-    # Make this a pure, beneficial dummy aura. It carries no stats, damage,
-    # proc, dispel mechanic, cooldown, visual or spell-family behavior.
     for field in range(1, 40):
         set_u32(row, field, 0)
-    # Keep the base spell's DurationIndex; the server makes the aura infinite.
     for field in range(41, 71):
         set_u32(row, field, 0)
+    set_u32(row, 68, 0xFFFFFFFF)  # no equipped item class requirement
+
     for field in range(71, 131):
         set_u32(row, field, 0)
-
     set_u32(row, 71, 6)   # SPELL_EFFECT_APPLY_AURA
     set_u32(row, 86, 1)   # TARGET_UNIT_CASTER
     set_u32(row, 95, 4)   # SPELL_AURA_DUMMY
 
-    set_u32(row, 131, 0)  # no cast visual
+    set_u32(row, 131, 0)
     set_u32(row, 132, 0)
     set_u32(row, 133, u32(icon_source, 133))
     set_u32(row, 134, 0)
@@ -72,7 +69,7 @@ def patch(path: Path) -> bool:
 
     for field in range(204, 234):
         set_u32(row, field, 0)
-    set_u32(row, 225, 32)  # Shadow school, cosmetic only.
+    set_u32(row, 225, 32)
 
     dbc.records = base_rows + [row]
     dbc.records.sort(key=lambda record: u32(record, 0))
