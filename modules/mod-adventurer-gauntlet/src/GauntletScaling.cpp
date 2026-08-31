@@ -17,10 +17,10 @@ constexpr uint32 GauntletSettingPledged = 0;
 constexpr uint32 RagefireMapId = 389;
 constexpr uint32 DeadminesMapId = 36;
 
-constexpr std::array<uint32, 5> TrashHealthPct = { 75, 150, 200, 250, 300 };
-constexpr std::array<uint32, 5> RareHealthPct  = { 90, 160, 225, 290, 355 };
-constexpr std::array<uint32, 5> BossHealthPct  = { 100, 175, 250, 325, 400 };
-constexpr std::array<uint32, 5> DamagePct      = { 100, 115, 130, 145, 160 };
+constexpr std::array<uint32, 5> TrashHealthPct = { 50, 150, 200, 250, 300 };
+constexpr std::array<uint32, 5> RareHealthPct  = { 50, 160, 225, 290, 355 };
+constexpr std::array<uint32, 5> BossHealthPct  = { 50, 175, 250, 325, 400 };
+constexpr std::array<uint32, 5> DamagePct      = { 75, 115, 130, 145, 160 };
 
 std::unordered_set<uint64> ScaledCreatures;
 
