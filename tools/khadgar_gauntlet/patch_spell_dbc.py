@@ -2,7 +2,15 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
+
+# This script lives in tools/khadgar_gauntlet while dbc.py lives one directory
+# above it. Add tools/ explicitly so the patcher works when invoked directly by
+# install.sh from any current working directory.
+TOOLS_DIR = Path(__file__).resolve().parent.parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
 
 from dbc import DBC, DBCError, set_u32, u32
 
@@ -44,13 +52,13 @@ def patch(path: Path) -> bool:
         set_u32(row, field, 0)
     for field in range(41, 71):
         set_u32(row, field, 0)
-    set_u32(row, 68, 0xFFFFFFFF)  # no equipped item class requirement
+    set_u32(row, 68, 0xFFFFFFFF)
 
     for field in range(71, 131):
         set_u32(row, field, 0)
-    set_u32(row, 71, 6)   # SPELL_EFFECT_APPLY_AURA
-    set_u32(row, 86, 1)   # TARGET_UNIT_CASTER
-    set_u32(row, 95, 4)   # SPELL_AURA_DUMMY
+    set_u32(row, 71, 6)
+    set_u32(row, 86, 1)
+    set_u32(row, 95, 4)
 
     set_u32(row, 131, 0)
     set_u32(row, 132, 0)
