@@ -38,6 +38,11 @@ bool IsRagefireCheckpointBoss(uint32 entry)
     return entry == RagefireOggleflintEntry || entry == RagefireJergoshEntry || entry == RagefireBazzalanEntry;
 }
 
+uint64 GetBossKey(Creature const* boss)
+{
+    return boss ? ((uint64(boss->GetInstanceId()) << 32) | uint64(boss->GetGUID().GetCounter())) : 0;
+}
+
 bool PassesCommonRewardRules(ItemTemplate const& item, uint8 playerLevel)
 {
     if (item.Class != ITEM_CLASS_WEAPON && item.Class != ITEM_CLASS_ARMOR)
@@ -193,17 +198,24 @@ bool RefillChest(GameObject* chest)
     return true;
 }
 
-void RefillCheckpointBoss(Creature* boss)
+void RefillCheckpointBossAfterDeath(Creature* boss)
 {
-    if (!boss || boss->GetMapId() != RagefireMapId || !IsRagefireCheckpointBoss(boss->GetEntry()))
+    if (!boss || boss->IsAlive() || boss->GetMapId() != RagefireMapId || !IsRagefireCheckpointBoss(boss->GetEntry()))
         return;
 
-    uint64 key = (uint64(boss->GetInstanceId()) << 32) | uint64(boss->GetGUID().GetCounter());
-    if (!ProcessedBosses.insert(key).second)
+    uint64 key = GetBossKey(boss);
+    if (!key || ProcessedBosses.find(key) != ProcessedBosses.end())
         return;
 
+    // Creature::Update runs after the native death/loot path has completed.
+    // Replacing items here prevents the core from overwriting our injected loot.
+    // Preserve native money, but replace all stock equipment with one controlled
+    // Gauntlet reward per living survivor.
     if (FillControlledLoot(boss->loot, boss->GetMap(), true))
+    {
         boss->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
+        ProcessedBosses.insert(key);
+    }
 }
 }
 
@@ -233,16 +245,25 @@ public:
     }
 };
 
-class AdventurerGauntletBossRewardsScript : public UnitScript
+class AdventurerGauntletBossRewardsScript : public AllCreatureScript
 {
 public:
     AdventurerGauntletBossRewardsScript()
-        : UnitScript("AdventurerGauntletBossRewardsScript") { }
+        : AllCreatureScript("AdventurerGauntletBossRewardsScript") { }
 
-    void OnUnitDeath(Unit* unit, Unit* /*killer*/) override
+    void OnCreatureUpdate(Creature* creature, uint32 /*diff*/) override
     {
-        if (Creature* boss = unit ? unit->ToCreature() : nullptr)
-            RefillCheckpointBoss(boss);
+        RefillCheckpointBossAfterDeath(creature);
+    }
+
+    void OnCreatureRemoveWorld(Creature* creature) override
+    {
+        if (!creature || creature->GetMapId() != RagefireMapId || !IsRagefireCheckpointBoss(creature->GetEntry()))
+            return;
+
+        uint64 key = GetBossKey(creature);
+        if (key)
+            ProcessedBosses.erase(key);
     }
 };
 
