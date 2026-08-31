@@ -53,7 +53,7 @@ SETS = [
 
 LEVELS = [3,5,8,12,16,20,25,30,35,40,45,50,55,60]
 NONSET_TYPES = [
-    "sword1h","mace1h","axe1h","sword2h","mace2h","dagger","rare_dagger","bow","shield","cloak",
+    "sword1h","sword2h","mace2h","dagger","rare_dagger","bow","shield","cloak",
     "leather_chest","leather_gloves","leather_belt","mail_chest","mail_gloves","mail_belt","cloth_gloves","cloth_belt",
 ]
 PREFIXES = ["Errante","Ceniza","Aurora","Cuervo","Bruma","Grifo","Tormenta","Roble","Lobo","Fauce","Estrella","Runas","Hierro","Marfil","Obsidiana","Vigilia","Abismo","Relampago","Escarcha","Fenix"]
@@ -136,9 +136,17 @@ def build_catalog() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
             rows.append(row)
             entry += 1
 
+    level_cycle = (LEVELS * 15)[:200]
     for index in range(200):
-        item_type = NONSET_TYPES[index % len(NONSET_TYPES)]
-        level = LEVELS[(index // len(NONSET_TYPES)) % len(LEVELS)]
+        if index == 0:
+            item_type = "mace1h"
+        elif index == 1:
+            item_type = "axe1h"
+        else:
+            item_type = NONSET_TYPES[index % len(NONSET_TYPES)]
+        level = level_cycle[index]
+        if index < 2:
+            level = 3
         quality = "purple" if (index % 5 == 0 or (level >= 40 and index % 3 == 0)) else "blue"
         archetype = "ranged" if item_type == "bow" else ("caster" if item_type in {"cloth_gloves", "cloth_belt"} else "melee")
         row = blank_row()
