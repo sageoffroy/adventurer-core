@@ -44,6 +44,13 @@ if (( status == 0 )); then
     python3 "$ROOT/tools/spell_rank_tabs.py" install "$@" || status=$?
 fi
 
+# SpellDraft v3 overlays the external BLP pack into the owned Z patch and extends
+# SpellIcon.dbc for paths that do not exist in stock 3.3.5a. The default pack
+# location is ~/adventurer-icons/Interface/Icons.
+if (( status == 0 )); then
+    python3 "$ROOT/tools/spelldraft_v3_icons.py" "$@" || status=$?
+fi
+
 # Playerbots integration is optional. A stock AzerothCore checkout has no
 # modules/mod-playerbots directory and must install Adventurer Core without it.
 if (( status == 0 && has_playerbots == 1 )); then
