@@ -9,6 +9,8 @@
 
 namespace
 {
+constexpr uint32 AdventurerItemMin = 910200;
+constexpr uint32 AdventurerItemMax = 910224;
 constexpr uint32 GauntletItemMin = 911100;
 constexpr uint32 GauntletItemMax = 911399;
 constexpr char ProtocolPrefix[] = "AGBOOK|";
@@ -20,7 +22,8 @@ uint32 GetAccountId(Player* player)
 
 bool IsGauntletCollectionItem(uint32 entry)
 {
-    return entry >= GauntletItemMin && entry <= GauntletItemMax;
+    return (entry >= AdventurerItemMin && entry <= AdventurerItemMax) ||
+        (entry >= GauntletItemMin && entry <= GauntletItemMax);
 }
 
 void DiscoverItem(Player* player, uint32 entry)
