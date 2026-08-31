@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CORE_DIR="${CORE_DIR:-$HOME/aventurerosdeazeroth}"
 SERVER_DATA_DIR="${SERVER_DATA_DIR:-$CORE_DIR/env/dist/data}"
+DBC_SRC="${DBC_SRC:-$HOME/dbc-clean-esMX/dbc/esMX}"
 CLIENT_DIR="${CLIENT_DIR:-/mnt/c/Games/World of Warcraft 3.3.5a}"
 SRC_DIR="$ROOT_DIR/modules/mod-adventurer-gauntlet"
 DST_DIR="$CORE_DIR/modules/mod-adventurer-gauntlet"
@@ -14,6 +15,7 @@ ITEM_GENERATOR="$ROOT_DIR/tools/khadgar_gauntlet/generate_items.py"
 SET_GENERATOR="$ROOT_DIR/tools/khadgar_gauntlet/generate_sets.py"
 DBC_PATCHER="$ROOT_DIR/tools/khadgar_gauntlet/patch_item_dbc.py"
 SPELL_PATCHER="$ROOT_DIR/tools/khadgar_gauntlet/patch_spell_dbc.py"
+CLIENT_V3_INSTALLER="$ROOT_DIR/tools/khadgar_gauntlet/install_client_v3.py"
 STASH_ADDON_SOURCE="$ROOT_DIR/tools/khadgar_gauntlet/AdventurerGauntletStash.lua"
 BOOK_ADDON_SOURCE="$ROOT_DIR/tools/khadgar_gauntlet/AdventurerGauntletBook.lua"
 MINIMAP_FIX_SOURCE="$ROOT_DIR/tools/khadgar_gauntlet/AdventurerMinimapFix.lua"
@@ -30,7 +32,7 @@ if [[ ! -d "$SRC_DIR" ]]; then
   exit 1
 fi
 
-for required in "$CATALOG_BUILDER" "$ITEM_GENERATOR" "$SET_GENERATOR" "$DBC_PATCHER" "$SPELL_PATCHER" "$STASH_ADDON_SOURCE" "$BOOK_ADDON_SOURCE" "$MINIMAP_FIX_SOURCE"; do
+for required in "$CATALOG_BUILDER" "$ITEM_GENERATOR" "$SET_GENERATOR" "$DBC_PATCHER" "$SPELL_PATCHER" "$CLIENT_V3_INSTALLER" "$STASH_ADDON_SOURCE" "$BOOK_ADDON_SOURCE" "$MINIMAP_FIX_SOURCE"; do
   if [[ ! -f "$required" ]]; then
     echo "ERROR: required Gauntlet file not found: $required" >&2
     exit 1
@@ -58,7 +60,18 @@ python3 "$SET_GENERATOR" \
   --sets "$SET_CATALOG" \
   --output "$SET_INCLUDE"
 
-if [[ -f "$SERVER_DATA_DIR/dbc/Item.dbc" && -f "$SERVER_DATA_DIR/dbc/Spell.dbc" && -d "$CLIENT_DIR" ]]; then
+if [[ -f "$SERVER_DATA_DIR/dbc/Item.dbc" && -f "$SERVER_DATA_DIR/dbc/Spell.dbc" && -d "$DBC_SRC" && -d "$CLIENT_DIR" ]]; then
+  # Rebuild the owned Z patches from the clean DBC source with the SpellDraft v3
+  # icon pack plus Gauntlet custom spell rows. This keeps server/client Spell.dbc
+  # identical for Juramento del Ultimo Aliento and Lobo solitario.
+  python3 "$CLIENT_V3_INSTALLER" \
+    --dbc-src "$DBC_SRC" \
+    --server-data-dir "$SERVER_DATA_DIR" \
+    --client-dir "$CLIENT_DIR" \
+    --locale esMX
+
+  # The Gauntlet reward catalogue is layered after that rebuild. Item.dbc is
+  # then copied into both already-owned Z patches by the existing safe sync.
   python3 "$DBC_PATCHER" \
     --catalog "$ITEM_CATALOG" \
     --dbc "$SERVER_DATA_DIR/dbc/Item.dbc"
@@ -71,7 +84,7 @@ if [[ -f "$SERVER_DATA_DIR/dbc/Item.dbc" && -f "$SERVER_DATA_DIR/dbc/Spell.dbc" 
     --server-data-dir "$SERVER_DATA_DIR" \
     --client-dir "$CLIENT_DIR"
 else
-  echo "WARNING: runtime DBC/client not found; Gauntlet client metadata was not installed." >&2
+  echo "WARNING: runtime DBC/client/clean DBC source not found; Gauntlet client metadata was not installed." >&2
 fi
 
 ADDON_DIR="$CLIENT_DIR/Interface/AddOns/AdventurerGauntlet"
