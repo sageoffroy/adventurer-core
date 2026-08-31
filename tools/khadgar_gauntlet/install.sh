@@ -61,17 +61,13 @@ python3 "$SET_GENERATOR" \
   --output "$SET_INCLUDE"
 
 if [[ -f "$SERVER_DATA_DIR/dbc/Item.dbc" && -f "$SERVER_DATA_DIR/dbc/Spell.dbc" && -d "$DBC_SRC" && -d "$CLIENT_DIR" ]]; then
-  # Rebuild the owned Z patches from the clean DBC source with the SpellDraft v3
-  # icon pack plus Gauntlet custom spell rows. This keeps server/client Spell.dbc
-  # identical for Juramento del Ultimo Aliento and Lobo solitario.
   python3 "$CLIENT_V3_INSTALLER" \
+    --core-dir "$CORE_DIR" \
     --dbc-src "$DBC_SRC" \
     --server-data-dir "$SERVER_DATA_DIR" \
     --client-dir "$CLIENT_DIR" \
     --locale esMX
 
-  # The Gauntlet reward catalogue is layered after that rebuild. Item.dbc is
-  # then copied into both already-owned Z patches by the existing safe sync.
   python3 "$DBC_PATCHER" \
     --catalog "$ITEM_CATALOG" \
     --dbc "$SERVER_DATA_DIR/dbc/Item.dbc"
