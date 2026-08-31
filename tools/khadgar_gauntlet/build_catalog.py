@@ -17,18 +17,17 @@ SOURCES = {
     "leather_chest":85, "mail_chest":2392, "leather_gloves":2125, "mail_gloves":2397,
     "cloth_gloves":2119, "shield":2133, "cloth_belt":3599, "leather_belt":2122,
     "mail_belt":2393, "mace2h":1195, "rare_dagger":1917,
+    "mace1h":36, "axe1h":37,
 }
 
 PIECE_NAMES = {
-    "sword2h":"Mandoble", "mace2h":"Gran maza", "sword1h":"Espada", "shield":"Escudo",
+    "sword2h":"Mandoble", "mace2h":"Gran maza", "sword1h":"Espada", "mace1h":"Maza", "axe1h":"Hacha", "shield":"Escudo",
     "mail_chest":"Coselete", "mail_gloves":"Guanteletes", "mail_belt":"Cinturon",
     "leather_chest":"Jubon", "leather_gloves":"Guantes", "leather_belt":"Cinturon",
     "cloth_gloves":"Guantes", "cloth_belt":"Faja", "cloak":"Capa", "dagger":"Daga",
     "rare_dagger":"Daga", "bow":"Arco",
 }
 
-# 20 sets x 5 pieces = 100 set pieces. The first five are deliberately
-# two-handed weapon sets; the next two are weapon+shield sets.
 SETS = [
     ("juramento_coloso","Juramento del Coloso",3,"2h",["sword2h","mail_chest","mail_gloves","mail_belt","cloak"]),
     ("martillo_ceniza","Martillo de Ceniza",5,"2h",["mace2h","mail_chest","mail_gloves","mail_belt","cloak"]),
@@ -54,7 +53,7 @@ SETS = [
 
 LEVELS = [3,5,8,12,16,20,25,30,35,40,45,50,55,60]
 NONSET_TYPES = [
-    "sword1h","sword2h","mace2h","dagger","rare_dagger","bow","shield","cloak",
+    "sword1h","mace1h","axe1h","sword2h","mace2h","dagger","rare_dagger","bow","shield","cloak",
     "leather_chest","leather_gloves","leather_belt","mail_chest","mail_gloves","mail_belt","cloth_gloves","cloth_belt",
 ]
 PREFIXES = ["Errante","Ceniza","Aurora","Cuervo","Bruma","Grifo","Tormenta","Roble","Lobo","Fauce","Estrella","Runas","Hierro","Marfil","Obsidiana","Vigilia","Abismo","Relampago","Escarcha","Fenix"]
@@ -98,9 +97,9 @@ def apply_chassis_values(row: dict[str, str], item_type: str, level: int, qualit
     if item_type in {"sword2h", "mace2h"}:
         base = 5 + level * 0.55
         row["dmg_min1"], row["dmg_max1"], row["delay"] = f"{base:.1f}", f"{base * 1.45:.1f}", "3200"
-    elif item_type in {"sword1h", "dagger", "rare_dagger"}:
+    elif item_type in {"sword1h", "mace1h", "axe1h", "dagger", "rare_dagger"}:
         base = 3 + level * 0.32
-        delay = "1800" if "dagger" in item_type else "2400"
+        delay = "1800" if "dagger" in item_type else ("2000" if item_type == "axe1h" else "2400")
         row["dmg_min1"], row["dmg_max1"], row["delay"] = f"{base:.1f}", f"{base * 1.4:.1f}", delay
     elif item_type == "bow":
         base = 3 + level * 0.28
@@ -137,10 +136,9 @@ def build_catalog() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
             rows.append(row)
             entry += 1
 
-    level_cycle = (LEVELS * 15)[:200]
     for index in range(200):
         item_type = NONSET_TYPES[index % len(NONSET_TYPES)]
-        level = level_cycle[index]
+        level = LEVELS[(index // len(NONSET_TYPES)) % len(LEVELS)]
         quality = "purple" if (index % 5 == 0 or (level >= 40 and index % 3 == 0)) else "blue"
         archetype = "ranged" if item_type == "bow" else ("caster" if item_type in {"cloth_gloves", "cloth_belt"} else "melee")
         row = blank_row()
@@ -157,6 +155,9 @@ def build_catalog() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
         raise RuntimeError("catalog invariant failed")
     if min(int(row["required_level"]) for row in rows) != 3:
         raise RuntimeError("gauntlet custom rewards must start at level 3")
+    for required_type in ("mace1h", "axe1h"):
+        if not any(row["required_level"] == "3" and row["source_entry"] == str(SOURCES[required_type]) for row in rows):
+            raise RuntimeError(f"missing level 3 {required_type} reward")
     return rows, bonuses
 
 
