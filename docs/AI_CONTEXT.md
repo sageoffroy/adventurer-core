@@ -6,7 +6,17 @@ This file lets a new ChatGPT/Codex session recover the project's working convent
 
 - Work for Aventureros de Azeroth is done in this repository: `sageoffroy/adventurer-core`.
 - The native Adventurer class and SpellDraft integration are maintained here.
+- Gauntlet is the dungeon/roguelike module layered on top of the matching stable SpellDraft major version.
 - Do not create a parallel implementation in another repository or invent a second installation pipeline.
+
+## Stable branch model
+
+- `stable/spelldraft-v2` = Adventurer + SpellDraft v2.
+- `stable/gauntlet-v2` = SpellDraft v2 + `mod-adventurer-gauntlet`.
+- Gauntlet-only evolution may advance as `v2.1`, `v2.2`, etc. without changing the SpellDraft major version.
+- When SpellDraft becomes `stable/spelldraft-v3`, integrate that stable base into Gauntlet and continue as `stable/gauntlet-v3`.
+- Gauntlet depends on SpellDraft; SpellDraft must not acquire Gauntlet gameplay logic merely to keep branches synchronized.
+- Old `feature/khadgar-gauntlet-*` branches and the old `aventurerosdeazeroth/feature/mod-dungeon-master` branch are historical references, not active bases for new work.
 
 ## Development rules
 
@@ -18,6 +28,7 @@ This file lets a new ChatGPT/Codex session recover the project's working convent
 6. If an existing test or ownership check blocks an otherwise valid requested change because it is stale, first determine whether that guard still provides real value. Do not automatically expand the guard or create more tests around it.
 7. If a task can be solved by changing a few known files, do not perform a repository-wide redesign.
 8. Keep changes reversible with normal Git history; avoid adding extra rollback machinery unless the existing installer genuinely requires it.
+9. For Gauntlet-only work, start from the latest stable Gauntlet branch for the current SpellDraft major version, not from an old Khadgar/Dungeon Master feature branch.
 
 ## Existing architecture
 
@@ -25,6 +36,9 @@ This file lets a new ChatGPT/Codex session recover the project's working convent
 - DBC work uses the existing `tools/dbc.py` path.
 - Client changes use the existing `tools/client.py` path.
 - SpellDraft catalogue/runtime work uses `config/spelldraft/` and the existing runtime tooling.
+- Gauntlet server gameplay lives under `modules/mod-adventurer-gauntlet/`.
+- Gauntlet-specific client/build helpers live under `tools/khadgar_gauntlet/`; the historical directory name is retained only to avoid path churn.
+- The main shared Gauntlet/base integration point is the final item DBC pipeline, including `tools/sync_item_dbc.py`.
 - Client/DBC/server changes must follow the existing `apply.sh` / `update.sh` pipeline rather than introducing a new installer.
 
 ## How a new AI session should start
@@ -35,9 +49,10 @@ Before changing code:
 2. Read `docs/PROJECT_GUIDE.md`.
 3. If the task is SpellDraft-related, read `docs/SPELLDRAFT.md`.
 4. If adapting a spell, read `docs/SPELL_WORKFLOW.md`.
-5. Inspect the current branch and the latest commits relevant to the requested feature.
-6. Inspect the existing implementation files referenced by those commits.
-7. State the minimal files that need to change before editing anything.
-8. Reuse existing patterns; do not invent a new architecture unless the current one demonstrably cannot support the requested behavior.
+5. If the task is dungeon/Gauntlet-related, read `docs/GAUNTLET.md` and `modules/mod-adventurer-gauntlet/README.md`.
+6. Inspect the current branch and the latest commits relevant to the requested feature.
+7. Inspect the existing implementation files referenced by those commits.
+8. State the minimal files that need to change before editing anything.
+9. Reuse existing patterns; do not invent a new architecture unless the current one demonstrably cannot support the requested behavior.
 
 If repository state contradicts this document, repository code and the user's explicit current instruction take precedence. Update this file only when a durable project convention changes.
