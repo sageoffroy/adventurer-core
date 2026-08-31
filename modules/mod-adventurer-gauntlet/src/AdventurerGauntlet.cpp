@@ -39,6 +39,7 @@ std::unordered_map<uint32, RunReturnPoint> RunReturnPoints;
 std::unordered_map<uint32, uint8> PendingRunLevels;
 std::unordered_map<uint32, uint8> ActiveRunInstanceLevels;
 std::unordered_map<uint32, uint8> ActiveRunNativeMinLevels;
+std::unordered_map<uint32, uint8> RagefireBossProgress;
 
 constexpr uint32 KhadgarEntry = 910000;
 constexpr uint32 KhadgarIntroText = 910000;
@@ -51,7 +52,12 @@ constexpr float RagefireX = 3.81f;
 constexpr float RagefireY = -14.82f;
 constexpr float RagefireZ = -17.84f;
 constexpr float RagefireO = 4.39f;
+constexpr uint32 RagefireOggleflintEntry = 11517;
+constexpr uint32 RagefireJergoshEntry = 11518;
+constexpr uint32 RagefireBazzalanEntry = 11519;
 constexpr uint32 RagefireFinalBossEntry = 11520;
+constexpr uint8 RagefireAllBossesMask = 0x0F;
+constexpr uint8 RagefireCompletedMask = 0x80;
 
 constexpr uint32 DeadminesMapId = 36;
 constexpr float DeadminesX = -16.4f;
@@ -84,6 +90,18 @@ char const* GetGauntletDungeonName(uint32 mapId)
             return "Minas de la Muerte";
         default:
             return "mazmorra";
+    }
+}
+
+uint8 GetRagefireBossBit(uint32 entry)
+{
+    switch (entry)
+    {
+        case RagefireOggleflintEntry: return 0x01;
+        case RagefireJergoshEntry: return 0x02;
+        case RagefireBazzalanEntry: return 0x04;
+        case RagefireFinalBossEntry: return 0x08;
+        default: return 0;
     }
 }
 
@@ -374,6 +392,7 @@ void ReturnFallenAdventurer(Player* player)
     {
         ActiveRunInstanceLevels.erase(instanceId);
         ActiveRunNativeMinLevels.erase(instanceId);
+        RagefireBossProgress.erase(instanceId);
     }
 
     player->TeleportTo(
@@ -394,31 +413,44 @@ void ReturnFallenAdventurer(Player* player)
         "Khadgar te ha devuelto. Durante el desarrollo puedes volver a intentar el desafio.");
 }
 
-void FinishRagefireAndSummonKhadgar(Creature* finalBoss)
+void RegisterRagefireBossDeathAndTryFinish(Creature* defeatedBoss)
 {
-    if (!finalBoss || finalBoss->GetMapId() != RagefireMapId || finalBoss->GetEntry() != RagefireFinalBossEntry)
+    if (!defeatedBoss || defeatedBoss->GetMapId() != RagefireMapId)
         return;
 
-    Map* map = finalBoss->GetMap();
+    uint8 bit = GetRagefireBossBit(defeatedBoss->GetEntry());
+    if (!bit)
+        return;
+
+    uint32 instanceId = defeatedBoss->GetInstanceId();
+    uint8& progress = RagefireBossProgress[instanceId];
+    progress |= bit;
+
+    if ((progress & RagefireAllBossesMask) != RagefireAllBossesMask || (progress & RagefireCompletedMask))
+        return;
+
+    progress |= RagefireCompletedMask;
+
+    Map* map = defeatedBoss->GetMap();
     std::vector<Player*> survivors = GetLivingRunMembers(map);
     if (survivors.empty())
         return;
 
-    Creature* khadgar = finalBoss->SummonCreature(
+    Creature* khadgar = defeatedBoss->SummonCreature(
         KhadgarEntry,
-        finalBoss->GetPositionX() + 2.5f,
-        finalBoss->GetPositionY() + 1.5f,
-        finalBoss->GetPositionZ(),
-        finalBoss->GetOrientation());
+        defeatedBoss->GetPositionX() + 2.5f,
+        defeatedBoss->GetPositionY() + 1.5f,
+        defeatedBoss->GetPositionZ(),
+        defeatedBoss->GetOrientation());
 
     for (Player* player : survivors)
     {
         ChatHandler(player->GetSession()).SendSysMessage(
-            "|cff00ff00Sima Ignea completada.|r");
+            "|cff00ff00Sima Ignea completada.|r Todos los jefes obligatorios han caido.");
         ChatHandler(player->GetSession()).SendSysMessage(
             khadgar
-                ? "Khadgar ha llegado. Habla con el cuando la expedicion este lista para continuar."
-                : "Khadgar intento llegar, pero no pudo materializarse junto al jefe.");
+                ? "Khadgar ha llegado con el Baul de Expediciones. Guarda lo que quieras salvar antes de continuar."
+                : "Khadgar intento llegar, pero no pudo materializarse junto al ultimo jefe pendiente.");
     }
 }
 }
@@ -474,8 +506,6 @@ public:
         if (activeItr != ActiveRunInstanceLevels.end())
             return;
 
-        // Load stock creatures before enabling level adaptation. This preserves
-        // their native selected levels so we can retain the dungeon's level curve.
         map->LoadAllGrids();
 
         uint8 nativeMinLevel = CalculateNativeMinimumLevel(map);
@@ -510,8 +540,10 @@ public:
     {
         if (map && IsGauntletDungeon(map->GetId()))
         {
-            ActiveRunInstanceLevels.erase(map->GetInstanceId());
-            ActiveRunNativeMinLevels.erase(map->GetInstanceId());
+            uint32 instanceId = map->GetInstanceId();
+            ActiveRunInstanceLevels.erase(instanceId);
+            ActiveRunNativeMinLevels.erase(instanceId);
+            RagefireBossProgress.erase(instanceId);
         }
     }
 };
@@ -536,8 +568,8 @@ public:
             creature->RemoveDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
         }
 
-        if (creature->GetMapId() == RagefireMapId && creature->GetEntry() == RagefireFinalBossEntry)
-            FinishRagefireAndSummonKhadgar(creature);
+        if (creature->GetMapId() == RagefireMapId)
+            RegisterRagefireBossDeathAndTryFinish(creature);
     }
 };
 
