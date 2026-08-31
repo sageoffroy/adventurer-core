@@ -53,6 +53,11 @@ python3 "$ROOT/tools/spell_rank_tabs.py" install "$@"
 # byte-identical after every update.
 python3 "$ROOT/tools/sync_item_dbc.py" "$@"
 
+# SpellDraft v3 overlays the external BLP pack into the owned Z patch and extends
+# SpellIcon.dbc for icon paths that do not exist in stock 3.3.5a. The pack lives
+# outside Git by default at ~/adventurer-icons/Interface/Icons.
+python3 "$ROOT/tools/spelldraft_v3_icons.py" "$@"
+
 # Class 10 needs Playerbots-specific guards only when the external module exists.
 if (( has_playerbots == 1 )); then
     python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir"
