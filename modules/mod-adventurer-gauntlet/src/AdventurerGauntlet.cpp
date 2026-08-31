@@ -10,6 +10,7 @@
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "ScriptedGossip.h"
+#include "SharedDefines.h"
 #include "TaskScheduler.h"
 
 #include <algorithm>
@@ -37,6 +38,7 @@ std::unordered_map<uint32, std::string> PendingRunNames;
 std::unordered_map<uint32, RunReturnPoint> RunReturnPoints;
 std::unordered_map<uint32, uint8> PendingRunLevels;
 std::unordered_map<uint32, uint8> ActiveRunInstanceLevels;
+std::unordered_map<uint32, uint8> ActiveRunNativeMinLevels;
 
 constexpr uint32 KhadgarEntry = 910000;
 constexpr uint32 KhadgarIntroText = 910000;
@@ -203,6 +205,13 @@ void RegisterPendingRun(std::vector<Player*> const& members, std::string const& 
     }
 }
 
+void UpdatePendingRunLevel(std::vector<Player*> const& members, uint8 runLevel)
+{
+    for (Player* member : members)
+        if (member)
+            PendingRunLevels[member->GetGUID().GetCounter()] = runLevel;
+}
+
 std::string const* GetPendingRunName(Player* player)
 {
     auto itr = PendingRunNames.find(player->GetGUID().GetCounter());
@@ -233,6 +242,43 @@ bool GetActiveRunLevel(Creature const* creature, uint8& level)
 
     level = itr->second;
     return true;
+}
+
+bool GetActiveRunNativeMinLevel(Creature const* creature, uint8& level)
+{
+    if (!creature)
+        return false;
+
+    auto itr = ActiveRunNativeMinLevels.find(creature->GetInstanceId());
+    if (itr == ActiveRunNativeMinLevels.end())
+        return false;
+
+    level = itr->second;
+    return true;
+}
+
+uint8 CalculateNativeMinimumLevel(Map* map)
+{
+    uint8 nativeMin = 0;
+    if (!map)
+        return nativeMin;
+
+    for (auto const& [spawnId, creature] : map->GetCreatureBySpawnIdStore())
+    {
+        (void)spawnId;
+        if (!creature || creature->IsPet() || creature->IsTrigger())
+            continue;
+
+        CreatureTemplate const* creatureTemplate = creature->GetCreatureTemplate();
+        if (!creatureTemplate || !creatureTemplate->minlevel || creatureTemplate->type == CREATURE_TYPE_CRITTER)
+            continue;
+
+        nativeMin = nativeMin == 0
+            ? creatureTemplate->minlevel
+            : std::min<uint8>(nativeMin, creatureTemplate->minlevel);
+    }
+
+    return nativeMin;
 }
 
 bool IsActiveRunCreature(Creature const* creature)
@@ -280,7 +326,7 @@ void AnnounceRunStart(std::vector<Player*> const& members, std::string const& co
             "Khadgar acepta el desafio. Desde ahora seran conocidos como |cff00ff00{}|r.",
             companyName);
         ChatHandler(member->GetSession()).PSendSysMessage(
-            "La expedicion queda fijada al nivel |cffffd100{}|r, el mas alto del grupo.",
+            "La primera expedicion queda fijada al nivel |cffffd100{}|r, el mas alto del grupo.",
             runLevel);
         ChatHandler(member->GetSession()).SendSysMessage(
             "Khadgar comienza a preparar el portal hacia |cffffd100Sima Ignea|r.");
@@ -325,7 +371,10 @@ void ReturnFallenAdventurer(Player* player)
     PendingRunLevels.erase(guid);
     RunReturnPoints.erase(returnItr);
     if (runEnded)
+    {
         ActiveRunInstanceLevels.erase(instanceId);
+        ActiveRunNativeMinLevels.erase(instanceId);
+    }
 
     player->TeleportTo(
         returnPoint.MapId,
@@ -395,8 +444,13 @@ public:
     void OnBeforeCreatureSelectLevel(CreatureTemplate const* /*creatureTemplate*/, Creature* creature, uint8& level) override
     {
         uint8 runLevel = 0;
-        if (GauntletEnabled && GetActiveRunLevel(creature, runLevel))
-            level = runLevel;
+        uint8 nativeMinLevel = 0;
+        if (!GauntletEnabled || !GetActiveRunLevel(creature, runLevel) || !GetActiveRunNativeMinLevel(creature, nativeMinLevel))
+            return;
+
+        uint8 nativeLevel = level;
+        uint8 offset = nativeLevel > nativeMinLevel ? nativeLevel - nativeMinLevel : 0;
+        level = std::min<uint8>(80, uint8(runLevel + offset));
     }
 };
 
@@ -414,25 +468,31 @@ public:
         if (!instanceId)
             return;
 
-        uint8 pendingRunLevel = 0;
-        if (!GetPendingRunLevel(player, pendingRunLevel))
-            return;
-
-        // Bind the player to the actual Gauntlet instance so logging out and back
-        // in does not make the normal instance-login validation eject them.
         player->BindToInstance();
 
-        auto [itr, inserted] = ActiveRunInstanceLevels.emplace(instanceId, pendingRunLevel);
-        if (!inserted)
+        auto activeItr = ActiveRunInstanceLevels.find(instanceId);
+        if (activeItr != ActiveRunInstanceLevels.end())
             return;
 
+        // Load stock creatures before enabling level adaptation. This preserves
+        // their native selected levels so we can retain the dungeon's level curve.
         map->LoadAllGrids();
+
+        uint8 nativeMinLevel = CalculateNativeMinimumLevel(map);
+        if (!nativeMinLevel)
+            nativeMinLevel = 1;
+
+        std::vector<Player*> partyMembers = GetPartyMembers(player);
+        uint8 runLevel = GetHighestPartyLevel(partyMembers);
+        UpdatePendingRunLevel(partyMembers, runLevel);
+
+        ActiveRunInstanceLevels[instanceId] = runLevel;
+        ActiveRunNativeMinLevels[instanceId] = nativeMinLevel;
 
         for (auto const& [spawnId, creature] : map->GetCreatureBySpawnIdStore())
         {
             (void)spawnId;
-            uint8 runLevel = 0;
-            if (!GetActiveRunLevel(creature, runLevel))
+            if (!creature || creature->IsPet() || creature->IsTrigger())
                 continue;
 
             creature->SelectLevel();
@@ -441,15 +501,18 @@ public:
         }
 
         ChatHandler(player->GetSession()).PSendSysMessage(
-            "El desafio adapta {} al nivel |cffffd100{}|r.",
+            "{} adapta su curva nativa al nivel base |cffffd100{}|r de la expedicion.",
             GetGauntletDungeonName(map->GetId()),
-            itr->second);
+            runLevel);
     }
 
     void OnDestroyInstance(MapInstanced* /*mapInstanced*/, Map* map) override
     {
         if (map && IsGauntletDungeon(map->GetId()))
+        {
             ActiveRunInstanceLevels.erase(map->GetInstanceId());
+            ActiveRunNativeMinLevels.erase(map->GetInstanceId());
+        }
     }
 };
 
@@ -685,7 +748,7 @@ public:
                     uint8 runLevel = 0;
                     GetPendingRunLevel(player, runLevel);
                     ChatHandler(player->GetSession()).PSendSysMessage(
-                        "Su compania es |cff00ff00{}|r. Nivel de expedicion: |cffffd100{}|r.",
+                        "Su compania es |cff00ff00{}|r. Nivel base actual: |cffffd100{}|r.",
                         *companyName,
                         runLevel);
                 }
