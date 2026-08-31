@@ -368,10 +368,10 @@ public:
     AdventurerGauntletAccountStashPlayerScript()
         : PlayerScript("AdventurerGauntletAccountStashPlayerScript") { }
 
-    void OnPlayerBeforeSendChatMessage(Player* player, uint32& /*type*/, uint32& lang, std::string& msg) override
+    void OnPlayerBeforeSendChatMessage(Player* player, uint32& /*type*/, uint32& /*lang*/, std::string& msg) override
     {
-        if (player && lang == LANG_ADDON)
-            HandleStashCommand(player, msg);
+        if (player && HandleStashCommand(player, msg))
+            msg.clear();
     }
 };
 
