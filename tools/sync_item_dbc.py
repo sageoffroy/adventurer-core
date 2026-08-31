@@ -50,12 +50,17 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
     item_payload = (server_dbc / ITEM_DBC).read_bytes()
     spell_payload = (server_dbc / SPELL_DBC).read_bytes()
 
+    # The v3 client rebuild intentionally refreshes more than Item.dbc/Spell.dbc
+    # (for example SkillLineAbility.dbc for SpellDraft rank metadata). Record the
+    # final installed hashes for the complete owned DBC bundle before verifying
+    # state, so verification remains strict against the actual final pipeline.
     dbc_state = state.get("dbc")
     if dbc_state:
         files = dbc_state.get("files", {})
-        for name in (ITEM_DBC, SPELL_DBC):
-            if name in files:
-                files[name] = sha256_file(server_dbc / name)
+        for name in list(files):
+            path = server_dbc / name
+            if path.is_file():
+                files[name] = sha256_file(path)
 
     client_state = state.get("client") or {}
     installed = client_state.get("installed") or {}
@@ -111,7 +116,7 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
     if problems:
         raise SyncItemDbcError("Final Z rebuild verification failed:\n  " + "\n  ".join(problems))
 
-    print(f"Final Z patches rebuilt from installed server DBCs; Item.dbc and Spell.dbc preserved.")
+    print("Final Z patches rebuilt from installed server DBCs; final DBC bundle preserved.")
 
 
 def main() -> int:
