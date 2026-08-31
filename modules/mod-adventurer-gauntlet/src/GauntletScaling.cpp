@@ -16,6 +16,7 @@ constexpr char const* GauntletSettingsSource = "adventurer_gauntlet";
 constexpr uint32 GauntletSettingPledged = 0;
 constexpr uint32 RagefireMapId = 389;
 constexpr uint32 DeadminesMapId = 36;
+constexpr uint32 LoneWolfSpellId = 910501;
 
 constexpr std::array<uint32, 5> TrashHealthPct = { 50, 150, 200, 250, 300 };
 constexpr std::array<uint32, 5> RareHealthPct  = { 50, 160, 225, 290, 355 };
@@ -32,6 +33,29 @@ bool IsGauntletMap(uint32 mapId)
 bool IsPledged(Player* player)
 {
     return player && player->GetPlayerSetting(GauntletSettingsSource, GauntletSettingPledged).IsEnabled();
+}
+
+bool IsSoloGauntletPlayer(Player* player)
+{
+    if (!player || !IsPledged(player) || !IsGauntletMap(player->GetMapId()))
+        return false;
+
+    Group* group = player->GetGroup();
+    return !group || group->GetMembersCount() == 1;
+}
+
+void RefreshLoneWolf(Player* player)
+{
+    if (!player)
+        return;
+
+    if (IsSoloGauntletPlayer(player))
+    {
+        if (!player->HasAura(LoneWolfSpellId))
+            player->CastSpell(player, LoneWolfSpellId, true);
+    }
+    else
+        player->RemoveAurasDueToSpell(LoneWolfSpellId);
 }
 
 uint8 GetRunPartySize(Map* map)
@@ -132,7 +156,25 @@ public:
     }
 };
 
+class AdventurerGauntletLoneWolfPlayerScript : public PlayerScript
+{
+public:
+    AdventurerGauntletLoneWolfPlayerScript()
+        : PlayerScript("AdventurerGauntletLoneWolfPlayerScript") { }
+
+    void OnPlayerMapChanged(Player* player) override
+    {
+        RefreshLoneWolf(player);
+    }
+
+    void OnPlayerLogin(Player* player) override
+    {
+        RefreshLoneWolf(player);
+    }
+};
+
 void AddAdventurerGauntletScalingScripts()
 {
     new AdventurerGauntletScalingUnitScript();
+    new AdventurerGauntletLoneWolfPlayerScript();
 }
