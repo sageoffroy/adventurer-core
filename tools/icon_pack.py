@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ICON_DIR = ROOT / "client" / "icons"
 CATALOG = ICON_DIR / "catalog.csv"
 ICON_ID_MIN = 910000
-ICON_ID_MAX = 919999
+ICON_ID_MAX = 999999
 SPELLICON_FIELDS = 2
 SPELLICON_RECORD_SIZE = 8
 
