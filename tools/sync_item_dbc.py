@@ -16,8 +16,10 @@ from khadgar_gauntlet.patch_item_dbc import load_mapping as load_gauntlet_item_m
 from khadgar_gauntlet.patch_item_dbc import patch as patch_gauntlet_item_dbc
 from khadgar_gauntlet.patch_spell_dbc import patch as patch_gauntlet_spell_dbc
 from mpq import write_mpq
+from spelldraft_v3_icons import collect_icons, default_pack_dir
 
 SPELL_DBC = "Spell.dbc"
+SPELL_ICON_DBC = "SpellIcon.dbc"
 
 
 class SyncItemDbcError(RuntimeError):
@@ -49,6 +51,13 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
 
     item_payload = (server_dbc / ITEM_DBC).read_bytes()
     spell_payload = (server_dbc / SPELL_DBC).read_bytes()
+    spell_icon_path = server_dbc / SPELL_ICON_DBC
+    if not spell_icon_path.is_file():
+        raise SyncItemDbcError(f"Installed final {SPELL_ICON_DBC} not found: {spell_icon_path}")
+    spell_icon_payload = spell_icon_path.read_bytes()
+
+    icon_pack_dir = default_pack_dir().expanduser().resolve()
+    icons = collect_icons(icon_pack_dir)
 
     # The v3 client rebuild intentionally refreshes more than Item.dbc/Spell.dbc
     # (for example SkillLineAbility.dbc for SpellDraft rank metadata). Record the
@@ -84,12 +93,26 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
             shutil.copy2(server_dbc / name, work / name)
 
         root_files, locale_files = build_archive_files(work)
+
+        # build_archive_files() is the generic Adventurer builder. SpellDraft v3
+        # adds a second owned layer: the final SpellIcon.dbc plus every external
+        # BLP texture. Re-add that layer here so this final Item/Spell sync cannot
+        # erase the icon pack that install_client_v3.py just built.
+        root_files[f"DBFilesClient\\{SPELL_ICON_DBC}"] = spell_icon_payload
+        locale_files[f"DBFilesClient\\{SPELL_ICON_DBC}"] = spell_icon_payload
+        for source, internal, _dbc_path in icons:
+            root_files[internal] = source.read_bytes()
+
         built_root = temp / "patch-Z.mpq"
         built_locale = temp / "patch-locale-z.mpq"
         write_mpq(built_root, root_files)
         write_mpq(built_locale, locale_files)
 
-        for payload, label in ((item_payload, "Item.dbc"), (spell_payload, "Spell.dbc")):
+        for payload, label in (
+            (item_payload, "Item.dbc"),
+            (spell_payload, "Spell.dbc"),
+            (spell_icon_payload, "SpellIcon.dbc"),
+        ):
             if payload not in built_root.read_bytes():
                 raise SyncItemDbcError(f"Rebuilt root Z patch does not contain final {label}")
             if payload not in built_locale.read_bytes():
@@ -116,7 +139,10 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
     if problems:
         raise SyncItemDbcError("Final Z rebuild verification failed:\n  " + "\n  ".join(problems))
 
-    print("Final Z patches rebuilt from installed server DBCs; final DBC bundle preserved.")
+    print(
+        f"Final Z patches rebuilt from installed server DBCs; final DBC bundle and "
+        f"SpellDraft v3 icon layer preserved ({len(icons)} BLP textures)."
+    )
 
 
 def main() -> int:
