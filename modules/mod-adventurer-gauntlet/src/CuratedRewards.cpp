@@ -207,10 +207,6 @@ void RefillCheckpointBossAfterDeath(Creature* boss)
     if (!key || ProcessedBosses.find(key) != ProcessedBosses.end())
         return;
 
-    // Creature::Update runs after the native death/loot path has completed.
-    // Replacing items here prevents the core from overwriting our injected loot.
-    // Preserve native money, but replace all stock equipment with one controlled
-    // Gauntlet reward per living survivor.
     if (FillControlledLoot(boss->loot, boss->GetMap(), true))
     {
         boss->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
@@ -251,7 +247,7 @@ public:
     AdventurerGauntletBossRewardsScript()
         : AllCreatureScript("AdventurerGauntletBossRewardsScript") { }
 
-    void OnCreatureUpdate(Creature* creature, uint32 /*diff*/) override
+    void OnAllCreatureUpdate(Creature* creature, uint32 /*diff*/) override
     {
         RefillCheckpointBossAfterDeath(creature);
     }
