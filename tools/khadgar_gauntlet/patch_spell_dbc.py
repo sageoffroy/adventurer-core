@@ -36,6 +36,30 @@ def _set_localized(dbc: DBC, row: bytearray, start_field: int, text: str) -> Non
         set_u32(row, field, offset)
 
 
+def _set_identity_and_text(
+    dbc: DBC,
+    row: bytearray,
+    spell_id: int,
+    icon_id: int,
+    name: str,
+    description: str,
+) -> None:
+    set_u32(row, 0, spell_id)
+    set_u32(row, 131, 0)
+    set_u32(row, 132, 0)
+    set_u32(row, 133, icon_id)
+    set_u32(row, 134, 0)
+    set_u32(row, 135, 0)
+    _set_localized(dbc, row, 136, name)
+    set_u32(row, 152, 0)
+    _set_localized(dbc, row, 153, "")
+    set_u32(row, 169, 0)
+    _set_localized(dbc, row, 170, description)
+    set_u32(row, 186, 0)
+    _set_localized(dbc, row, 187, description)
+    set_u32(row, 203, 0)
+
+
 def _build_marker_aura(
     dbc: DBC,
     base: bytearray,
@@ -59,20 +83,7 @@ def _build_marker_aura(
     set_u32(row, 86, 1)
     set_u32(row, 95, 4)
 
-    set_u32(row, 131, 0)
-    set_u32(row, 132, 0)
-    set_u32(row, 133, icon_id)
-    set_u32(row, 134, 0)
-    set_u32(row, 135, 0)
-
-    _set_localized(dbc, row, 136, name)
-    set_u32(row, 152, 0)
-    _set_localized(dbc, row, 153, "")
-    set_u32(row, 169, 0)
-    _set_localized(dbc, row, 170, description)
-    set_u32(row, 186, 0)
-    _set_localized(dbc, row, 187, description)
-    set_u32(row, 203, 0)
+    _set_identity_and_text(dbc, row, spell_id, icon_id, name, description)
 
     for field in range(204, 234):
         set_u32(row, field, 0)
@@ -87,6 +98,30 @@ def _set_aura_effect(row: bytearray, index: int, aura_type: int, amount_pct: int
     set_u32(row, 80 + index, amount_pct - 1)
     set_u32(row, 86 + index, 1)
     set_u32(row, 95 + index, aura_type)
+
+
+def _build_lone_wolf_aura(dbc: DBC, base: bytearray) -> bytearray:
+    # Keep the known-good stock buff metadata from spell 1126 (duration, range,
+    # cast metadata, proc/category links, etc.) and replace only the effect and
+    # presentation fields we actually own. The previous implementation zeroed
+    # broad ranges of Spell.dbc and could leave SpellMgr with an invalid custom
+    # spell even though the row physically existed in the file.
+    row = bytearray(base)
+    _set_identity_and_text(
+        dbc,
+        row,
+        LONE_WOLF_SPELL_ID,
+        LONE_WOLF_ICON_ID,
+        LONE_WOLF_NAME,
+        LONE_WOLF_DESCRIPTION,
+    )
+
+    for field in range(71, 131):
+        set_u32(row, field, 0)
+    _set_aura_effect(row, 0, SPELL_AURA_MOD_INCREASE_SPEED, 20)
+    _set_aura_effect(row, 1, SPELL_AURA_MOD_MELEE_RANGED_HASTE, 10)
+    _set_aura_effect(row, 2, SPELL_AURA_HASTE_SPELLS, 10)
+    return row
 
 
 def patch(path: Path) -> bool:
@@ -113,27 +148,20 @@ def patch(path: Path) -> bool:
         PLEDGE_NAME,
         PLEDGE_DESCRIPTION,
     )
-    lone_wolf = _build_marker_aura(
-        dbc,
-        base,
-        LONE_WOLF_SPELL_ID,
-        LONE_WOLF_ICON_ID,
-        LONE_WOLF_NAME,
-        LONE_WOLF_DESCRIPTION,
-    )
-    for field in range(71, 131):
-        set_u32(lone_wolf, field, 0)
-    _set_aura_effect(lone_wolf, 0, SPELL_AURA_MOD_INCREASE_SPEED, 20)
-    _set_aura_effect(lone_wolf, 1, SPELL_AURA_MOD_MELEE_RANGED_HASTE, 10)
-    _set_aura_effect(lone_wolf, 2, SPELL_AURA_HASTE_SPELLS, 10)
+    lone_wolf = _build_lone_wolf_aura(dbc, base)
 
     dbc.records = base_rows + [pledge, lone_wolf]
     dbc.records.sort(key=lambda record: u32(record, 0))
     after = dbc.to_bytes()
-    if after == before:
-        return False
-    path.write_bytes(after)
-    return True
+    if after != before:
+        path.write_bytes(after)
+
+    verify = DBC.read(path)
+    ids = {u32(row, 0) for row in verify.records}
+    missing = owned - ids
+    if missing:
+        raise DBCError(f"{path}: custom Gauntlet spell rows missing after patch: {sorted(missing)}")
+    return after != before
 
 
 def main() -> int:
@@ -142,7 +170,7 @@ def main() -> int:
     args = parser.parse_args()
     changed = patch(args.dbc)
     state = "patched" if changed else "already current"
-    print(f"Gauntlet Spell.dbc: {state} (pledge {PLEDGE_SPELL_ID}, lone wolf {LONE_WOLF_SPELL_ID}).")
+    print(f"Gauntlet Spell.dbc: {state} and verified (pledge {PLEDGE_SPELL_ID}, lone wolf {LONE_WOLF_SPELL_ID}).")
     return 0
 
 
