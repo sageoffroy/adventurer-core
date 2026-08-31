@@ -31,13 +31,16 @@ python3 "$ROOT/tools/database.py" prepare "$@"
 status=0
 python3 "$ROOT/tools/adventurer_apply.py" apply "$@" || status=$?
 
-if (( status == 0 )); then
-    python3 "$ROOT/tools/spell_rank_tabs.py" install "$@" || status=$?
-fi
-
-# SpellDraft v3 external icon pack.
+# SpellDraft v3 owns the final client/server DBC rebuild. It reapplies current
+# rank-tab/component metadata, expands SpellIcon.dbc and packs the external BLPs
+# in one pass so no later metadata rebuild can erase the icon layer.
 if (( status == 0 )); then
     python3 "$ROOT/tools/spelldraft_v3_icons.py" "$@" || status=$?
+fi
+
+# Restore Item.dbc parity inside the final Z patches without rebuilding them.
+if (( status == 0 )); then
+    python3 "$ROOT/tools/sync_item_dbc.py" "$@" || status=$?
 fi
 
 if (( status == 0 && has_playerbots == 1 )); then

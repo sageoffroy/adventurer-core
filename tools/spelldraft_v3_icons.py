@@ -3,7 +3,9 @@
 
 The pack mirrors client paths under Interface/Icons. Existing Blizzard icon
 paths override only the BLP texture; new paths are appended to SpellIcon.dbc
-with deterministic Adventurer-owned IDs.
+with deterministic Adventurer-owned IDs. The same pass also reapplies current
+SpellDraft rank-tab/component metadata so no later client rebuild can erase the
+icon layer.
 """
 
 from __future__ import annotations
@@ -16,6 +18,10 @@ from pathlib import Path
 import adventurer_apply  # noqa: F401
 import client
 from dbc import DBC, DBCError, set_u32, u32
+from spell_rank_tabs import (
+    patch_component_free_drafted_spells,
+    patch_server_rank_tabs,
+)
 
 SPELLICON_FIELDS = 2
 SPELLICON_RECORD_SIZE = 8
@@ -88,12 +94,7 @@ def patch_spell_icon(path: Path, icons: list[tuple[Path, str, str]]) -> dict[str
     custom_rows: list[bytearray] = []
     next_id = CUSTOM_ICON_MIN + 1
 
-    ordered = sorted(
-        icons,
-        key=lambda item: (Path(item[1]).name.lower() != LONE_WOLF_FILENAME, item[1].lower()),
-    )
-
-    for _source, _internal, dbc_path in ordered:
+    for _source, _internal, dbc_path in icons:
         key = normalized_path(dbc_path)
         existing = stock_by_path.get(key)
         if existing is not None:
@@ -124,7 +125,10 @@ def patch_spell_icon(path: Path, icons: list[tuple[Path, str, str]]) -> dict[str
     return assigned
 
 
-def install_wrappers(pack_dir: Path) -> tuple[list[tuple[Path, str, str]], dict[str, int]]:
+def install_wrappers(
+    pack_dir: Path,
+    spell_ranks_path: Path | None = None,
+) -> tuple[list[tuple[Path, str, str]], dict[str, int]]:
     icons = collect_icons(pack_dir)
     assigned: dict[str, int] = {}
 
@@ -133,6 +137,19 @@ def install_wrappers(pack_dir: Path) -> tuple[list[tuple[Path, str, str]], dict[
 
     def patch_dbc_copy(source: Path, work: Path):
         changed = original_patch_dbc_copy(source, work)
+
+        if spell_ranks_path is not None:
+            rank_changed = patch_server_rank_tabs(
+                work / "SkillLineAbility.dbc",
+                spell_ranks_path,
+            )
+            component_changed = patch_component_free_drafted_spells(
+                work / "Spell.dbc",
+                spell_ranks_path,
+            )
+            changed["SkillLineAbility.dbc"] = rank_changed or changed.get("SkillLineAbility.dbc", False)
+            changed["Spell.dbc"] = component_changed or changed.get("Spell.dbc", False)
+
         before = (work / "SpellIcon.dbc").read_bytes()
         assigned.clear()
         assigned.update(patch_spell_icon(work / "SpellIcon.dbc", icons))
@@ -155,6 +172,7 @@ def install_wrappers(pack_dir: Path) -> tuple[list[tuple[Path, str, str]], dict[
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--core-dir", required=True, type=Path)
     parser.add_argument("--dbc-src", required=True, type=Path)
     parser.add_argument("--server-data-dir", required=True, type=Path)
     parser.add_argument("--client-dir", required=True, type=Path)
@@ -163,7 +181,14 @@ def main() -> int:
     args, _unknown = parser.parse_known_args()
 
     try:
-        icons, assigned = install_wrappers(args.icon_pack_dir.expanduser().resolve())
+        spell_ranks = (
+            args.core_dir.expanduser().resolve()
+            / "data" / "sql" / "base" / "db_world" / "spell_ranks.sql"
+        )
+        icons, assigned = install_wrappers(
+            args.icon_pack_dir.expanduser().resolve(),
+            spell_ranks,
+        )
         with tempfile.TemporaryDirectory(prefix="spelldraft-v3-icons-") as tmp_name:
             build_dir = Path(tmp_name)
             client.build_patch(args.dbc_src, build_dir, args.locale)
@@ -178,7 +203,7 @@ def main() -> int:
         else:
             print("WARNING: lobo_solitario.blp not present in the icon pack yet.")
         return 0
-    except (DBCError, client.ClientError, OSError) as exc:
+    except (DBCError, client.ClientError, OSError, ValueError) as exc:
         print(f"ERROR: {exc}")
         return 1
 

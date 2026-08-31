@@ -32,12 +32,15 @@ python3 "$ROOT/tools/adopt_source.py" \
   --path "src/server/game/Spells/SpellEffects.cpp"
 
 python3 "$ROOT/tools/upgrade_apply.py" "$@"
-python3 "$ROOT/tools/spell_rank_tabs.py" install "$@"
-python3 "$ROOT/tools/sync_item_dbc.py" "$@"
 
-# SpellDraft v3 icon pack. Files live outside Git by default at
-# ~/adventurer-icons/Interface/Icons and are packed into Adventurer's Z MPQs.
+# SpellDraft v3 rebuilds the final client/server DBC bundle in one pass: normal
+# Adventurer transforms, server rank-tab/component normalization, SpellIcon.dbc
+# expansion and every BLP from the external icon pack.
 python3 "$ROOT/tools/spelldraft_v3_icons.py" "$@"
+
+# Keep the already-owned Item.dbc byte-identical in both Z archives after the
+# v3 rebuild. This is an in-place sync and does not rebuild the icon payload.
+python3 "$ROOT/tools/sync_item_dbc.py" "$@"
 
 if (( has_playerbots == 1 )); then
     python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir"
