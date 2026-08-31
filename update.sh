@@ -27,6 +27,14 @@ if [[ -d "$core_dir/modules/mod-playerbots" ]]; then
     has_playerbots=1
 fi
 
+# SpellDraft now owns the narrow native Tame Beast class gate in SpellEffects.cpp.
+# Existing installs created before that file was package-owned adopt it once,
+# only while it is clean and still belongs to the same AzerothCore commit. The
+# original bytes are stored in the normal Adventurer rollback backup first.
+python3 "$ROOT/tools/adopt_source.py" \
+  --core-dir "$core_dir" \
+  --path "src/server/game/Spells/SpellEffects.cpp"
+
 # Upgrade only Adventurer-owned source/runtime/client state. The original clean
 # installation backups remain untouched, so rollback still returns all the way
 # to the pre-Adventurer server rather than merely to the previous package build.
