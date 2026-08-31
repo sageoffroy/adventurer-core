@@ -12,6 +12,7 @@ from __future__ import annotations
 import struct
 
 import client
+import core_patch
 import mpq
 
 
@@ -210,6 +211,29 @@ def _install_server_dbcs(build_dir, server_dbc_dir):
 
 
 client.install_server_dbcs = _install_server_dbcs
+
+
+# Tame Beast (1515) is a native Hunter spell, but SpellDraft can legitimately
+# grant it to class 10. Keep AzerothCore's normal tame flow and relax only the
+# final class gate for an Adventurer that actually knows 1515.
+def _patch_adventurer_tame_beast(text: str) -> str:
+    clean = """    if (!m_caster->IsClass(CLASS_HUNTER, CLASS_CONTEXT_PET))
+        return;"""
+    patched = """    if (!m_caster->IsClass(CLASS_HUNTER, CLASS_CONTEXT_PET))
+    {
+        Player* player = m_caster->ToPlayer();
+        if (!player || player->getClass() != CLASS_ADVENTURER || !player->HasSpell(1515))
+            return;
+    }"""
+    return core_patch.replace_once(
+        text,
+        clean,
+        patched,
+        "SpellEffects Adventurer Tame Beast class gate",
+    )
+
+
+core_patch.TRANSFORMS["src/server/game/Spells/SpellEffects.cpp"] = _patch_adventurer_tame_beast
 
 # Keep the source-layer universal chassis at 75% while accepting an existing
 # owned 75% install on future upgrades.
