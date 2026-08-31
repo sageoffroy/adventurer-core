@@ -12,6 +12,7 @@
 #include "ScriptedGossip.h"
 #include "TaskScheduler.h"
 
+#include <algorithm>
 #include <array>
 #include <string>
 #include <unordered_map>
@@ -20,7 +21,6 @@
 namespace
 {
 bool GauntletEnabled = true;
-constexpr uint8 GauntletStartLevel = 3;
 uint8 GauntletMinPlayers = 1;
 uint8 GauntletMaxPlayers = 5;
 
@@ -35,6 +35,7 @@ struct RunReturnPoint
 
 std::unordered_map<uint32, std::string> PendingRunNames;
 std::unordered_map<uint32, RunReturnPoint> RunReturnPoints;
+std::unordered_map<uint32, uint8> PendingRunLevels;
 std::unordered_map<uint32, uint8> ActiveRunInstanceLevels;
 
 constexpr uint32 KhadgarEntry = 910000;
@@ -122,6 +123,15 @@ std::vector<Player*> GetPartyMembers(Player* leader)
     return members;
 }
 
+uint8 GetHighestPartyLevel(std::vector<Player*> const& members)
+{
+    uint8 level = 1;
+    for (Player* member : members)
+        if (member)
+            level = std::max<uint8>(level, member->GetLevel());
+    return level;
+}
+
 std::vector<Player*> GetLivingRunMembers(Map* map)
 {
     std::vector<Player*> members;
@@ -166,12 +176,6 @@ bool ValidateParty(Player* player, std::vector<Player*>& members, std::string& e
 
     for (Player* member : members)
     {
-        if (member->GetLevel() != GauntletStartLevel)
-        {
-            error = "Todos los integrantes deben comenzar el desafio en nivel 3.";
-            return false;
-        }
-
         if (!member->IsAlive())
         {
             error = "Todos los integrantes deben estar vivos para comenzar.";
@@ -182,12 +186,13 @@ bool ValidateParty(Player* player, std::vector<Player*>& members, std::string& e
     return true;
 }
 
-void RegisterPendingRun(std::vector<Player*> const& members, std::string const& companyName)
+void RegisterPendingRun(std::vector<Player*> const& members, std::string const& companyName, uint8 runLevel)
 {
     for (Player* member : members)
     {
         uint32 guid = member->GetGUID().GetCounter();
         PendingRunNames[guid] = companyName;
+        PendingRunLevels[guid] = runLevel;
         RunReturnPoints[guid] = {
             member->GetMapId(),
             member->GetPositionX(),
@@ -202,6 +207,19 @@ std::string const* GetPendingRunName(Player* player)
 {
     auto itr = PendingRunNames.find(player->GetGUID().GetCounter());
     return itr == PendingRunNames.end() ? nullptr : &itr->second;
+}
+
+bool GetPendingRunLevel(Player* player, uint8& level)
+{
+    if (!player)
+        return false;
+
+    auto itr = PendingRunLevels.find(player->GetGUID().GetCounter());
+    if (itr == PendingRunLevels.end())
+        return false;
+
+    level = itr->second;
+    return true;
 }
 
 bool GetActiveRunLevel(Creature const* creature, uint8& level)
@@ -254,13 +272,16 @@ bool TeleportParty(std::vector<Player*> const& members, uint32 mapId, float x, f
     return success;
 }
 
-void AnnounceRunStart(std::vector<Player*> const& members, std::string const& companyName)
+void AnnounceRunStart(std::vector<Player*> const& members, std::string const& companyName, uint8 runLevel)
 {
     for (Player* member : members)
     {
         ChatHandler(member->GetSession()).PSendSysMessage(
             "Khadgar acepta el desafio. Desde ahora seran conocidos como |cff00ff00{}|r.",
             companyName);
+        ChatHandler(member->GetSession()).PSendSysMessage(
+            "La expedicion queda fijada al nivel |cffffd100{}|r, el mas alto del grupo.",
+            runLevel);
         ChatHandler(member->GetSession()).SendSysMessage(
             "Khadgar comienza a preparar el portal hacia |cffffd100Sima Ignea|r.");
     }
@@ -301,6 +322,7 @@ void ReturnFallenAdventurer(Player* player)
     bool runEnded = !InstanceStillHasLivingAdventurers(player->GetMap(), player);
 
     PendingRunNames.erase(runItr);
+    PendingRunLevels.erase(guid);
     RunReturnPoints.erase(returnItr);
     if (runEnded)
         ActiveRunInstanceLevels.erase(instanceId);
@@ -392,7 +414,15 @@ public:
         if (!instanceId)
             return;
 
-        auto [itr, inserted] = ActiveRunInstanceLevels.emplace(instanceId, player->GetLevel());
+        uint8 pendingRunLevel = 0;
+        if (!GetPendingRunLevel(player, pendingRunLevel))
+            return;
+
+        // Bind the player to the actual Gauntlet instance so logging out and back
+        // in does not make the normal instance-login validation eject them.
+        player->BindToInstance();
+
+        auto [itr, inserted] = ActiveRunInstanceLevels.emplace(instanceId, pendingRunLevel);
         if (!inserted)
             return;
 
@@ -599,10 +629,11 @@ public:
                     return true;
                 }
 
+                uint8 runLevel = GetHighestPartyLevel(members);
                 std::string companyName = GenerateCompanyName();
                 ResetPartyInstances(player);
-                RegisterPendingRun(members, companyName);
-                AnnounceRunStart(members, companyName);
+                RegisterPendingRun(members, companyName, runLevel);
+                AnnounceRunStart(members, companyName, runLevel);
 
                 static_cast<npc_adventurer_gauntlet_khadgarAI*>(creature->AI())->BeginTravel(
                     members,
@@ -650,7 +681,14 @@ public:
             }
             case ACTION_STATUS:
                 if (std::string const* companyName = GetPendingRunName(player))
-                    ChatHandler(player->GetSession()).PSendSysMessage("Su compania es |cff00ff00{}|r.", *companyName);
+                {
+                    uint8 runLevel = 0;
+                    GetPendingRunLevel(player, runLevel);
+                    ChatHandler(player->GetSession()).PSendSysMessage(
+                        "Su compania es |cff00ff00{}|r. Nivel de expedicion: |cffffd100{}|r.",
+                        *companyName,
+                        runLevel);
+                }
                 CloseGossipMenuFor(player);
                 return true;
             default:
