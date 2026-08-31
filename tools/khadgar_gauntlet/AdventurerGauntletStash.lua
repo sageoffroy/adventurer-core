@@ -3,12 +3,16 @@ local STASH_ITEMS = {}
 local SLOTS = {}
 local MAX_SLOTS = 16
 local PREFIX = "AGSTASH"
+local COMMAND_PREFIX = "AGSTASH|"
 local FRAME_NAME = "AdventurerGauntletStashFrame"
 local PENDING_WITHDRAW = nil
 
 local function SendCommand(command)
-    if not UnitName("player") then return end
-    SendAddonMessage(PREFIX, command, "WHISPER", UnitName("player"))
+    local target = UnitName("player")
+    if not target or target == "" then return end
+    -- Use the same self-whisper transport already proven by SpellDraft on the
+    -- 3.3.5a client. The server filters these protocol messages before chat.
+    SendChatMessage(COMMAND_PREFIX .. command, "WHISPER", nil, target)
 end
 
 local function ItemIdFromLink(link)
@@ -158,14 +162,12 @@ local function UpdateStashTooltip(button)
 end
 
 local function ConfigureSlot(button, visualIndex, stashSlot)
+    -- Stable 4x4 backpack-style grid: slots 1..16 read left-to-right and
+    -- top-to-bottom. Do not reverse the logical slot IDs against the visual UI.
+    local column = (visualIndex - 1) % 4
+    local row = math.floor((visualIndex - 1) / 4)
     button:ClearAllPoints()
-    if visualIndex == 1 then
-        button:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -12, -208)
-    elseif ((visualIndex - 1) % 4) == 0 then
-        button:SetPoint("BOTTOMRIGHT", _G[FRAME_NAME .. "Item" .. (visualIndex - 4)], "TOPRIGHT", 0, 4)
-    else
-        button:SetPoint("BOTTOMRIGHT", _G[FRAME_NAME .. "Item" .. (visualIndex - 1)], "BOTTOMLEFT", -5, 0)
-    end
+    button:SetPoint("TOPLEFT", frame, "TOPLEFT", 14 + column * 39, -72 - row * 39)
     button.stashSlot = stashSlot
     button:Show()
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -187,7 +189,7 @@ end
 
 for visualIndex = 1, MAX_SLOTS do
     local button = _G[FRAME_NAME .. "Item" .. visualIndex]
-    local stashSlot = MAX_SLOTS - visualIndex + 1
+    local stashSlot = visualIndex
     button:SetID(stashSlot)
     ConfigureSlot(button, visualIndex, stashSlot)
     SLOTS[stashSlot] = button
@@ -242,14 +244,19 @@ local function SystemMessageFilter(self, event, message, ...)
 end
 ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", SystemMessageFilter)
 
+local function StashWhisperFilter(_, _, message, sender)
+    if sender == UnitName("player") and type(message) == "string" and string.sub(message, 1, string.len(COMMAND_PREFIX)) == COMMAND_PREFIX then
+        return true
+    end
+    return false
+end
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", StashWhisperFilter)
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", StashWhisperFilter)
+
 local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("CHAT_MSG_ADDON")
 eventFrame:RegisterEvent("BAG_UPDATE")
-eventFrame:SetScript("OnEvent", function(self, event, ...)
-    if event == "CHAT_MSG_ADDON" then
-        local prefix, message = ...
-        if prefix == PREFIX then HandleState(message) end
-    elseif event == "BAG_UPDATE" then
+eventFrame:SetScript("OnEvent", function(self, event)
+    if event == "BAG_UPDATE" then
         TryPickupPendingWithdraw()
     end
 end)
