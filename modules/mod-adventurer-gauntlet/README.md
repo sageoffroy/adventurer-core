@@ -5,11 +5,11 @@ Modulo Gauntlet / Dungeon Master de Aventureros de Azeroth.
 Gauntlet se monta sobre la base estable de Aventurero + SpellDraft. Para la linea actual:
 
 ```text
-stable/spelldraft-v2
-  = Aventurero + SpellDraft v2
+stable/spelldraft-v3
+  = Aventurero + SpellDraft v3 + pack de iconos administrado
 
-stable/gauntlet-v2
-  = SpellDraft v2 + este modulo
+stable/gauntlet-v3
+  = SpellDraft v3 + este modulo
 ```
 
 Khadgar es parte de la experiencia, pero no define el alcance completo del modulo.
@@ -25,6 +25,8 @@ Khadgar es parte de la experiencia, pero no define el alcance completo del modul
 - Los bosses/checkpoints usan recompensas controladas por Gauntlet.
 - Las recompensas actuales de los bosses de Ragefire se escriben directamente en el loot del cuerpo del boss; no se usa un segundo Cofre de Expedicion para ese flujo.
 - El sistema de stash de cuenta vive en `AccountStash.cpp` y su UI cliente asociada.
+- `Lobo solitario` (`910501`) identifica al aventurero que entra solo a las mazmorras controladas por el modo. En la primera version v3 es un aura visible sin bonus de balance inventado.
+- El Libro de Objetos registra por cuenta cada objeto custom actual descubierto al lootearlo; la muerte o eliminacion del personaje no borra ese descubrimiento.
 - Los items y sets curados son propios del modulo y no deben mezclarse con la logica de SpellDraft.
 
 ## Estructura
@@ -34,8 +36,10 @@ Khadgar es parte de la experiencia, pero no define el alcance completo del modul
 - `AdventurerGauntlet.cpp` — orquestacion principal de la run y comportamiento general del modo.
 - `GauntletScaling.cpp` — escalado de criaturas/grupo.
 - `GauntletPermadeath.cpp` — muerte/permadeath de la run.
+- `LoneWolf.cpp` — aura de reconocimiento para runs en solitario.
 - `CuratedRewards.cpp` — seleccion y escritura de recompensas controladas en bosses.
 - `AccountStash.cpp` — stash persistente de cuenta.
+- `AccountCollection.cpp` — descubrimientos persistentes del Libro de Objetos por cuenta.
 - `SetBonuses.cpp` — bonus de sets custom.
 - `KhadgarCelebration.cpp` — comportamiento/presentacion relacionado con Khadgar.
 - `loader.h` — registro de scripts del modulo.
@@ -47,11 +51,31 @@ Khadgar es parte de la experiencia, pero no define el alcance completo del modul
 
 ### `data/sql/`
 
-Actualizaciones de base de datos propiedad de Gauntlet. No moverlas al SQL base de SpellDraft salvo que realmente dejen de ser especificas del modulo.
+Actualizaciones de base de datos propiedad de Gauntlet, incluidos stash y Libro de Objetos. No moverlas al SQL base de SpellDraft salvo que realmente dejen de ser especificas del modulo.
+
+## Libro de Objetos
+
+El libro es una coleccion de descubrimientos de cuenta, no un banco.
+
+Actualmente registra:
+
+- objetos custom del Aventurero en `910200-910224` cuando existen y son looteados;
+- recompensas custom Gauntlet en `911100-911399`.
+
+Solo los objetos descubiertos son enviados al cliente. Los no descubiertos no se muestran. El descubrimiento queda guardado en `adventurer_gauntlet_account_collection` por `account_id + item_entry`.
+
+Se abre con:
+
+```text
+/objetos
+/librodeobjetos
+```
+
+El Baul de Expediciones sigue siendo el sistema separado que conserva objetos fisicos.
 
 ## Catalogo de objetos
 
-La fuente de verdad es:
+La fuente de verdad de recompensas Gauntlet es:
 
 `data/items/early_items.csv`
 
@@ -79,13 +103,17 @@ Formato:
 
 Una misma `set_key` puede tener varios umbrales, por ejemplo 2, 4 y 6 piezas. Los bonus se aplican server-side usando spells stock y se recalculan segun los hooks del modulo.
 
-## Integracion con SpellDraft
+## Integracion con SpellDraft v3
 
 La logica de gameplay del Gauntlet permanece dentro de `modules/mod-adventurer-gauntlet/` y `tools/khadgar_gauntlet/`.
 
-El principal punto tecnico compartido con la base Aventurero/SpellDraft es el pipeline final de `Item.dbc`, incluido `tools/sync_item_dbc.py`, porque los items custom del Gauntlet deben existir tanto para worldserver como para el cliente.
+Los puntos tecnicos compartidos con la base son datos que deben terminar en el mismo cliente/servidor:
 
-No mover gameplay de Gauntlet a archivos de SpellDraft solo para evitar ese punto de integracion.
+- `tools/sync_item_dbc.py` sincroniza metadata de objetos custom;
+- `tools/gauntlet_spells.py` define Juramento (`910500`) y Lobo solitario (`910501`), que el adaptador v3 incorpora al mismo `Spell.dbc` usado por servidor y cliente;
+- si `client/icons/` contiene `lobo_solitario.blp` y se regenera `client/icons/catalog.csv`, Lobo solitario usa ese nuevo icono automaticamente.
+
+No mover gameplay de Gauntlet a archivos de SpellDraft solo para evitar estos puntos de integracion.
 
 ## Instalacion
 
@@ -95,8 +123,8 @@ Usar la rama estable actual:
 cd ~/adventurer-core
 
 git fetch origin
-git switch stable/gauntlet-v2
-git reset --hard origin/stable/gauntlet-v2
+git switch stable/gauntlet-v3
+git reset --hard origin/stable/gauntlet-v3
 ```
 
 Primero actualizar la base Aventurero/SpellDraft instalada:
@@ -113,7 +141,10 @@ Primero actualizar la base Aventurero/SpellDraft instalada:
 Despues instalar/actualizar el modulo Gauntlet:
 
 ```bash
-CORE_DIR=~/aventurerosdeazeroth bash tools/khadgar_gauntlet/install.sh
+CORE_DIR=~/aventurerosdeazeroth \
+SERVER_DATA_DIR=~/aventurerosdeazeroth/env/dist/data \
+CLIENT_DIR="/mnt/c/Games/World of Warcraft 3.3.5a" \
+  bash tools/khadgar_gauntlet/install.sh
 ```
 
 Luego:
@@ -139,8 +170,8 @@ Durante desarrollo Khadgar puede spawnearse con:
 
 ## Versionado
 
-- cambios solo de Gauntlet: `v2.1`, `v2.2`, etc.;
-- nueva base estable SpellDraft v3: integrar esa base y continuar como `stable/gauntlet-v3`;
+- cambios solo de Gauntlet: `v3.1`, `v3.2`, etc.;
+- cuando SpellDraft tenga una nueva version mayor estable, integrar esa base y continuar con el mismo numero mayor en Gauntlet;
 - no volver a desarrollar desde `feature/khadgar-gauntlet-v1`, `feature/khadgar-gauntlet-v1-clientfix` ni desde el antiguo `aventurerosdeazeroth/feature/mod-dungeon-master`.
 
 La documentacion general de esta relacion vive en `docs/GAUNTLET.md`.
