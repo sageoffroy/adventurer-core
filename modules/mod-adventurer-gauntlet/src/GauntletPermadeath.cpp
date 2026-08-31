@@ -2,12 +2,14 @@
 #include "Player.h"
 #include "PlayerSettings.h"
 #include "ScriptMgr.h"
+#include "SpellAuras.h"
 
 namespace
 {
 constexpr char const* GauntletSettingsSource = "adventurer_gauntlet";
 constexpr uint32 GauntletSettingPledged = 0;
 constexpr uint32 GauntletSettingFallen = 1;
+constexpr uint32 PledgeAuraSpellId = 910500;
 constexpr uint32 RagefireMapId = 389;
 constexpr uint32 DeadminesMapId = 36;
 
@@ -30,13 +32,25 @@ void PersistGauntletSetting(Player* player, uint32 index, uint32 value)
     PlayerSettingsStore::UpdateSetting(player->GetGUID().GetCounter(), GauntletSettingsSource, index, value);
 }
 
-void SendPledgeStatus(Player* player)
+void EnsurePledgeAura(Player* player)
 {
-    if (!player)
+    if (!player || !player->IsAlive() || !HasGauntletSetting(player, GauntletSettingPledged) || HasGauntletSetting(player, GauntletSettingFallen))
         return;
 
-    ChatHandler(player->GetSession()).SendSysMessage(
-        "|cffb048f8Juramento del Ultimo Aliento|r: el pacto de Khadgar sigue vigente. Tu proxima muerte sera definitiva.");
+    if (!player->HasAura(PledgeAuraSpellId))
+        player->CastSpell(player, PledgeAuraSpellId, true);
+
+    if (Aura* aura = player->GetAura(PledgeAuraSpellId))
+    {
+        aura->SetMaxDuration(-1);
+        aura->SetDuration(-1);
+    }
+}
+
+void RemovePledgeAura(Player* player)
+{
+    if (player)
+        player->RemoveAurasDueToSpell(PledgeAuraSpellId);
 }
 }
 
@@ -57,8 +71,7 @@ public:
                 "|cffffd100El pacto de Khadgar ha quedado sellado.|r Desde este momento, si caes, ninguna magia podra devolverte a la vida.");
         }
 
-        if (!HasGauntletSetting(player, GauntletSettingFallen))
-            SendPledgeStatus(player);
+        EnsurePledgeAura(player);
     }
 
     void OnPlayerJustDied(Player* player) override
@@ -67,6 +80,7 @@ public:
             return;
 
         PersistGauntletSetting(player, GauntletSettingFallen, 1);
+        RemovePledgeAura(player);
 
         // The original gauntlet development loop resurrected fallen characters
         // after returning them from the dungeon. This script is registered after
@@ -90,10 +104,11 @@ public:
 
         if (!HasGauntletSetting(player, GauntletSettingFallen))
         {
-            SendPledgeStatus(player);
+            EnsurePledgeAura(player);
             return;
         }
 
+        RemovePledgeAura(player);
         if (player->IsAlive())
             player->KillPlayer();
 
