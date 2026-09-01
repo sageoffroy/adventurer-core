@@ -16,7 +16,7 @@ SET_GENERATOR="$ROOT_DIR/tools/khadgar_gauntlet/generate_sets.py"
 DBC_PATCHER="$ROOT_DIR/tools/khadgar_gauntlet/patch_item_dbc.py"
 SPELL_PATCHER="$ROOT_DIR/tools/khadgar_gauntlet/patch_spell_dbc.py"
 CLIENT_V3_INSTALLER="$ROOT_DIR/tools/khadgar_gauntlet/install_client_v3.py"
-STASH_ADDON_SOURCE="$ROOT_DIR/tools/khadgar_gauntlet/AdventurerGauntletStash.lua"
+BANK_ADDON_SOURCE="$ROOT_DIR/tools/khadgar_gauntlet/AdventurerGauntletBank.lua"
 BOOK_ADDON_SOURCE="$ROOT_DIR/tools/khadgar_gauntlet/AdventurerGauntletBook.lua"
 MINIMAP_FIX_SOURCE="$ROOT_DIR/tools/khadgar_gauntlet/AdventurerMinimapFix.lua"
 ITEM_SQL="$DST_DIR/data/sql/db-world/updates/2026_08_30_02_adventurer_gauntlet_items.generated.sql"
@@ -32,7 +32,7 @@ if [[ ! -d "$SRC_DIR" ]]; then
   exit 1
 fi
 
-for required in "$CATALOG_BUILDER" "$ITEM_GENERATOR" "$SET_GENERATOR" "$DBC_PATCHER" "$SPELL_PATCHER" "$CLIENT_V3_INSTALLER" "$STASH_ADDON_SOURCE" "$BOOK_ADDON_SOURCE" "$MINIMAP_FIX_SOURCE"; do
+for required in "$CATALOG_BUILDER" "$ITEM_GENERATOR" "$SET_GENERATOR" "$DBC_PATCHER" "$SPELL_PATCHER" "$CLIENT_V3_INSTALLER" "$BANK_ADDON_SOURCE" "$BOOK_ADDON_SOURCE" "$MINIMAP_FIX_SOURCE"; do
   if [[ ! -f "$required" ]]; then
     echo "ERROR: required Gauntlet file not found: $required" >&2
     exit 1
@@ -47,9 +47,6 @@ fi
 rm -rf "$DST_DIR"
 cp -a "$SRC_DIR" "$DST_DIR"
 
-# Persist the exact runtime data directory selected by this install. The module's
-# CMake install hook reads this file and patches this exact Spell.dbc after
-# `make install`, avoiding assumptions about CMAKE_INSTALL_PREFIX.
 printf '%s\n' "$(realpath -m "$SERVER_DATA_DIR")" > "$DST_DIR/.server-data-dir"
 
 python3 "$CATALOG_BUILDER" \
@@ -90,15 +87,16 @@ fi
 
 ADDON_DIR="$CLIENT_DIR/Interface/AddOns/AdventurerGauntlet"
 mkdir -p "$ADDON_DIR"
+rm -f "$ADDON_DIR/AdventurerGauntletStash.lua"
 cat > "$ADDON_DIR/AdventurerGauntlet.toc" <<'EOF'
 ## Interface: 30300
 ## Title: Adventurer Gauntlet
-## Notes: Gauntlet account stash, item collection and client integration for Aventureros de Azeroth.
-AdventurerGauntletStash.lua
+## Notes: Gauntlet account bank, item collection and client integration for Aventureros de Azeroth.
+AdventurerGauntletBank.lua
 AdventurerGauntletBook.lua
 AdventurerMinimapFix.lua
 EOF
-cp "$STASH_ADDON_SOURCE" "$ADDON_DIR/AdventurerGauntletStash.lua"
+cp "$BANK_ADDON_SOURCE" "$ADDON_DIR/AdventurerGauntletBank.lua"
 cp "$BOOK_ADDON_SOURCE" "$ADDON_DIR/AdventurerGauntletBook.lua"
 cp "$MINIMAP_FIX_SOURCE" "$ADDON_DIR/AdventurerMinimapFix.lua"
 
@@ -106,7 +104,7 @@ echo
 echo "Adventurer Gauntlet installed into: $DST_DIR"
 echo "Runtime data dir pinned for final DBC patch: $(cat "$DST_DIR/.server-data-dir")"
 echo "Khadgar template entry: 910000"
-echo "Account stash entry: 910002"
+echo "Account bank entry: 910002"
 echo "Lone Wolf aura: 910501"
 echo "Account item book: /libro or /objetos"
 echo "Custom item discovery range: 911100-911399"
