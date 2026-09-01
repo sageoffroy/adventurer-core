@@ -26,7 +26,12 @@ class SyncItemDbcError(RuntimeError):
     pass
 
 
-def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
+def sync(
+    core_dir: Path,
+    server_data_dir: Path,
+    client_dir: Path,
+    include_icon_textures: bool = True,
+) -> None:
     core = core_dir.expanduser().resolve()
     data = server_data_dir.expanduser().resolve()
     client_dir = client_dir.expanduser().resolve()
@@ -56,8 +61,10 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
         raise SyncItemDbcError(f"Installed final {SPELL_ICON_DBC} not found: {spell_icon_path}")
     spell_icon_payload = spell_icon_path.read_bytes()
 
-    icon_pack_dir = default_pack_dir().expanduser().resolve()
-    icons = collect_icons(icon_pack_dir)
+    icons = []
+    if include_icon_textures:
+        icon_pack_dir = default_pack_dir().expanduser().resolve()
+        icons = collect_icons(icon_pack_dir)
 
     # The v3 client rebuild intentionally refreshes more than Item.dbc/Spell.dbc
     # (for example SkillLineAbility.dbc for SpellDraft rank metadata). Record the
@@ -94,14 +101,14 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
 
         root_files, locale_files = build_archive_files(work)
 
-        # build_archive_files() is the generic Adventurer builder. SpellDraft v3
-        # adds a second owned layer: the final SpellIcon.dbc plus every external
-        # BLP texture. Re-add that layer here so this final Item/Spell sync cannot
-        # erase the icon pack that install_client_v3.py just built.
+        # SpellIcon.dbc remains authoritative in both modes. For diagnosis we can
+        # deliberately omit the external BLP payload while preserving every DBC
+        # and the rest of the owned client patch unchanged.
         root_files[f"DBFilesClient\\{SPELL_ICON_DBC}"] = spell_icon_payload
         locale_files[f"DBFilesClient\\{SPELL_ICON_DBC}"] = spell_icon_payload
-        for source, internal, _dbc_path in icons:
-            root_files[internal] = source.read_bytes()
+        if include_icon_textures:
+            for source, internal, _dbc_path in icons:
+                root_files[internal] = source.read_bytes()
 
         built_root = temp / "patch-Z.mpq"
         built_locale = temp / "patch-locale-z.mpq"
@@ -139,10 +146,16 @@ def sync(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
     if problems:
         raise SyncItemDbcError("Final Z rebuild verification failed:\n  " + "\n  ".join(problems))
 
-    print(
-        f"Final Z patches rebuilt from installed server DBCs; final DBC bundle and "
-        f"SpellDraft v3 icon layer preserved ({len(icons)} BLP textures)."
-    )
+    if include_icon_textures:
+        print(
+            f"Final Z patches rebuilt from installed server DBCs; final DBC bundle and "
+            f"SpellDraft v3 icon layer preserved ({len(icons)} BLP textures)."
+        )
+    else:
+        print(
+            "Final Z patches rebuilt from installed server DBCs WITHOUT external icon textures; "
+            "SpellIcon.dbc and all other owned client data were preserved."
+        )
 
 
 def main() -> int:
@@ -150,10 +163,20 @@ def main() -> int:
     parser.add_argument("--core-dir", required=True, type=Path)
     parser.add_argument("--server-data-dir", required=True, type=Path)
     parser.add_argument("--client-dir", required=True, type=Path)
+    parser.add_argument(
+        "--without-icon-textures",
+        action="store_true",
+        help="Rebuild owned Z patches without external Interface/Icons BLP files, preserving SpellIcon.dbc.",
+    )
     args, _unknown = parser.parse_known_args()
 
     try:
-        sync(args.core_dir, args.server_data_dir, args.client_dir)
+        sync(
+            args.core_dir,
+            args.server_data_dir,
+            args.client_dir,
+            include_icon_textures=not args.without_icon_textures,
+        )
     except (SyncItemDbcError, OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
         parser.error(str(exc))
         return 2
