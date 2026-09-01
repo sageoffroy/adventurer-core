@@ -24,27 +24,34 @@ ITEM_INTERNAL = "DBFilesClient\\Item.dbc"
 
 # Custom Adventurer item entry -> native Item.dbc chassis.
 # Inventory type and all other client-side item classification fields are cloned
-# exactly from the native chassis. Both custom daggers therefore remain normal
-# one-hand daggers (InventoryType 13), and the travel ration remains native food.
+# exactly from the native chassis. The travel ration remains native food and the
+# contraband weapon rows use the exact stock weapon type/model selected for them.
 CONTRABAND_ITEMS: dict[int, int] = {
     910200: 1917,
     910201: 1195,
     910202: 3220,
-    910210: 25,
-    910211: 8178,
-    910212: 2092,
+    910210: 18957,
+    910211: 4939,
+    910212: 4947,
     910213: 2092,
-    910214: 2504,
+    910214: 4763,
     910215: 1372,
     910216: 85,
     910217: 2392,
     910218: 2125,
     910219: 2397,
     910220: 2119,
-    910221: 2133,
+    910221: 7108,
     910222: 3599,
     910223: 2122,
     910224: 2393,
+    910225: 4948,
+    910226: 4562,
+    910227: 1406,
+    910228: 29584,
+    910229: 27401,
+    910230: 9514,
+    910231: 3446,
 }
 
 
