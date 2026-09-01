@@ -10,7 +10,6 @@ import sys
 
 from database import _run_mysql, query_scalar, read_database_info
 
-
 ROOT = Path(__file__).resolve().parent.parent
 PENDING_WORLD_RELATIVE = Path("data/sql/updates/pending_db_world")
 DEFAULT_CONF_RELATIVE = Path("env/dist/etc/worldserver.conf")
@@ -21,12 +20,8 @@ LEGACY_FIXED_TALENT_UPDATE_NAMES = (
     "rev_1787446800000000000.sql",
     "rev_1787779800000000000.sql",
 )
-
-# Development history before the 000/001/002 consolidation. These files must
-# not survive in pending_db_world when rebuilding a development database from
-# scratch, otherwise AzerothCore would replay obsolete intermediate states.
 LEGACY_WORLD_UPDATE_NAMES = tuple(
-    f"rev_178744680000000{index:03d}.sql" for index in range(1, 15)
+    f"rev_1787446800000000{index:03d}.sql" for index in range(1, 15)
 )
 
 
@@ -40,23 +35,10 @@ class WorldUpdate:
         return PENDING_WORLD_RELATIVE / self.name
 
 
-# Three authoritative responsibilities:
-# 000 = custom item definitions
-# 001 = Adventurer class definition
-# 002 = Goldshire start, quests and Remen distribution
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
-    WorldUpdate(
-        ROOT / "sql" / "world" / "000_adventurer_items.sql",
-        "rev_1789000000000000000.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "001_adventurer.sql",
-        "rev_1789000000000000001.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "002_adventurer_goldshire.sql",
-        "rev_1789000000000000002.sql",
-    ),
+    WorldUpdate(ROOT / "sql/world/000_adventurer_items.sql", "rev_1789000000000000000.sql"),
+    WorldUpdate(ROOT / "sql/world/001_adventurer.sql", "rev_1789000000000000001.sql"),
+    WorldUpdate(ROOT / "sql/world/002_adventurer_goldshire.sql", "rev_1789000000000000002.sql"),
 )
 
 WORLD_UPDATE_SOURCE = WORLD_UPDATES[0].source
@@ -72,10 +54,8 @@ def validate_core(core: Path) -> Path:
     core = core.expanduser().resolve()
     pending = core / PENDING_WORLD_RELATIVE
     if not pending.is_dir():
-        raise WorldUpdateError(
-            f"AzerothCore pending world-update directory not found: {pending}"
-        )
-    if not (core / "src" / "server" / "game").is_dir():
+        raise WorldUpdateError(f"AzerothCore pending world-update directory not found: {pending}")
+    if not (core / "src/server/game").is_dir():
         raise WorldUpdateError(f"Not an AzerothCore source root: {core}")
     return core
 
@@ -100,16 +80,12 @@ def remove_legacy_pending(core: Path) -> list[Path]:
 def install_one(core: Path, update: WorldUpdate) -> tuple[Path, bool]:
     target = core / update.relative
     payload = source_payload(update)
-
     if target.exists():
         if not target.is_file():
             raise WorldUpdateError(f"World update target is not a file: {target}")
         if target.read_bytes() != payload:
-            raise WorldUpdateError(
-                f"World update target already exists with different contents: {target}"
-            )
+            raise WorldUpdateError(f"World update target already exists with different contents: {target}")
         return target, False
-
     target.write_bytes(payload)
     return target, True
 
@@ -117,8 +93,7 @@ def install_one(core: Path, update: WorldUpdate) -> tuple[Path, bool]:
 def install(core: Path) -> tuple[list[Path], list[tuple[Path, bool]]]:
     core = validate_core(core)
     removed = remove_legacy_pending(core)
-    results = [install_one(core, update) for update in WORLD_UPDATES]
-    return removed, results
+    return removed, [install_one(core, update) for update in WORLD_UPDATES]
 
 
 def verify_one(core: Path, update: WorldUpdate) -> Path:
@@ -132,11 +107,8 @@ def verify_one(core: Path, update: WorldUpdate) -> Path:
 
 def verify(core: Path) -> list[Path]:
     core = validate_core(core)
-    legacy = [
-        core / PENDING_WORLD_RELATIVE / name
-        for name in LEGACY_WORLD_UPDATE_NAMES
-        if (core / PENDING_WORLD_RELATIVE / name).exists()
-    ]
+    pending = core / PENDING_WORLD_RELATIVE
+    legacy = [pending / name for name in LEGACY_WORLD_UPDATE_NAMES if (pending / name).exists()]
     if legacy:
         raise WorldUpdateError(
             "Legacy Adventurer pending world updates still exist: "
@@ -152,9 +124,7 @@ def remove_one(core: Path, update: WorldUpdate) -> tuple[Path, bool]:
     if not target.is_file():
         raise WorldUpdateError(f"World update target is not a file: {target}")
     if target.read_bytes() != source_payload(update):
-        raise WorldUpdateError(
-            f"Refusing to remove world update with different contents: {target}"
-        )
+        raise WorldUpdateError(f"Refusing to remove world update with different contents: {target}")
     target.unlink()
     return target, True
 
@@ -166,11 +136,7 @@ def remove(core: Path) -> list[tuple[Path, bool]]:
 
 def cleanup_database(core: Path, conf: Path | None = None) -> None:
     core = validate_core(core)
-    conf = (
-        conf.expanduser().resolve()
-        if conf
-        else (core / DEFAULT_CONF_RELATIVE).resolve()
-    )
+    conf = conf.expanduser().resolve() if conf else (core / DEFAULT_CONF_RELATIVE).resolve()
     db = read_database_info(conf, "WorldDatabaseInfo")
 
     update_names = (
@@ -183,9 +149,7 @@ def cleanup_database(core: Path, conf: Path | None = None) -> None:
 DELETE FROM `spell_script_names`
 WHERE (`spell_id` BETWEEN {LEGACY_FIXED_TALENT_SPELL_MIN} AND {LEGACY_FIXED_TALENT_SPELL_MAX})
    OR (`spell_id` BETWEEN {-LEGACY_FIXED_TALENT_SPELL_MAX} AND {-LEGACY_FIXED_TALENT_SPELL_MIN});
-
-DELETE FROM `updates`
-WHERE `name` IN ({names});
+DELETE FROM `updates` WHERE `name` IN ({names});
 """.encode()
     _run_mysql(db, sql)
 
@@ -195,10 +159,7 @@ WHERE `name` IN ({names});
         f"WHERE (`spell_id` BETWEEN {LEGACY_FIXED_TALENT_SPELL_MIN} AND {LEGACY_FIXED_TALENT_SPELL_MAX}) "
         f"OR (`spell_id` BETWEEN {-LEGACY_FIXED_TALENT_SPELL_MAX} AND {-LEGACY_FIXED_TALENT_SPELL_MIN})",
     ))
-    marker_count = int(query_scalar(
-        db,
-        f"SELECT COUNT(*) FROM `updates` WHERE `name` IN ({names})",
-    ))
+    marker_count = int(query_scalar(db, f"SELECT COUNT(*) FROM `updates` WHERE `name` IN ({names})"))
     if binding_count or marker_count:
         raise WorldUpdateError(
             "Maintenance DB cleanup did not converge: "
@@ -209,11 +170,9 @@ WHERE `name` IN ({names});
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="world.py")
     sub = result.add_subparsers(dest="command", required=True)
-
     for name in ("install", "verify", "remove"):
         command = sub.add_parser(name)
         command.add_argument("--core-dir", required=True, type=Path)
-
     cleanup = sub.add_parser("cleanup-db")
     cleanup.add_argument("--core-dir", required=True, type=Path)
     cleanup.add_argument("--worldserver-conf", type=Path)
@@ -225,16 +184,12 @@ def main() -> int:
     try:
         if args.command == "install":
             removed, results = install(args.core_dir)
-            changed = sum(1 for _target, was_changed in results if was_changed)
             if removed:
                 print(f"Removed {len(removed)} obsolete Adventurer pending world updates.")
-            print(
-                f"Adventurer world updates installed: {changed} changed, "
-                f"{len(results) - changed} already current."
-            )
+            changed = sum(1 for _target, was_changed in results if was_changed)
+            print(f"Adventurer world updates installed: {changed} changed, {len(results) - changed} already current.")
             for target, was_changed in results:
-                state = "installed" if was_changed else "already current"
-                print(f"  {state}: {target}")
+                print(f"  {'installed' if was_changed else 'already current'}: {target}")
             print("  AzerothCore will apply pending updates on the next worldserver startup.")
         elif args.command == "verify":
             targets = verify(args.core_dir)
@@ -244,13 +199,9 @@ def main() -> int:
         elif args.command == "remove":
             results = remove(args.core_dir)
             removed = sum(1 for _target, was_removed in results if was_removed)
-            print(
-                f"Adventurer world updates removed: {removed}; "
-                f"{len(results) - removed} were already absent."
-            )
+            print(f"Adventurer world updates removed: {removed}; {len(results) - removed} were already absent.")
             for target, was_removed in results:
-                state = "removed" if was_removed else "already absent"
-                print(f"  {state}: {target}")
+                print(f"  {'removed' if was_removed else 'already absent'}: {target}")
         else:
             cleanup_database(args.core_dir, args.worldserver_conf)
             print("Adventurer maintenance DB rows and legacy fixed-talent residue cleaned.")
