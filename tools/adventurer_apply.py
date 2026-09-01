@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply Adventurer Core with client Item.dbc metadata for contraband items.
+"""Apply Adventurer Core with client Item.dbc metadata for custom items.
 
 The custom item rows are built from stock Item.dbc chassis and the exact final
 Item.dbc installed for worldserver is then written back into both staged Z MPQs
@@ -23,17 +23,13 @@ ITEM_DBC = "Item.dbc"
 ITEM_INTERNAL = "DBFilesClient\\Item.dbc"
 
 # Custom Adventurer item entry -> native Item.dbc chassis.
-# Inventory type and all other client-side item classification fields are cloned
-# exactly from the native chassis. The travel ration remains native food and the
-# contraband weapon rows use the exact stock weapon type/model selected for them.
+# This mirrors sql/world/000_adventurer_items.sql: only items that actually
+# exist in the authoritative item definition file are reserved client-side.
 CONTRABAND_ITEMS: dict[int, int] = {
-    910200: 1917,
-    910201: 1195,
     910202: 3220,
     910210: 18957,
     910211: 4939,
     910212: 4947,
-    910213: 2092,
     910214: 4763,
     910215: 1372,
     910216: 85,
