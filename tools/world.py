@@ -119,9 +119,14 @@ def install_one(core: Path, update: WorldUpdate) -> tuple[Path, bool]:
     if target.exists():
         if not target.is_file():
             raise WorldUpdateError(f"World update target is not a file: {target}")
-        if target.read_bytes() != payload:
-            raise WorldUpdateError(f"World update target already exists with different contents: {target}")
-        return target, False
+        if target.read_bytes() == payload:
+            return target, False
+        # rev_178900... files are fully owned generated outputs. During active
+        # development their source may legitimately change before worldserver has
+        # consumed the pending copy. Replace stale owned pending data instead of
+        # forcing a manual delete or creating corrective migrations.
+        target.write_bytes(payload)
+        return target, True
     target.write_bytes(payload)
     return target, True
 
@@ -225,7 +230,7 @@ def main() -> int:
             changed = sum(1 for _target, was_changed in results if was_changed)
             print(f"Adventurer world updates installed: {changed} changed, {len(results) - changed} already current.")
             for target, was_changed in results:
-                print(f"  {'installed' if was_changed else 'already current'}: {target}")
+                print(f"  {'installed/updated' if was_changed else 'already current'}: {target}")
             print("  AzerothCore will apply pending updates on the next worldserver startup.")
         elif args.command == "verify":
             targets = verify(args.core_dir)
