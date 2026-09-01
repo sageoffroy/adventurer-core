@@ -47,7 +47,8 @@ class WorldUpdate:
 # two Goldshire hand-offs into real 0/1 talk objectives; 014 restores the two
 # custom daggers to the native one-hand InventoryType used by their chassis;
 # 015 rebases the expedition shop/start supplies around the normal level-3 run;
-# 016 replaces Remen's weapon assortment with the approved level-3 lineup.
+# 016 replaces Remen's weapon assortment with the approved level-3 lineup;
+# 017 removes only the legacy native weapons from Remen's vendor list.
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
@@ -100,6 +101,10 @@ WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "016_adventurer_contraband_weapons.sql",
         "rev_1787446800000000013.sql",
+    ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "017_adventurer_remove_legacy_contraband_weapons.sql",
+        "rev_1787446800000000014.sql",
     ),
 )
 
