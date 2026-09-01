@@ -6,8 +6,8 @@ SET @GAUNTLET_CHEST_ENTRY := 910001;
 -- Lobo solitario is a self aura and must not require an equipped item.
 UPDATE `spell_dbc`
 SET `EquippedItemClass` = -1,
-    `EquippedItemSubClassMask` = 0,
-    `EquippedItemInventoryTypeMask` = 0
+    `EquippedItemSubclass` = 0,
+    `EquippedItemInvTypes` = 0
 WHERE `ID` = @LONE_WOLF;
 
 -- Move the expedition chest decisively out of the crate pile and beside
