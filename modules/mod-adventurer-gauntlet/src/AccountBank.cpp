@@ -10,13 +10,12 @@
 #include "ScriptMgr.h"
 #include "WorldSession.h"
 
-#include <array>
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <vector>
 
 namespace
 {
@@ -27,7 +26,6 @@ constexpr uint32 BankBagSlotCount = 7;
 constexpr uint32 MaxBagCapacity = 36;
 constexpr uint32 RangeCheckMs = 500;
 constexpr float UseRange = 8.0f;
-constexpr char ProtocolPrefix[] = "AGBANK|";
 
 std::unordered_set<uint32> OpenBankPlayers;
 std::unordered_map<uint32, uint32> RangeTimers;
@@ -154,7 +152,7 @@ bool GetStoredItem(Player* player, uint32 slot, StoredItem& item)
         return false;
 
     if (QueryResult result = CharacterDatabase.Query(
-        "SELECT `item_entry`, `item_count` FROM `adventurer_gauntlet_account_stash` "
+        "SELECT `item_entry`, `item_count` FROM `adventurer_gauntlet_account_bank_items` "
         "WHERE `account_id` = {} AND `slot_index` = {} AND `item_count` > 0 LIMIT 1",
         accountId,
         slot))
@@ -170,22 +168,18 @@ bool GetStoredItem(Player* player, uint32 slot, StoredItem& item)
 bool BagIsEmpty(Player* player, uint32 bagIndex)
 {
     uint32 accountId = GetAccountId(player);
-    uint32 bagEntry = GetInstalledBag(player, bagIndex);
-    uint32 capacity = GetBagCapacity(bagEntry);
+    uint32 capacity = GetBagCapacity(GetInstalledBag(player, bagIndex));
     if (!accountId || !capacity)
         return true;
 
     uint32 first = EncodeBagItemSlot(bagIndex, 1);
     uint32 last = EncodeBagItemSlot(bagIndex, capacity);
-    if (QueryResult result = CharacterDatabase.Query(
-        "SELECT 1 FROM `adventurer_gauntlet_account_stash` "
+    return !CharacterDatabase.Query(
+        "SELECT 1 FROM `adventurer_gauntlet_account_bank_items` "
         "WHERE `account_id` = {} AND `slot_index` BETWEEN {} AND {} AND `item_count` > 0 LIMIT 1",
         accountId,
         first,
-        last))
-        return false;
-
-    return true;
+        last);
 }
 
 void RefreshEquipmentVisuals(Player* player)
@@ -219,11 +213,8 @@ void SendBankState(Player* player)
         return;
 
     ChatHandler handler(player->GetSession());
-    uint32 purchased = GetPurchasedBagSlots(player);
-    uint32 price = GetNextBagSlotPrice(player);
-
     handler.SendSysMessage("AGBANK|OPEN");
-    handler.PSendSysMessage("AGBANK|META|{}|{}", purchased, price);
+    handler.PSendSysMessage("AGBANK|META|{}|{}", GetPurchasedBagSlots(player), GetNextBagSlotPrice(player));
 
     for (uint32 bagIndex = 1; bagIndex <= BankBagSlotCount; ++bagIndex)
     {
@@ -236,7 +227,7 @@ void SendBankState(Player* player)
     if (accountId)
     {
         if (QueryResult result = CharacterDatabase.Query(
-            "SELECT `slot_index`, `item_entry`, `item_count` FROM `adventurer_gauntlet_account_stash` "
+            "SELECT `slot_index`, `item_entry`, `item_count` FROM `adventurer_gauntlet_account_bank_items` "
             "WHERE `account_id` = {} AND `item_count` > 0 ORDER BY `slot_index`",
             accountId))
         {
@@ -273,17 +264,14 @@ bool DepositItem(Player* player, uint32 entry, uint32 slot)
         return false;
 
     StoredItem occupied;
-    if (GetStoredItem(player, slot, occupied))
-        return false;
-
-    if (player->GetItemCount(entry, false) == 0)
+    if (GetStoredItem(player, slot, occupied) || player->GetItemCount(entry, false) == 0)
         return false;
 
     player->DestroyItemCount(entry, 1, true, true);
     RefreshEquipmentVisuals(player);
 
     CharacterDatabase.DirectExecute(
-        "INSERT INTO `adventurer_gauntlet_account_stash` "
+        "INSERT INTO `adventurer_gauntlet_account_bank_items` "
         "(`account_id`, `slot_index`, `item_entry`, `item_count`) VALUES ({}, {}, {}, 1)",
         GetAccountId(player),
         slot,
@@ -305,7 +293,7 @@ bool WithdrawItem(Player* player, uint32 slot)
         return false;
 
     CharacterDatabase.DirectExecute(
-        "DELETE FROM `adventurer_gauntlet_account_stash` WHERE `account_id` = {} AND `slot_index` = {}",
+        "DELETE FROM `adventurer_gauntlet_account_bank_items` WHERE `account_id` = {} AND `slot_index` = {}",
         GetAccountId(player),
         slot);
     return true;
@@ -331,8 +319,11 @@ bool InstallBag(Player* player, uint32 bagIndex, uint32 entry)
 
 bool RemoveBag(Player* player, uint32 bagIndex)
 {
+    if (!player)
+        return false;
+
     uint32 entry = GetInstalledBag(player, bagIndex);
-    if (!player || !entry || !BagIsEmpty(player, bagIndex))
+    if (!entry || !BagIsEmpty(player, bagIndex))
         return false;
 
     ItemPosCountVec dest;
@@ -399,11 +390,11 @@ bool HandleBankCommand(Player* player, std::string const& rawMessage)
     if (!player)
         return false;
 
-    std::string addonPrefix = "AGBANK\t";
-    if (rawMessage.rfind(addonPrefix, 0) != 0)
+    constexpr char AddonPrefix[] = "AGBANK\t";
+    if (rawMessage.rfind(AddonPrefix, 0) != 0)
         return false;
 
-    std::string payload = rawMessage.substr(addonPrefix.size());
+    std::string payload = rawMessage.substr(sizeof(AddonPrefix) - 1);
     if (payload == "BUY")
         BuyBagSlot(player);
     else if (payload == "REFRESH")
