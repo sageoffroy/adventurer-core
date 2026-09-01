@@ -1,4 +1,5 @@
 #include "Creature.h"
+#include "DatabaseEnv.h"
 #include "ItemTemplate.h"
 #include "LootMgr.h"
 #include "Map.h"
@@ -16,10 +17,6 @@
 namespace
 {
 constexpr uint32 RagefireMapId = 389;
-constexpr uint32 RagefireOggleflintEntry = 11517;
-constexpr uint32 RagefireJergoshEntry = 11518;
-constexpr uint32 RagefireBazzalanEntry = 11519;
-constexpr uint32 RagefireFinalBossEntry = 11520;
 constexpr uint32 GauntletItemMin = 911100;
 constexpr uint32 GauntletItemMax = 911399;
 
@@ -31,6 +28,13 @@ enum RewardPool : uint8
     REWARD_LEGENDARY = 3,
 };
 
+enum RewardProfile : uint8
+{
+    REWARD_PROFILE_NONE = 0,
+    REWARD_PROFILE_CHECKPOINT = 1,
+    REWARD_PROFILE_FINAL = 2,
+};
+
 struct RewardPools
 {
     std::array<std::vector<uint32>, 4> Items;
@@ -38,14 +42,14 @@ struct RewardPools
 
 std::unordered_set<uint64> ProcessedBosses;
 
-bool IsRagefireCheckpointBoss(uint32 entry)
+uint8 GetRewardProfile(uint32 creatureEntry)
 {
-    return entry == RagefireOggleflintEntry || entry == RagefireJergoshEntry || entry == RagefireBazzalanEntry;
-}
+    if (QueryResult result = WorldDatabase.Query(
+        "SELECT `reward_profile` FROM `adventurer_gauntlet_loot_rule` WHERE `creature_entry` = {}",
+        creatureEntry))
+        return (*result)[0].Get<uint8>();
 
-bool IsRagefireRewardBoss(uint32 entry)
-{
-    return IsRagefireCheckpointBoss(entry) || entry == RagefireFinalBossEntry;
+    return REWARD_PROFILE_NONE;
 }
 
 uint64 GetBossKey(Creature const* boss)
@@ -229,14 +233,18 @@ bool FillFinalBossLoot(Loot& loot, Map* map)
 
 void RefillBossAfterDeath(Creature* boss)
 {
-    if (!boss || boss->IsAlive() || boss->GetMapId() != RagefireMapId || !IsRagefireRewardBoss(boss->GetEntry()))
+    if (!boss || boss->IsAlive() || boss->GetMapId() != RagefireMapId)
+        return;
+
+    uint8 rewardProfile = GetRewardProfile(boss->GetEntry());
+    if (rewardProfile == REWARD_PROFILE_NONE)
         return;
 
     uint64 key = GetBossKey(boss);
     if (!key || ProcessedBosses.find(key) != ProcessedBosses.end())
         return;
 
-    bool filled = boss->GetEntry() == RagefireFinalBossEntry
+    bool filled = rewardProfile == REWARD_PROFILE_FINAL
         ? FillFinalBossLoot(boss->loot, boss->GetMap())
         : FillCheckpointLoot(boss->loot, boss->GetMap());
 
@@ -261,7 +269,7 @@ public:
 
     void OnCreatureRemoveWorld(Creature* creature) override
     {
-        if (!creature || creature->GetMapId() != RagefireMapId || !IsRagefireRewardBoss(creature->GetEntry()))
+        if (!creature || creature->GetMapId() != RagefireMapId || GetRewardProfile(creature->GetEntry()) == REWARD_PROFILE_NONE)
             return;
 
         uint64 key = GetBossKey(creature);
