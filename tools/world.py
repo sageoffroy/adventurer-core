@@ -46,7 +46,8 @@ class WorldUpdate:
 # 012 adds cloth gloves, a shield, and cloth/leather/mail belts; 013 turns the
 # two Goldshire hand-offs into real 0/1 talk objectives; 014 restores the two
 # custom daggers to the native one-hand InventoryType used by their chassis;
-# 015 rebases the expedition shop/start supplies around the normal level-3 run.
+# 015 rebases the expedition shop/start supplies around the normal level-3 run;
+# 016 replaces Remen's weapon assortment with the approved level-3 lineup.
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
@@ -95,6 +96,10 @@ WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
         ROOT / "sql" / "world" / "015_adventurer_level3_loadout.sql",
         "rev_1787446800000000012.sql",
+    ),
+    WorldUpdate(
+        ROOT / "sql" / "world" / "016_adventurer_contraband_weapons.sql",
+        "rev_1787446800000000013.sql",
     ),
 )
 
