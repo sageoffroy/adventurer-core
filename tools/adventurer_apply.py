@@ -50,6 +50,19 @@ CONTRABAND_ITEMS: dict[int, int] = {
     910231: 3446,
 }
 
+# AzerothCore's world item_template data contains a few corrected presentation
+# values that differ from the stock Item.dbc row with the same entry. Our SQL
+# clones those world rows, so mirror the same presentation values into the
+# custom Item.dbc rows. Field indexes: 5=DisplayInfoID, 6=InventoryType,
+# 7=Sheath. These values come directly from the clean worldserver validation.
+ITEM_DBC_OVERRIDES: dict[int, dict[int, int]] = {
+    910210: {5: 31400, 6: 13, 7: 1},
+    910211: {5: 20112},
+    910212: {5: 20603},
+    910214: {5: 3186},
+    910221: {5: 18661},
+}
+
 
 def _u32(record: bytearray, field: int) -> int:
     return struct.unpack_from("<I", record, field * 4)[0]
@@ -95,6 +108,8 @@ def patch_item_dbc(path) -> bool:
             )
         row = bytearray(source)
         _set_u32(row, 0, entry)
+        for field, value in ITEM_DBC_OVERRIDES.get(entry, {}).items():
+            _set_u32(row, field, value)
         rebuilt.append(row)
 
     rebuilt.sort(key=lambda row: _u32(row, 0))
