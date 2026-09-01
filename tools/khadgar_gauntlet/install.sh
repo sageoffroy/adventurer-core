@@ -13,8 +13,6 @@ SET_CATALOG="$DST_DIR/data/items/sets.csv"
 CATALOG_BUILDER="$ROOT_DIR/tools/khadgar_gauntlet/build_catalog.py"
 ITEM_GENERATOR="$ROOT_DIR/tools/khadgar_gauntlet/generate_items.py"
 SET_GENERATOR="$ROOT_DIR/tools/khadgar_gauntlet/generate_sets.py"
-DBC_PATCHER="$ROOT_DIR/tools/khadgar_gauntlet/patch_item_dbc.py"
-SPELL_PATCHER="$ROOT_DIR/tools/khadgar_gauntlet/patch_spell_dbc.py"
 CLIENT_V3_INSTALLER="$ROOT_DIR/tools/khadgar_gauntlet/install_client_v3.py"
 BANK_ADDON_SOURCE="$ROOT_DIR/tools/khadgar_gauntlet/AdventurerGauntletBank.lua"
 BOOK_ADDON_SOURCE="$ROOT_DIR/tools/khadgar_gauntlet/AdventurerGauntletBook.lua"
@@ -32,7 +30,7 @@ if [[ ! -d "$SRC_DIR" ]]; then
   exit 1
 fi
 
-for required in "$CATALOG_BUILDER" "$ITEM_GENERATOR" "$SET_GENERATOR" "$DBC_PATCHER" "$SPELL_PATCHER" "$CLIENT_V3_INSTALLER" "$BANK_ADDON_SOURCE" "$BOOK_ADDON_SOURCE" "$MINIMAP_FIX_SOURCE"; do
+for required in "$CATALOG_BUILDER" "$ITEM_GENERATOR" "$SET_GENERATOR" "$CLIENT_V3_INSTALLER" "$BANK_ADDON_SOURCE" "$BOOK_ADDON_SOURCE" "$MINIMAP_FIX_SOURCE"; do
   if [[ ! -f "$required" ]]; then
     echo "ERROR: required Gauntlet file not found: $required" >&2
     exit 1
@@ -70,13 +68,10 @@ if [[ -f "$SERVER_DATA_DIR/dbc/Item.dbc" && -f "$SERVER_DATA_DIR/dbc/Spell.dbc" 
     --client-dir "$CLIENT_DIR" \
     --locale esMX
 
-  python3 "$DBC_PATCHER" \
-    --catalog "$ITEM_CATALOG" \
-    --dbc "$SERVER_DATA_DIR/dbc/Item.dbc"
-
-  python3 "$SPELL_PATCHER" \
-    --dbc "$SERVER_DATA_DIR/dbc/Spell.dbc"
-
+  # One authoritative final DBC pass. sync_item_dbc.py rebuilds the 300
+  # Gauntlet Item.dbc rows directly from build_catalog.py, reapplies Gauntlet
+  # Spell.dbc rows, and then writes the exact same final DBC payloads to the
+  # runtime server directory and both owned Z client archives.
   python3 "$ROOT_DIR/tools/sync_item_dbc.py" \
     --core-dir "$CORE_DIR" \
     --server-data-dir "$SERVER_DATA_DIR" \
