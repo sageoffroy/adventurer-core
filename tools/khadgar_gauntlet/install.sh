@@ -47,6 +47,11 @@ fi
 rm -rf "$DST_DIR"
 cp -a "$SRC_DIR" "$DST_DIR"
 
+# Persist the exact runtime data directory selected by this install. The module's
+# CMake install hook reads this file and patches this exact Spell.dbc after
+# `make install`, avoiding assumptions about CMAKE_INSTALL_PREFIX.
+printf '%s\n' "$(realpath -m "$SERVER_DATA_DIR")" > "$DST_DIR/.server-data-dir"
+
 python3 "$CATALOG_BUILDER" \
   --items "$ITEM_CATALOG" \
   --sets "$SET_CATALOG"
@@ -99,6 +104,7 @@ cp "$MINIMAP_FIX_SOURCE" "$ADDON_DIR/AdventurerMinimapFix.lua"
 
 echo
 echo "Adventurer Gauntlet installed into: $DST_DIR"
+echo "Runtime data dir pinned for final DBC patch: $(cat "$DST_DIR/.server-data-dir")"
 echo "Khadgar template entry: 910000"
 echo "Account stash entry: 910002"
 echo "Lone Wolf aura: 910501"
