@@ -31,16 +31,17 @@ python3 "$ROOT/tools/database.py" prepare "$@"
 status=0
 python3 "$ROOT/tools/adventurer_apply.py" apply "$@" || status=$?
 
-# SpellDraft v3 owns the final client/server DBC rebuild. It reapplies current
-# rank-tab/component metadata, expands SpellIcon.dbc and packs the external BLPs
-# in one pass so no later metadata rebuild can erase the icon layer.
+# Gauntlet module/catalog/addon staging is shared with update.sh. It does not
+# build or install DBC/MPQ artifacts; the final bundle is built once below.
 if (( status == 0 )); then
-    python3 "$ROOT/tools/spelldraft_v3_icons.py" "$@" || status=$?
+    python3 "$ROOT/tools/khadgar_gauntlet/stage.py" "$@" || status=$?
 fi
 
-# Restore Item.dbc parity inside the final Z patches without rebuilding them.
+# One authoritative client/server build for Aventurero + SpellDraft v3 +
+# Gauntlet. Every DBC transform and external icon is applied before the final
+# server DBCs and client Z patches are installed.
 if (( status == 0 )); then
-    python3 "$ROOT/tools/sync_item_dbc.py" "$@" || status=$?
+    python3 "$ROOT/tools/build_client_bundle.py" "$@" || status=$?
 fi
 
 if (( status == 0 && has_playerbots == 1 )); then
