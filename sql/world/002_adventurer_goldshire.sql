@@ -138,18 +138,11 @@ VALUES
  0);
 
 -- ---------------------------------------------------------------------------
--- Remen inventory. 000 defines the custom items; this section only distributes
--- them. Native weapons/armor are never inserted here.
+-- Remen inventory. Adventurer Core fully owns this vendor inventory: clear the
+-- native stock first, then add only approved supplies, clothing and weapons.
 -- ---------------------------------------------------------------------------
 DELETE FROM `npc_vendor`
-WHERE `entry` = @REMEN_MARCOT
-  AND `item` IN (
-    2512, 2516, 4540, 159, 954, 955, 1180, 1181, 3012,
-    910210, 910211, 910212, 910214, 910215, 910216, 910217, 910218, 910219,
-    910220, 910221, 910222, 910223, 910224, 910225, 910226, 910227, 910228,
-    910229, 910230, 910231
-  )
-  AND `ExtendedCost` = 0;
+WHERE `entry` = @REMEN_MARCOT;
 
 -- Unlimited ammunition, food, water and low-level stat scrolls.
 INSERT INTO `npc_vendor`
@@ -179,17 +172,18 @@ VALUES
 (@REMEN_MARCOT, 0, 910223, 2, @RESTOCK_THREE_DAYS, 0, 0),
 (@REMEN_MARCOT, 0, 910224, 1, @RESTOCK_THREE_DAYS, 0, 0);
 
--- Definitive scarce weapon lineup.
+-- Definitive scarce weapon lineup. IDs 910210/211/212/214/221 are retired and
+-- never reused because older clients may have cached their previous identities.
 INSERT INTO `npc_vendor`
 (`entry`, `slot`, `item`, `maxcount`, `incrtime`, `ExtendedCost`, `VerifiedBuild`)
 VALUES
-(@REMEN_MARCOT, 0, 910212, 3, @RESTOCK_THREE_DAYS, 0, 0),
-(@REMEN_MARCOT, 0, 910211, 1, @RESTOCK_THREE_DAYS, 0, 0),
-(@REMEN_MARCOT, 0, 910210, 2, @RESTOCK_THREE_DAYS, 0, 0),
+(@REMEN_MARCOT, 0, 910234, 3, @RESTOCK_THREE_DAYS, 0, 0),
+(@REMEN_MARCOT, 0, 910233, 1, @RESTOCK_THREE_DAYS, 0, 0),
+(@REMEN_MARCOT, 0, 910232, 2, @RESTOCK_THREE_DAYS, 0, 0),
 (@REMEN_MARCOT, 0, 910225, 2, @RESTOCK_THREE_DAYS, 0, 0),
-(@REMEN_MARCOT, 0, 910214, 2, @RESTOCK_THREE_DAYS, 0, 0),
+(@REMEN_MARCOT, 0, 910235, 2, @RESTOCK_THREE_DAYS, 0, 0),
 (@REMEN_MARCOT, 0, 910226, 1, @RESTOCK_THREE_DAYS, 0, 0),
-(@REMEN_MARCOT, 0, 910221, 2, @RESTOCK_THREE_DAYS, 0, 0),
+(@REMEN_MARCOT, 0, 910236, 2, @RESTOCK_THREE_DAYS, 0, 0),
 (@REMEN_MARCOT, 0, 910227, 1, @RESTOCK_THREE_DAYS, 0, 0),
 (@REMEN_MARCOT, 0, 910228, 3, @RESTOCK_THREE_DAYS, 0, 0),
 (@REMEN_MARCOT, 0, 910229, 1, @RESTOCK_THREE_DAYS, 0, 0),
