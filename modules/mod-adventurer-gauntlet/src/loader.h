@@ -2,7 +2,7 @@ void AddAdventurerGauntletScripts();
 void AddAdventurerGauntletPermadeathScripts();
 void AddAdventurerGauntletScalingScripts();
 void AddAdventurerGauntletRunReconnectScripts();
-void AddAdventurerGauntletAccountStashScripts();
+void AddAdventurerGauntletAccountBankScripts();
 void AddAdventurerGauntletAccountCollectionScripts();
 void AddAdventurerGauntletCelebrationScripts();
 void AddAdventurerGauntletCuratedRewardsScripts();
