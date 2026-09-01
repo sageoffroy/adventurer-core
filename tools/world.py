@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install, verify and clean Adventurer Core world maintenance updates."""
+"""Install, verify and clean Adventurer Core world SQL."""
 
 from __future__ import annotations
 
@@ -15,14 +15,18 @@ ROOT = Path(__file__).resolve().parent.parent
 PENDING_WORLD_RELATIVE = Path("data/sql/updates/pending_db_world")
 DEFAULT_CONF_RELATIVE = Path("env/dist/etc/worldserver.conf")
 
-# Old development revisions generated a fixed Guardian/Champion/Scholar talent
-# tree in the 290000 spell reservation. SpellDraft now owns all Adventurer
-# talents, so these identifiers are cleanup-only and are never installed.
 LEGACY_FIXED_TALENT_SPELL_MIN = 290000
 LEGACY_FIXED_TALENT_SPELL_MAX = 299999
 LEGACY_FIXED_TALENT_UPDATE_NAMES = (
     "rev_1787446800000000000.sql",
     "rev_1787779800000000000.sql",
+)
+
+# Development history before the 000/001/002 consolidation. These files must
+# not survive in pending_db_world when rebuilding a development database from
+# scratch, otherwise AzerothCore would replay obsolete intermediate states.
+LEGACY_WORLD_UPDATE_NAMES = tuple(
+    f"rev_178744680000000{index:03d}.sql" for index in range(1, 15)
 )
 
 
@@ -36,79 +40,25 @@ class WorldUpdate:
         return PENDING_WORLD_RELATIVE / self.name
 
 
-# Talents are exclusively SpellDraft cards and therefore have no fixed-tree
-# world migrations. 003 is immutable installation history; 005 rebases the
-# chassis from 95% to 80%; 006 gives non-Shaman races visual fallback models
-# for classless totem spells; 007 owns the shared Adventurer start setup; 008
-# adds the Goldshire introduction; 009 continues it through Remen's contraband;
-# 010 adds two Adventurer-owned low-level rare contraband items; 011 replaces
-# the temporary native green assortment with the custom contraband starter set;
-# 012 adds cloth gloves, a shield, and cloth/leather/mail belts; 013 turns the
-# two Goldshire hand-offs into real 0/1 talk objectives; 014 restores the two
-# custom daggers to the native one-hand InventoryType used by their chassis;
-# 015 rebases the expedition shop/start supplies around the normal level-3 run;
-# 016 replaces Remen's weapon assortment with the approved level-3 lineup;
-# 017 removes only the legacy native weapons from Remen's vendor list.
+# Three authoritative responsibilities:
+# 000 = custom item definitions
+# 001 = Adventurer class definition
+# 002 = Goldshire start, quests and Remen distribution
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(
-        ROOT / "sql" / "world" / "003_adventurer_chassis.sql",
-        "rev_1787446800000000001.sql",
+        ROOT / "sql" / "world" / "000_adventurer_items.sql",
+        "rev_1789000000000000000.sql",
     ),
     WorldUpdate(
-        ROOT / "sql" / "world" / "005_adventurer_chassis_80.sql",
-        "rev_1787446800000000002.sql",
+        ROOT / "sql" / "world" / "001_adventurer.sql",
+        "rev_1789000000000000001.sql",
     ),
     WorldUpdate(
-        ROOT / "sql" / "world" / "006_adventurer_totem_models.sql",
-        "rev_1787446800000000003.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "007_adventurer_start.sql",
-        "rev_1787446800000000004.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "008_adventurer_goldshire_intro.sql",
-        "rev_1787446800000000005.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "009_adventurer_goldshire_contraband.sql",
-        "rev_1787446800000000006.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "010_adventurer_remen_rare_goods.sql",
-        "rev_1787446800000000007.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "011_adventurer_contraband_set.sql",
-        "rev_1787446800000000008.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "012_adventurer_contraband_accessories.sql",
-        "rev_1787446800000000009.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "013_adventurer_goldshire_objectives.sql",
-        "rev_1787446800000000010.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "014_adventurer_contraband_dagger_inventory.sql",
-        "rev_1787446800000000011.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "015_adventurer_level3_loadout.sql",
-        "rev_1787446800000000012.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "016_adventurer_contraband_weapons.sql",
-        "rev_1787446800000000013.sql",
-    ),
-    WorldUpdate(
-        ROOT / "sql" / "world" / "017_adventurer_remove_legacy_contraband_weapons.sql",
-        "rev_1787446800000000014.sql",
+        ROOT / "sql" / "world" / "002_adventurer_goldshire.sql",
+        "rev_1789000000000000002.sql",
     ),
 )
 
-# Kept as aliases for older callers/tests that referenced the single-update API.
 WORLD_UPDATE_SOURCE = WORLD_UPDATES[0].source
 WORLD_UPDATE_NAME = WORLD_UPDATES[0].name
 WORLD_UPDATE_RELATIVE = WORLD_UPDATES[0].relative
@@ -136,6 +86,17 @@ def source_payload(update: WorldUpdate = WORLD_UPDATES[0]) -> bytes:
     return update.source.read_bytes()
 
 
+def remove_legacy_pending(core: Path) -> list[Path]:
+    pending = core / PENDING_WORLD_RELATIVE
+    removed: list[Path] = []
+    for name in LEGACY_WORLD_UPDATE_NAMES:
+        target = pending / name
+        if target.is_file():
+            target.unlink()
+            removed.append(target)
+    return removed
+
+
 def install_one(core: Path, update: WorldUpdate) -> tuple[Path, bool]:
     target = core / update.relative
     payload = source_payload(update)
@@ -153,9 +114,11 @@ def install_one(core: Path, update: WorldUpdate) -> tuple[Path, bool]:
     return target, True
 
 
-def install(core: Path) -> list[tuple[Path, bool]]:
+def install(core: Path) -> tuple[list[Path], list[tuple[Path, bool]]]:
     core = validate_core(core)
-    return [install_one(core, update) for update in WORLD_UPDATES]
+    removed = remove_legacy_pending(core)
+    results = [install_one(core, update) for update in WORLD_UPDATES]
+    return removed, results
 
 
 def verify_one(core: Path, update: WorldUpdate) -> Path:
@@ -169,6 +132,16 @@ def verify_one(core: Path, update: WorldUpdate) -> Path:
 
 def verify(core: Path) -> list[Path]:
     core = validate_core(core)
+    legacy = [
+        core / PENDING_WORLD_RELATIVE / name
+        for name in LEGACY_WORLD_UPDATE_NAMES
+        if (core / PENDING_WORLD_RELATIVE / name).exists()
+    ]
+    if legacy:
+        raise WorldUpdateError(
+            "Legacy Adventurer pending world updates still exist: "
+            + ", ".join(str(path) for path in legacy)
+        )
     return [verify_one(core, update) for update in WORLD_UPDATES]
 
 
@@ -192,13 +165,6 @@ def remove(core: Path) -> list[tuple[Path, bool]]:
 
 
 def cleanup_database(core: Path, conf: Path | None = None) -> None:
-    """Remove package markers plus any legacy fixed-talent residue.
-
-    The main database rollback snapshot restores the class-10 chassis ranges.
-    This explicit cleanup also understands historical Guardian development
-    revisions so updating/rolling back cannot leave cloned fixed-talent script
-    bindings or obsolete AzerothCore update markers behind.
-    """
     core = validate_core(core)
     conf = (
         conf.expanduser().resolve()
@@ -207,7 +173,11 @@ def cleanup_database(core: Path, conf: Path | None = None) -> None:
     )
     db = read_database_info(conf, "WorldDatabaseInfo")
 
-    update_names = tuple(update.name for update in WORLD_UPDATES) + LEGACY_FIXED_TALENT_UPDATE_NAMES
+    update_names = (
+        tuple(update.name for update in WORLD_UPDATES)
+        + LEGACY_WORLD_UPDATE_NAMES
+        + LEGACY_FIXED_TALENT_UPDATE_NAMES
+    )
     names = ", ".join("'" + name.replace("'", "''") + "'" for name in update_names)
     sql = f"""
 DELETE FROM `spell_script_names`
@@ -247,7 +217,6 @@ def parser() -> argparse.ArgumentParser:
     cleanup = sub.add_parser("cleanup-db")
     cleanup.add_argument("--core-dir", required=True, type=Path)
     cleanup.add_argument("--worldserver-conf", type=Path)
-
     return result
 
 
@@ -255,8 +224,10 @@ def main() -> int:
     args = parser().parse_args()
     try:
         if args.command == "install":
-            results = install(args.core_dir)
+            removed, results = install(args.core_dir)
             changed = sum(1 for _target, was_changed in results if was_changed)
+            if removed:
+                print(f"Removed {len(removed)} obsolete Adventurer pending world updates.")
             print(
                 f"Adventurer world updates installed: {changed} changed, "
                 f"{len(results) - changed} already current."
