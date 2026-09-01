@@ -1,11 +1,12 @@
 -- Aventureros de Azeroth: account-wide expedition bank.
--- Intentionally mirrors Blizzard's 3.3.5 BankFrame layout and interaction model.
+-- Mirrors Blizzard's 3.3.5 BankFrame layout and interaction model.
 
 local PREFIX = "AGBANK"
 local FRAME_NAME = "AdventurerGauntletBankFrame"
 local BASE_SLOTS = 28
 local BAG_SLOTS = 7
 local MAX_BAG_CAPACITY = 36
+local COLUMNS = 7
 
 local ITEMS = {}
 local BAGS = {}
@@ -78,7 +79,6 @@ frame:SetFrameStrata("HIGH")
 frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
 frame:EnableMouse(true)
 frame:Hide()
-
 UIPanelWindows[FRAME_NAME] = { area = "left", pushable = 5, whileDead = 1 }
 tinsert(UISpecialFrames, FRAME_NAME)
 
@@ -88,7 +88,6 @@ local function AddBankTexture(path, width, height, point, relativePoint)
     texture:SetWidth(width)
     texture:SetHeight(height)
     texture:SetPoint(point, frame, relativePoint)
-    return texture
 end
 
 AddBankTexture("Interface\\BankFrame\\UI-BankFrame-TopLeft", 256, 256, "TOPLEFT", "TOPLEFT")
@@ -149,10 +148,7 @@ end
 
 local function RequestWithdraw(button)
     if not button or not button.entry or CursorHasItem() or PENDING_WITHDRAW then return end
-    PENDING_WITHDRAW = {
-        entry = button.entry,
-        before = SnapshotInventoryEntry(button.entry),
-    }
+    PENDING_WITHDRAW = { entry = button.entry, before = SnapshotInventoryEntry(button.entry) }
     SendCommand("WITHDRAW|" .. button.bankSlot)
 end
 
@@ -182,18 +178,19 @@ for index = 1, BASE_SLOTS do
     local button = CreateFrame("Button", name, frame, "ItemButtonTemplate")
     button:SetWidth(37)
     button:SetHeight(37)
-    local column = (index - 1) % 6
-    local row = math.floor((index - 1) / 6)
-    -- Native BankFrame uses 6 columns in this 384px layout.
-    button:SetPoint("TOPLEFT", frame, "TOPLEFT", 40 + column * 49, -73 - row * 44)
+    local column = (index - 1) % COLUMNS
+    local row = math.floor((index - 1) / COLUMNS)
+    button:SetPoint("TOPLEFT", frame, "TOPLEFT", 40 + column * 43, -73 - row * 44)
     ConfigureItemButton(button, index)
     MAIN_SLOTS[index] = button
 end
 
 local function CreateBagFrame(bagIndex)
     local bagFrame = CreateFrame("Frame", FRAME_NAME .. "Bag" .. bagIndex, UIParent, "ContainerFrameTemplate")
+    bagFrame:UnregisterAllEvents()
+    bagFrame:SetScript("OnEvent", nil)
     bagFrame:SetWidth(192)
-    bagFrame:SetPoint("TOPLEFT", frame, "TOPRIGHT", 4 + ((bagIndex - 1) % 2) * 194, -((math.floor((bagIndex - 1) / 2)) * 250))
+    bagFrame:SetPoint("TOPLEFT", frame, "TOPRIGHT", 4 + ((bagIndex - 1) % 2) * 194, -(math.floor((bagIndex - 1) / 2) * 250))
     bagFrame:SetFrameStrata("HIGH")
     bagFrame:Hide()
     tinsert(UISpecialFrames, bagFrame:GetName())
@@ -211,7 +208,9 @@ local function ConfigureBagContents(bagIndex)
     local nameText = _G[bagFrame:GetName() .. "Name"]
     if nameText then nameText:SetText(bag and (GetItemInfo(bag.entry) or "Bolsa") or "Bolsa") end
     local portraitTexture = _G[bagFrame:GetName() .. "Portrait"]
-    if portraitTexture and bag then SetPortraitToTexture(portraitTexture, GetItemIcon(bag.entry) or "Interface\\Icons\\INV_Misc_Bag_08") end
+    if portraitTexture and bag and SetPortraitToTexture then
+        SetPortraitToTexture(portraitTexture, GetItemIcon(bag.entry) or "Interface\\Icons\\INV_Misc_Bag_08")
+    end
 
     for visual = 1, MAX_BAG_CAPACITY do
         local button = _G[bagFrame:GetName() .. "Item" .. visual]
@@ -285,9 +284,9 @@ local function Refresh()
     end
 
     for bagIndex, bag in pairs(BAGS) do
-        for inner = 1, bag.capacity do
-            local bagFrame = BAG_FRAMES[bagIndex]
-            if bagFrame then
+        local bagFrame = BAG_FRAMES[bagIndex]
+        if bagFrame then
+            for inner = 1, bag.capacity do
                 local button = _G[bagFrame:GetName() .. "Item" .. inner]
                 if button then PaintItem(button, ITEMS[EncodeBagSlot(bagIndex, inner)]) end
             end
@@ -298,32 +297,31 @@ local function Refresh()
         MoneyFrame_Update(costMoney:GetName(), NEXT_BAG_PRICE)
         MoneyFrame_Update(money:GetName(), GetMoney())
     end
+
     local canBuy = PURCHASED_BAGS < BAG_SLOTS and NEXT_BAG_PRICE > 0
-    buy:SetEnabled(canBuy)
-    buyText:SetShown(canBuy)
-    costLabel:SetShown(canBuy)
-    costMoney:SetShown(canBuy)
-    buy:SetShown(canBuy)
+    if canBuy then
+        buy:Show(); buyText:Show(); costLabel:Show(); costMoney:Show()
+    else
+        buy:Hide(); buyText:Hide(); costLabel:Hide(); costMoney:Hide()
+    end
 end
 
 local function CloseAll()
-    frame:Hide()
+    HideUIPanel(frame)
     for _, bagFrame in pairs(BAG_FRAMES) do bagFrame:Hide() end
     PENDING_WITHDRAW = nil
 end
 
 local function HandleState(message)
     if message == "OPEN" then
-        ITEMS = {}
-        BAGS = {}
+        ITEMS = {}; BAGS = {}
         ShowUIPanel(frame)
         return
     elseif message == "CLOSE" then
         CloseAll()
         return
     elseif message == "DONE" then
-        Refresh()
-        ShowUIPanel(frame)
+        Refresh(); ShowUIPanel(frame)
         return
     end
 
