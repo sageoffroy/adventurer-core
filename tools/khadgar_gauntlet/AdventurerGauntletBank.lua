@@ -181,93 +181,45 @@ local function CreateBagFrame(bagIndex)
     local bagFrame = CreateFrame("Frame", name, UIParent, "ContainerFrameTemplate")
     bagFrame:UnregisterAllEvents()
     bagFrame:SetScript("OnEvent", nil)
-    -- ContainerFrameTemplate carries Blizzard's native OnShow handler, which
-    -- calls ContainerFrame_Update() for a real bag ID. Expedition bags are
-    -- virtual/account-wide and are painted below, so never run that handler.
+    -- Expedition bags are virtual. Native OnShow/OnHide handlers try to read
+    -- real bag IDs and mutate Blizzard's open-bag bookkeeping, so keep them off.
     bagFrame:SetScript("OnShow", nil)
+    bagFrame:SetScript("OnHide", nil)
     bagFrame:SetFrameStrata("HIGH")
-    bagFrame:SetPoint("TOPLEFT", BANK, "TOPRIGHT", 4 + ((bagIndex - 1) % 2) * 194, -(math.floor((bagIndex - 1) / 2) * 250))
     bagFrame:Hide()
     tinsert(UISpecialFrames, name)
     BAG_FRAMES[bagIndex] = bagFrame
     return bagFrame
 end
 
-local function LayoutVirtualBagBackground(bagFrame, size)
-    local name = bagFrame:GetName()
-    local top = _G[name .. "BackgroundTop"]
-    local middle1 = _G[name .. "BackgroundMiddle1"]
-    local middle2 = _G[name .. "BackgroundMiddle2"]
-    local bottom = _G[name .. "BackgroundBottom"]
-    local oneSlot = _G[name .. "Background1Slot"]
-    local money = _G[name .. "MoneyFrame"]
-    if not top or not middle1 or not middle2 or not bottom then return end
+local function GenerateNativeBagGeometry(bagFrame, size, bagIndex)
+    if bagFrame.expeditionLayoutSize == size then return end
 
-    local texture = "Interface\\ContainerFrame\\UI-Bag-Components-Bank"
-    local columns = 4
-    local rows = math.max(1, math.ceil(size / columns))
-    local remainingRows = rows - 1
-    local rowHeight = 41
-    local textureHeight = 512
-    local rowsPerMiddle = 6
-
-    if oneSlot then oneSlot:Hide() end
-    if money then money:Hide() end
-
-    top:SetTexture(texture)
-    top:Show()
-    middle1:SetTexture(texture)
-    middle2:SetTexture(texture)
-    middle1:Hide()
-    middle2:Hide()
-    bottom:SetTexture(texture)
-
-    if (size % columns) == 2 then
-        top:SetTexCoord(0, 1, 0.189453125, 0.330078125)
-        top:SetHeight(72)
-    elseif rows == 1 then
-        top:SetTexCoord(0, 1, 0.00390625, 0.16796875)
-        top:SetHeight(86)
-    else
-        top:SetTexCoord(0, 1, 0.00390625, 0.18359375)
-        top:SetHeight(94)
+    -- Blizzard already owns the exact 3.3.5 bag texture slicing and button
+    -- anchors. Let ContainerFrame_GenerateFrame do that work, but preserve and
+    -- restore its global open-bag bookkeeping because this is a virtual bag.
+    local savedShown = ContainerFrame1.bagsShown
+    local savedBags = {}
+    for index, frameName in ipairs(ContainerFrame1.bags) do
+        savedBags[index] = frameName
     end
 
-    local middleHeight = 0
-    local lastMiddle = middle1
-    if rows == 1 then
-        bottom:ClearAllPoints()
-        bottom:SetPoint("TOP", middle1, "TOP", 0, 0)
-        bottom:Show()
-    else
-        local firstRowPixelOffset = 9
-        local firstRowTexCoordOffset = 0.353515625
-        local middleCount = math.ceil(remainingRows / rowsPerMiddle)
-        for index = 1, middleCount do
-            local middle = _G[name .. "BackgroundMiddle" .. index]
-            if middle then
-                local height
-                if remainingRows > rowsPerMiddle then
-                    height = (rowsPerMiddle * rowHeight) + firstRowTexCoordOffset
-                    remainingRows = remainingRows - rowsPerMiddle
-                else
-                    height = remainingRows * rowHeight - firstRowPixelOffset
-                    remainingRows = 0
-                end
-                middle:SetHeight(height)
-                middle:SetTexCoord(0, 1, firstRowTexCoordOffset, (height / textureHeight) + firstRowTexCoordOffset)
-                middle:Show()
-                middleHeight = middleHeight + height
-                lastMiddle = middle
-            end
-        end
-        bottom:ClearAllPoints()
-        bottom:SetPoint("TOP", lastMiddle, "BOTTOM", 0, 0)
-        bottom:Show()
-    end
+    ContainerFrame_GenerateFrame(bagFrame, size, NUM_BAG_FRAMES + bagIndex)
 
-    bagFrame:SetWidth(192)
-    bagFrame:SetHeight(top:GetHeight() + bottom:GetHeight() + middleHeight)
+    ContainerFrame1.bagsShown = savedShown
+    ContainerFrame1.bags = savedBags
+    bagFrame:Hide()
+    bagFrame:ClearAllPoints()
+    bagFrame:SetPoint(
+        "TOPLEFT",
+        BANK,
+        "TOPRIGHT",
+        4 + ((bagIndex - 1) % 2) * 194,
+        -(math.floor((bagIndex - 1) / 2) * 250)
+    )
+    bagFrame.expeditionLayoutSize = size
+
+    if updateContainerFrameAnchors then updateContainerFrameAnchors() end
 end
 
 local function ConfigureBagContents(bagIndex)
@@ -275,7 +227,7 @@ local function ConfigureBagContents(bagIndex)
     if not bag then return end
 
     local bagFrame = BAG_FRAMES[bagIndex] or CreateBagFrame(bagIndex)
-    LayoutVirtualBagBackground(bagFrame, bag.capacity)
+    GenerateNativeBagGeometry(bagFrame, bag.capacity, bagIndex)
 
     local nameText = _G[bagFrame:GetName() .. "Name"]
     if nameText then
@@ -291,10 +243,8 @@ local function ConfigureBagContents(bagIndex)
         local button = _G[bagFrame:GetName() .. "Item" .. visual]
         if button then
             if visual <= bag.capacity then
-                local column = (visual - 1) % 4
-                local row = math.floor((visual - 1) / 4)
-                button:ClearAllPoints()
-                button:SetPoint("TOPLEFT", bagFrame, "TOPLEFT", 17 + column * 39, -55 - row * 39)
+                -- Geometry and slot anchoring are intentionally left exactly as
+                -- generated by Blizzard's ContainerFrame_GenerateFrame().
                 ConfigureItemButton(button, EncodeBagSlot(bagIndex, visual))
                 PaintItem(button, ITEMS[EncodeBagSlot(bagIndex, visual)])
                 button:Show()
