@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""Build the final Adventurer/SpellDraft/Gauntlet client and server DBC bundle.
+
+This helper is called only by the root apply/update pipelines. It performs one
+client/server build from the clean DBC source, applying every owned transform
+before the final DBCs and MPQs are installed.
+"""
+
+from __future__ import annotations
+
+import argparse
+import tempfile
+from pathlib import Path
+
+import adventurer_apply  # noqa: F401
+import client
+import spelldraft_v3_icons
+from khadgar_gauntlet.build_catalog import build_catalog
+from khadgar_gauntlet.patch_item_dbc import patch as patch_gauntlet_items
+from khadgar_gauntlet.patch_spell_dbc import patch as patch_gauntlet_spells
+
+
+def gauntlet_mapping() -> dict[int, int]:
+    rows, _bonuses = build_catalog()
+    mapping = {
+        int(row["entry"]): int(row["source_entry"])
+        for row in rows
+        if (row.get("enabled") or "").strip().lower() in {"1", "true", "yes", "on"}
+    }
+    expected = set(range(911100, 911400))
+    if set(mapping) != expected:
+        missing = sorted(expected - set(mapping))
+        extra = sorted(set(mapping) - expected)
+        raise RuntimeError(
+            "Gauntlet catalog must own exactly 911100-911399; "
+            f"missing={missing[:10]} extra={extra[:10]}"
+        )
+    return mapping
+
+
+def build(args) -> None:
+    core = args.core_dir.expanduser().resolve()
+    spell_ranks = core / "data" / "sql" / "base" / "db_world" / "spell_ranks.sql"
+    icons, assigned = spelldraft_v3_icons.install_wrappers(
+        args.icon_pack_dir.expanduser().resolve(),
+        spell_ranks,
+    )
+
+    mapping = gauntlet_mapping()
+    original_patch_dbc_copy = client.patch_dbc_copy
+
+    def patch_dbc_copy(source: Path, work: Path):
+        changed = original_patch_dbc_copy(source, work)
+
+        item_path = work / adventurer_apply.ITEM_DBC
+        before_item = item_path.read_bytes()
+        patch_gauntlet_items(item_path, mapping)
+        changed[adventurer_apply.ITEM_DBC] = (
+            item_path.read_bytes() != before_item
+            or changed.get(adventurer_apply.ITEM_DBC, False)
+        )
+
+        spell_path = work / "Spell.dbc"
+        before_spell = spell_path.read_bytes()
+        patch_gauntlet_spells(spell_path)
+        changed["Spell.dbc"] = (
+            spell_path.read_bytes() != before_spell
+            or changed.get("Spell.dbc", False)
+        )
+        return changed
+
+    client.patch_dbc_copy = patch_dbc_copy
+
+    with tempfile.TemporaryDirectory(prefix="adventurer-client-bundle-") as tmp_name:
+        build_dir = Path(tmp_name)
+        client.build_patch(args.dbc_src.expanduser().resolve(), build_dir, args.locale)
+        client.install_server_dbcs(build_dir, args.server_data_dir.expanduser().resolve() / "dbc")
+        client.install_patch(args.client_dir.expanduser().resolve(), build_dir, args.locale)
+
+    lone_key = spelldraft_v3_icons.normalized_path(spelldraft_v3_icons.LONE_WOLF_DBC_PATH)
+    lone_id = assigned.get(lone_key)
+    if lone_id is not None and lone_id != spelldraft_v3_icons.LONE_WOLF_ICON_ID:
+        raise RuntimeError(
+            f"{spelldraft_v3_icons.LONE_WOLF_FILENAME} must resolve to SpellIcon ID "
+            f"{spelldraft_v3_icons.LONE_WOLF_ICON_ID}, found {lone_id}"
+        )
+
+    print(
+        f"Final client/server bundle installed in one pass: 300 Gauntlet items, "
+        f"Gauntlet spells and {len(icons)} SpellDraft v3 icon textures."
+    )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--core-dir", required=True, type=Path)
+    parser.add_argument("--dbc-src", required=True, type=Path)
+    parser.add_argument("--server-data-dir", required=True, type=Path)
+    parser.add_argument("--client-dir", required=True, type=Path)
+    parser.add_argument("--locale", default="esMX")
+    parser.add_argument("--icon-pack-dir", type=Path, default=spelldraft_v3_icons.default_pack_dir())
+    args, _unknown = parser.parse_known_args()
+    try:
+        build(args)
+    except Exception as exc:
+        parser.error(str(exc))
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
