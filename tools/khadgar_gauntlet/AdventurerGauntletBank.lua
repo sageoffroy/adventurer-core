@@ -55,6 +55,7 @@ for index = 1, BAG_SLOTS do
         OnReceiveDrag = button:GetScript("OnReceiveDrag"),
         OnEnter = button:GetScript("OnEnter"),
         OnLeave = button:GetScript("OnLeave"),
+        UpdateTooltip = button.UpdateTooltip,
     }
 end
 
@@ -192,6 +193,10 @@ local function CreateBagFrame(bagIndex)
     local bagFrame = CreateFrame("Frame", name, UIParent, "ContainerFrameTemplate")
     bagFrame:UnregisterAllEvents()
     bagFrame:SetScript("OnEvent", nil)
+    -- ContainerFrameTemplate carries Blizzard's native OnShow handler, which
+    -- calls ContainerFrame_Update() for a real bag ID. Expedition bags are
+    -- virtual/account-wide and are painted below, so never run that handler.
+    bagFrame:SetScript("OnShow", nil)
     bagFrame:SetFrameStrata("HIGH")
     bagFrame:SetPoint("TOPLEFT", BANK, "TOPRIGHT", 4 + ((bagIndex - 1) % 2) * 194, -(math.floor((bagIndex - 1) / 2) * 250))
     bagFrame:Hide()
@@ -237,23 +242,29 @@ local function ConfigureBagContents(bagIndex)
     end
 end
 
+local function UpdateBagTooltip(self)
+    local bag = BAGS[self.expeditionBagIndex]
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    if bag then
+        GameTooltip:SetHyperlink("item:" .. bag.entry)
+    elseif self.expeditionBagIndex <= PURCHASED_BAGS then
+        GameTooltip:SetText(BANK_BAG or "Casilla de bolsa")
+    else
+        GameTooltip:SetText(BANK_BAG_PURCHASE or "Comprar casilla de bolsa")
+    end
+    GameTooltip:Show()
+end
+
 local function ConfigureBagButton(button, bagIndex)
     button.expeditionBagIndex = bagIndex
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
 
-    button:SetScript("OnEnter", function(self)
-        local bag = BAGS[self.expeditionBagIndex]
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        if bag then
-            GameTooltip:SetHyperlink("item:" .. bag.entry)
-        elseif self.expeditionBagIndex <= PURCHASED_BAGS then
-            GameTooltip:SetText(BANK_BAG or "Casilla de bolsa")
-        else
-            GameTooltip:SetText(BANK_BAG_PURCHASE or "Comprar casilla de bolsa")
-        end
-        GameTooltip:Show()
-    end)
+    -- GameTooltip periodically calls owner.UpdateTooltip while visible. Replace
+    -- the native BankFrame implementation as well as OnEnter; otherwise it can
+    -- call SetText(nil) for our virtual purchase slots after their state changes.
+    button.UpdateTooltip = UpdateBagTooltip
+    button:SetScript("OnEnter", UpdateBagTooltip)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     button:SetScript("OnReceiveDrag", function(self)
@@ -365,6 +376,7 @@ local function RestoreNativeBank()
         button:SetScript("OnReceiveDrag", scripts.OnReceiveDrag)
         button:SetScript("OnEnter", scripts.OnEnter)
         button:SetScript("OnLeave", scripts.OnLeave)
+        button.UpdateTooltip = scripts.UpdateTooltip
         button.expeditionBagIndex = nil
     end
 
