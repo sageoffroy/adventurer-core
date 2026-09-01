@@ -65,12 +65,17 @@ def collect_icons(pack_dir: Path) -> list[tuple[Path, str, str]]:
         )
 
     icons: list[tuple[Path, str, str]] = []
+    seen_paths: set[str] = set()
     for path in sorted(icon_root.rglob("*.blp"), key=lambda p: str(p).lower()):
         payload = path.read_bytes()
         if len(payload) < 4 or payload[:4] not in (b"BLP1", b"BLP2"):
             raise DBCError(f"Icon is not a valid BLP texture: {path}")
         relative = path.relative_to(pack_dir).as_posix().replace("/", "\\")
         dbc_path = relative[:-4]
+        key = normalized_path(dbc_path)
+        if key in seen_paths:
+            continue
+        seen_paths.add(key)
         icons.append((path, relative, dbc_path))
 
     if not icons:
@@ -94,16 +99,23 @@ def patch_spell_icon(path: Path, icons: list[tuple[Path, str, str]]) -> dict[str
     assigned: dict[str, int] = {}
     custom_rows: list[bytearray] = []
     next_id = CUSTOM_ICON_MIN + 1
+    lone_wolf_key = normalized_path(LONE_WOLF_DBC_PATH)
 
     for _source, _internal, dbc_path in icons:
         key = normalized_path(dbc_path)
+        if key in assigned:
+            continue
+
         existing = stock_by_path.get(key)
         if existing is not None:
             assigned[key] = existing
             continue
 
-        filename = dbc_path.replace("/", "\\").rsplit("\\", 1)[-1].lower() + ".blp"
-        if filename == LONE_WOLF_FILENAME and LONE_WOLF_ICON_ID not in used_ids:
+        if key == lone_wolf_key:
+            if LONE_WOLF_ICON_ID in used_ids:
+                raise DBCError(
+                    f"Reserved Lone Wolf SpellIcon ID {LONE_WOLF_ICON_ID} is already in use"
+                )
             icon_id = LONE_WOLF_ICON_ID
         else:
             while next_id in used_ids:
