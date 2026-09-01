@@ -37,10 +37,14 @@ def stage(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
 
     item_catalog = module_target / "data" / "items" / "early_items.csv"
     set_catalog = module_target / "data" / "items" / "sets.csv"
-    item_sql = module_target / "data" / "sql" / "db-world" / "updates" / "2026_08_30_02_adventurer_gauntlet_items.generated.sql"
+    # Item SQL is generated into the module, but deliberately outside AzerothCore's
+    # module auto-update directory. tools/world.py merges it into the authoritative
+    # 000 item payload so every custom item is created before class/Goldshire/Gauntlet.
+    item_sql = module_target / "data" / "sql" / "world" / "000_gauntlet_items.generated.sql"
     set_include = module_target / "src" / "GeneratedGauntletSets.inc"
 
     run(str(TOOLS / "build_catalog.py"), "--items", str(item_catalog), "--sets", str(set_catalog))
+    item_sql.parent.mkdir(parents=True, exist_ok=True)
     run(str(TOOLS / "generate_items.py"), "--input", str(item_catalog), "--output", str(item_sql))
     run(
         str(TOOLS / "generate_sets.py"),
