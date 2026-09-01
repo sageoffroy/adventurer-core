@@ -6,7 +6,6 @@ local PREFIX = "AGBANK"
 local BASE_SLOTS = 28
 local BAG_SLOTS = 7
 local MAX_BAG_CAPACITY = 36
-local KHADGAR_ENTRY = 18166
 
 local ITEMS = {}
 local BAGS = {}
@@ -59,20 +58,9 @@ for index = 1, BAG_SLOTS do
     }
 end
 
-local khadgarPortrait = CreateFrame("PlayerModel", "AdventurerGauntletBankKhadgarPortrait", BANK)
-khadgarPortrait:SetWidth(60)
-khadgarPortrait:SetHeight(60)
-khadgarPortrait:SetPoint("TOPLEFT", BANK, "TOPLEFT", 7, -6)
-khadgarPortrait:SetFrameLevel(BANK:GetFrameLevel() + 1)
-khadgarPortrait:Hide()
-
 local function PrepareKhadgarPortrait()
-    PORTRAIT:Hide()
-    khadgarPortrait:Show()
-    khadgarPortrait:SetCreature(KHADGAR_ENTRY)
-    if khadgarPortrait.SetPortraitZoom then
-        khadgarPortrait:SetPortraitZoom(1)
-    end
+    PORTRAIT:Show()
+    SetPortraitTexture(PORTRAIT, "npc")
 end
 
 local function SendCommand(command)
@@ -234,7 +222,7 @@ local function LayoutVirtualBagBackground(bagFrame, size)
     middle2:Hide()
     bottom:SetTexture(texture)
 
-    if math.mod(size, columns) == 2 then
+    if (size % columns) == 2 then
         top:SetTexCoord(0, 1, 0.189453125, 0.330078125)
         top:SetHeight(72)
     elseif rows == 1 then
@@ -422,7 +410,6 @@ local function RestoreNativeBank()
     if not ACTIVE then return end
 
     ACTIVE = false
-    khadgarPortrait:Hide()
     PORTRAIT:Show()
 
     BANK:SetScript("OnShow", ORIGINAL.bankOnShow)
