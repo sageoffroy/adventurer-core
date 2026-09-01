@@ -116,6 +116,12 @@ def _build_lone_wolf_aura(dbc: DBC, base: bytearray) -> bytearray:
         LONE_WOLF_DESCRIPTION,
     )
 
+    # Lobo solitario is a self aura and must never require an equipped item.
+    # Spell.dbc stores EquippedItemClass as signed int32; -1 is 0xFFFFFFFF.
+    set_u32(row, 68, 0xFFFFFFFF)
+    set_u32(row, 69, 0)
+    set_u32(row, 70, 0)
+
     for field in range(71, 131):
         set_u32(row, field, 0)
     _set_aura_effect(row, 0, SPELL_AURA_MOD_INCREASE_SPEED, 20)
