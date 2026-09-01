@@ -12,18 +12,49 @@ from pathlib import Path
 from adventurer_apply import ITEM_DBC  # noqa: F401
 from adventurer import load_state, save_state, sha256_file, verify_state
 from client import DBC_NAMES, OWNER_MANIFEST, build_archive_files
-from khadgar_gauntlet.patch_item_dbc import load_mapping as load_gauntlet_item_mapping
+from khadgar_gauntlet.build_catalog import build_catalog as build_gauntlet_catalog
 from khadgar_gauntlet.patch_item_dbc import patch as patch_gauntlet_item_dbc
 from khadgar_gauntlet.patch_spell_dbc import patch as patch_gauntlet_spell_dbc
 from mpq import write_mpq
 from spelldraft_v3_icons import collect_icons, default_pack_dir
 
+ROOT = Path(__file__).resolve().parent.parent
+GAUNTLET_SOURCE = ROOT / "modules/mod-adventurer-gauntlet"
 SPELL_DBC = "Spell.dbc"
 SPELL_ICON_DBC = "SpellIcon.dbc"
 
 
 class SyncItemDbcError(RuntimeError):
     pass
+
+
+def gauntlet_item_mapping() -> dict[int, int]:
+    """Build the authoritative Gauntlet Item.dbc mapping from source.
+
+    Never depend on an already-generated early_items.csv inside the installed
+    AzerothCore tree. update.sh and a clean Gauntlet install must produce the
+    same 300 client item rows from the source catalog generator every time.
+    """
+    rows, _bonuses = build_gauntlet_catalog()
+    mapping = {
+        int(row["entry"]): int(row["source_entry"])
+        for row in rows
+        if (row.get("enabled") or "").strip().lower() in {"1", "true", "yes", "on"}
+    }
+    if len(mapping) != 300:
+        raise SyncItemDbcError(
+            f"Gauntlet source catalog must generate exactly 300 enabled items, found {len(mapping)}"
+        )
+    expected = set(range(911100, 911400))
+    actual = set(mapping)
+    if actual != expected:
+        missing = sorted(expected - actual)
+        extra = sorted(actual - expected)
+        raise SyncItemDbcError(
+            "Gauntlet source catalog does not own the complete 911100-911399 range"
+            f"; missing={missing[:10]} extra={extra[:10]}"
+        )
+    return mapping
 
 
 def sync(
@@ -45,13 +76,14 @@ def sync(
         raise SyncItemDbcError("Installed server DBC bundle is incomplete: " + ", ".join(missing))
 
     state = load_state(core)
-    gauntlet_catalog = core / "modules/mod-adventurer-gauntlet/data/items/early_items.csv"
-    gauntlet_installed = (core / "modules/mod-adventurer-gauntlet").is_dir()
 
-    if gauntlet_catalog.is_file():
-        mapping = load_gauntlet_item_mapping(gauntlet_catalog)
+    # Gauntlet is a branch-owned gameplay layer. If its source module exists in
+    # this Adventurer Core checkout, always rebuild the final runtime DBCs from
+    # that source. This makes update.sh independent of whatever generated CSV or
+    # module state happened to be present in the target AzerothCore directory.
+    if GAUNTLET_SOURCE.is_dir():
+        mapping = gauntlet_item_mapping()
         patch_gauntlet_item_dbc(server_dbc / ITEM_DBC, mapping)
-    if gauntlet_installed:
         patch_gauntlet_spell_dbc(server_dbc / SPELL_DBC)
 
     item_payload = (server_dbc / ITEM_DBC).read_bytes()
