@@ -10,8 +10,6 @@ local PENDING_WITHDRAW = nil
 local function SendCommand(command)
     local target = UnitName("player")
     if not target or target == "" then return end
-    -- Use the same self-whisper transport already proven by SpellDraft on the
-    -- 3.3.5a client. The server filters these protocol messages before chat.
     SendChatMessage(COMMAND_PREFIX .. command, "WHISPER", nil, target)
 end
 
@@ -152,7 +150,9 @@ if portraitButton then
     end)
     portraitButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
-if closeButton then closeButton:SetScript("OnClick", function() frame:Hide() end) end
+if closeButton then
+    closeButton:SetScript("OnClick", function() frame:Hide() end)
+end
 
 local function UpdateStashTooltip(button)
     if not button or not button.entry then GameTooltip:Hide(); return end
@@ -162,12 +162,17 @@ local function UpdateStashTooltip(button)
 end
 
 local function ConfigureSlot(button, visualIndex, stashSlot)
-    -- Stable 4x4 backpack-style grid: slots 1..16 read left-to-right and
-    -- top-to-bottom. Do not reverse the logical slot IDs against the visual UI.
-    local column = (visualIndex - 1) % 4
-    local row = math.floor((visualIndex - 1) / 4)
+    -- Preserve the working ContainerFrameTemplate geometry. Each item button is
+    -- anchored to the stash frame (or to another child button), so dragging the
+    -- window keeps the complete grid and close button together.
     button:ClearAllPoints()
-    button:SetPoint("TOPLEFT", frame, "TOPLEFT", 14 + column * 39, -72 - row * 39)
+    if visualIndex == 1 then
+        button:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -12, -208)
+    elseif ((visualIndex - 1) % 4) == 0 then
+        button:SetPoint("BOTTOMRIGHT", _G[FRAME_NAME .. "Item" .. (visualIndex - 4)], "TOPRIGHT", 0, 4)
+    else
+        button:SetPoint("BOTTOMRIGHT", _G[FRAME_NAME .. "Item" .. (visualIndex - 1)], "BOTTOMLEFT", -5, 0)
+    end
     button.stashSlot = stashSlot
     button:Show()
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -189,7 +194,7 @@ end
 
 for visualIndex = 1, MAX_SLOTS do
     local button = _G[FRAME_NAME .. "Item" .. visualIndex]
-    local stashSlot = visualIndex
+    local stashSlot = MAX_SLOTS - visualIndex + 1
     button:SetID(stashSlot)
     ConfigureSlot(button, visualIndex, stashSlot)
     SLOTS[stashSlot] = button
