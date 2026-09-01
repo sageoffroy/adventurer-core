@@ -13,6 +13,8 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -20,8 +22,13 @@ namespace
 {
 constexpr uint32 KhadgarEntry = 910000;
 constexpr uint32 AccountStashEntry = 910002;
-constexpr uint32 AccountStashSlots = 16;
+constexpr uint32 AccountStashSlots = 28;
+constexpr uint32 StashRangeCheckMs = 500;
+constexpr float StashUseRange = 8.0f;
 constexpr char ProtocolPrefix[] = "AGSTASH|";
+
+std::unordered_set<uint32> OpenStashPlayers;
+std::unordered_map<uint32, uint32> StashRangeTimers;
 
 struct StashItem
 {
@@ -161,6 +168,17 @@ void SendStashState(Player* player)
             handler.PSendSysMessage("AGSTASH|S|{}|{}|{}", item.slot, item.entry, item.count);
 
     handler.SendSysMessage("AGSTASH|DONE");
+}
+
+void CloseStash(Player* player)
+{
+    if (!player || !player->GetSession())
+        return;
+
+    ChatHandler(player->GetSession()).SendSysMessage("AGSTASH|CLOSE");
+    uint32 guid = player->GetGUID().GetCounter();
+    OpenStashPlayers.erase(guid);
+    StashRangeTimers.erase(guid);
 }
 
 bool DepositOne(Player* player, uint32 entry, uint32 targetSlot)
@@ -344,6 +362,12 @@ public:
 
     bool OnGossipHello(Player* player, GameObject* /*go*/) override
     {
+        if (player)
+        {
+            uint32 guid = player->GetGUID().GetCounter();
+            OpenStashPlayers.insert(guid);
+            StashRangeTimers[guid] = StashRangeCheckMs;
+        }
         SendStashState(player);
         return true;
     }
@@ -372,6 +396,36 @@ public:
     {
         if (player && lang == LANG_ADDON)
             HandleStashCommand(player, msg);
+    }
+
+    void OnPlayerUpdate(Player* player, uint32 diff) override
+    {
+        if (!player)
+            return;
+
+        uint32 guid = player->GetGUID().GetCounter();
+        if (!OpenStashPlayers.contains(guid))
+            return;
+
+        uint32& timer = StashRangeTimers[guid];
+        if (timer > diff)
+        {
+            timer -= diff;
+            return;
+        }
+        timer = StashRangeCheckMs;
+
+        if (!player->FindNearestGameObject(AccountStashEntry, StashUseRange))
+            CloseStash(player);
+    }
+
+    void OnPlayerLogout(Player* player) override
+    {
+        if (!player)
+            return;
+        uint32 guid = player->GetGUID().GetCounter();
+        OpenStashPlayers.erase(guid);
+        StashRangeTimers.erase(guid);
     }
 };
 
