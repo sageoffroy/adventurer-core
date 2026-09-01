@@ -17,9 +17,8 @@
 namespace
 {
 constexpr uint32 RagefireMapId = 389;
-constexpr uint32 GauntletItemMin = 911100;
-constexpr uint32 GauntletItemMax = 911399;
 constexpr uint32 UniversalMask = 0xFFFFFFFFu;
+constexpr uint32 ClosestCandidateCount = 5;
 
 enum RewardPool : uint8
 {
@@ -41,7 +40,7 @@ struct RewardPools
     std::array<std::vector<uint32>, 4> Items;
 };
 
-std::unordered_set<uint64> ProcessedBosses;
+std::unordered_set<uint64> ProcessedCreatures;
 
 uint8 GetRewardProfile(uint32 creatureEntry)
 {
@@ -53,28 +52,37 @@ uint8 GetRewardProfile(uint32 creatureEntry)
     return REWARD_PROFILE_NONE;
 }
 
-uint64 GetBossKey(Creature const* boss)
+uint64 GetCreatureKey(Creature const* creature)
 {
-    return boss ? ((uint64(boss->GetInstanceId()) << 32) | uint64(boss->GetGUID().GetCounter())) : 0;
+    return creature ? ((uint64(creature->GetInstanceId()) << 32) | uint64(creature->GetGUID().GetCounter())) : 0;
 }
 
-bool PassesCommonRewardRules(ItemTemplate const& item, uint8 playerLevel)
+uint32 LevelDistance(uint32 requiredLevel, uint8 rewardLevel)
+{
+    return requiredLevel > rewardLevel ? requiredLevel - rewardLevel : rewardLevel - requiredLevel;
+}
+
+bool PassesCommonRewardRules(ItemTemplate const& item)
 {
     if (item.Class != ITEM_CLASS_WEAPON && item.Class != ITEM_CLASS_ARMOR)
         return false;
     if (item.InventoryType == INVTYPE_NON_EQUIP || item.InventoryType == INVTYPE_BAG)
         return false;
-    if (item.RequiredLevel > playerLevel)
+
+    // Reward selection is based on RequiredLevel proximity. Items without a
+    // real required level are intentionally excluded because quest/internal
+    // rewards frequently use 0 and make poor Gauntlet candidates.
+    if (!item.RequiredLevel)
         return false;
 
-    uint32 minItemLevel = playerLevel > 3 ? playerLevel - 3 : 1;
-    uint32 maxItemLevel = playerLevel + 10;
-    if (item.ItemLevel < minItemLevel || item.ItemLevel > maxItemLevel)
+    // Keep obviously abnormal item-level relationships out of the native pool.
+    // Custom items added later pass through the same rule, so they naturally
+    // join the selector when their template is sane.
+    if (item.ItemLevel < item.RequiredLevel || item.ItemLevel > item.RequiredLevel + 15)
         return false;
 
-    // Native green rewards must be usable by the classless Adventurer. Items
-    // restricted to a stock class or race (for example Warrior-only quest
-    // weapons) are invalid rewards even when their level and quality fit.
+    // Aventurero is classless: stock class/race restrictions are never valid
+    // Gauntlet rewards.
     if (item.AllowableClass != UniversalMask || item.AllowableRace != UniversalMask)
         return false;
 
@@ -86,7 +94,7 @@ bool PassesCommonRewardRules(ItemTemplate const& item, uint8 playerLevel)
     return true;
 }
 
-RewardPools BuildControlledPools(uint8 playerLevel)
+RewardPools BuildControlledPools()
 {
     RewardPools pools;
     ItemTemplateContainer const* itemStore = sObjectMgr->GetItemTemplateStore();
@@ -95,46 +103,57 @@ RewardPools BuildControlledPools(uint8 playerLevel)
 
     for (auto const& [entry, item] : *itemStore)
     {
-        if (!PassesCommonRewardRules(item, playerLevel))
+        if (!PassesCommonRewardRules(item))
             continue;
-
-        bool customGauntletItem = entry >= GauntletItemMin && entry <= GauntletItemMax;
 
         if (item.Quality == ITEM_QUALITY_UNCOMMON)
-        {
-            if (!customGauntletItem)
-                pools.Items[REWARD_GREEN].push_back(entry);
-            continue;
-        }
-
-        if (!customGauntletItem)
-            continue;
-
-        if (item.Quality == ITEM_QUALITY_RARE)
+            pools.Items[REWARD_GREEN].push_back(entry);
+        else if (item.Quality == ITEM_QUALITY_RARE)
             pools.Items[REWARD_BLUE].push_back(entry);
         else if (item.Quality == ITEM_QUALITY_EPIC)
             pools.Items[REWARD_EPIC].push_back(entry);
-        else if (item.Quality == ITEM_QUALITY_LEGENDARY)
-            pools.Items[REWARD_LEGENDARY].push_back(entry);
+
+        // Legendary rewards are intentionally disabled until their curated
+        // catalog is ready.
     }
 
     return pools;
 }
 
-uint32 SelectFromPool(std::vector<uint32> const& candidates, std::unordered_set<uint32>& usedEntries)
+uint32 SelectClosestFromPool(std::vector<uint32> const& candidates, uint8 rewardLevel,
+    std::unordered_set<uint32>& usedEntries)
 {
     if (candidates.empty())
         return 0;
 
-    uint32 attempts = std::min<uint32>(static_cast<uint32>(candidates.size()), 32);
-    for (uint32 attempt = 0; attempt < attempts; ++attempt)
-    {
-        uint32 entry = candidates[urand(0, static_cast<uint32>(candidates.size() - 1))];
-        if (usedEntries.insert(entry).second)
-            return entry;
-    }
+    std::vector<uint32> ordered;
+    ordered.reserve(candidates.size());
+    for (uint32 entry : candidates)
+        if (usedEntries.find(entry) == usedEntries.end())
+            ordered.push_back(entry);
 
-    return candidates[urand(0, static_cast<uint32>(candidates.size() - 1))];
+    if (ordered.empty())
+        return 0;
+
+    std::sort(ordered.begin(), ordered.end(), [rewardLevel](uint32 leftEntry, uint32 rightEntry)
+    {
+        ItemTemplate const* left = sObjectMgr->GetItemTemplate(leftEntry);
+        ItemTemplate const* right = sObjectMgr->GetItemTemplate(rightEntry);
+        if (!left || !right)
+            return leftEntry < rightEntry;
+
+        uint32 leftDistance = LevelDistance(left->RequiredLevel, rewardLevel);
+        uint32 rightDistance = LevelDistance(right->RequiredLevel, rewardLevel);
+        if (leftDistance != rightDistance)
+            return leftDistance < rightDistance;
+
+        return leftEntry < rightEntry;
+    });
+
+    uint32 closestCount = std::min<uint32>(ClosestCandidateCount, static_cast<uint32>(ordered.size()));
+    uint32 entry = ordered[urand(0, closestCount - 1)];
+    usedEntries.insert(entry);
+    return entry;
 }
 
 void AddLootItem(Loot& loot, uint32 itemEntry)
@@ -166,34 +185,32 @@ bool GetRewardContext(Map* map, uint32& survivorCount, uint8& rewardLevel)
     return survivorCount && rewardLevel;
 }
 
-void AddCheckpointExtraRoll(Loot& loot, RewardPools const& pools, std::unordered_set<uint32>& usedEntries)
+void AddCheckpointExtraRoll(Loot& loot, RewardPools const& pools, uint8 rewardLevel,
+    std::unordered_set<uint32>& usedEntries)
 {
     uint32 roll = urand(1, 100);
     if (roll <= 50)
         return;
     if (roll <= 80)
-        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_GREEN], usedEntries));
+        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_GREEN], rewardLevel, usedEntries));
     else if (roll <= 90)
-        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_BLUE], usedEntries));
+        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_BLUE], rewardLevel, usedEntries));
     else if (roll <= 99)
-        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_EPIC], usedEntries));
-    else
-        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_LEGENDARY], usedEntries));
+        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_EPIC], rewardLevel, usedEntries));
 }
 
-void AddFinalExtraRoll(Loot& loot, RewardPools const& pools, std::unordered_set<uint32>& usedEntries)
+void AddFinalExtraRoll(Loot& loot, RewardPools const& pools, uint8 rewardLevel,
+    std::unordered_set<uint32>& usedEntries)
 {
     uint32 roll = urand(1, 100);
     if (roll <= 25)
         return;
     if (roll <= 75)
-        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_GREEN], usedEntries));
+        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_GREEN], rewardLevel, usedEntries));
     else if (roll <= 90)
-        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_BLUE], usedEntries));
+        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_BLUE], rewardLevel, usedEntries));
     else if (roll <= 97)
-        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_EPIC], usedEntries));
-    else
-        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_LEGENDARY], usedEntries));
+        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_EPIC], rewardLevel, usedEntries));
 }
 
 bool FillCheckpointLoot(Loot& loot, Map* map)
@@ -203,7 +220,7 @@ bool FillCheckpointLoot(Loot& loot, Map* map)
     if (!GetRewardContext(map, survivorCount, rewardLevel))
         return false;
 
-    RewardPools pools = BuildControlledPools(rewardLevel);
+    RewardPools pools = BuildControlledPools();
     std::unordered_set<uint32> usedEntries;
     uint32 gold = loot.gold;
 
@@ -212,9 +229,9 @@ bool FillCheckpointLoot(Loot& loot, Map* map)
     loot.gold = gold;
 
     for (uint32 reward = 0; reward < survivorCount; ++reward)
-        AddLootItem(loot, SelectFromPool(pools.Items[REWARD_GREEN], usedEntries));
+        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_GREEN], rewardLevel, usedEntries));
 
-    AddCheckpointExtraRoll(loot, pools, usedEntries);
+    AddCheckpointExtraRoll(loot, pools, rewardLevel, usedEntries);
     return !loot.empty();
 }
 
@@ -225,7 +242,7 @@ bool FillFinalBossLoot(Loot& loot, Map* map)
     if (!GetRewardContext(map, survivorCount, rewardLevel))
         return false;
 
-    RewardPools pools = BuildControlledPools(rewardLevel);
+    RewardPools pools = BuildControlledPools();
     std::unordered_set<uint32> usedEntries;
     uint32 gold = loot.gold;
 
@@ -233,33 +250,70 @@ bool FillFinalBossLoot(Loot& loot, Map* map)
     loot.loot_type = LOOT_CORPSE;
     loot.gold = gold;
 
-    AddLootItem(loot, SelectFromPool(pools.Items[REWARD_BLUE], usedEntries));
-    AddFinalExtraRoll(loot, pools, usedEntries);
+    AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_BLUE], rewardLevel, usedEntries));
+    AddFinalExtraRoll(loot, pools, rewardLevel, usedEntries);
     return !loot.empty();
 }
 
-void RefillBossAfterDeath(Creature* boss)
+bool AddCommonMobTestDrop(Creature* creature)
 {
-    if (!boss || boss->IsAlive() || boss->GetMapId() != RagefireMapId)
+    uint32 survivorCount = 0;
+    uint8 rewardLevel = 0;
+    if (!GetRewardContext(creature->GetMap(), survivorCount, rewardLevel))
+        return false;
+
+    // Temporary testing rates: one extra equipment item at most.
+    // 20% green, 4% blue, 1% epic, 75% nothing. Legendary is disabled.
+    uint32 roll = urand(1, 10000);
+    RewardPool pool;
+    if (roll <= 2000)
+        pool = REWARD_GREEN;
+    else if (roll <= 2400)
+        pool = REWARD_BLUE;
+    else if (roll <= 2500)
+        pool = REWARD_EPIC;
+    else
+        return false;
+
+    RewardPools pools = BuildControlledPools();
+    std::unordered_set<uint32> usedEntries;
+    uint32 itemEntry = SelectClosestFromPool(pools.Items[pool], rewardLevel, usedEntries);
+    if (!itemEntry)
+        return false;
+
+    AddLootItem(creature->loot, itemEntry);
+    creature->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
+    return true;
+}
+
+void ProcessCreatureAfterDeath(Creature* creature)
+{
+    if (!creature || creature->IsAlive() || creature->GetMapId() != RagefireMapId)
         return;
 
-    uint8 rewardProfile = GetRewardProfile(boss->GetEntry());
-    if (rewardProfile == REWARD_PROFILE_NONE)
+    uint64 key = GetCreatureKey(creature);
+    if (!key || ProcessedCreatures.find(key) != ProcessedCreatures.end())
         return;
 
-    uint64 key = GetBossKey(boss);
-    if (!key || ProcessedBosses.find(key) != ProcessedBosses.end())
-        return;
+    // Mark first so a failed/empty roll is still processed only once.
+    ProcessedCreatures.insert(key);
 
-    bool filled = rewardProfile == REWARD_PROFILE_FINAL
-        ? FillFinalBossLoot(boss->loot, boss->GetMap())
-        : FillCheckpointLoot(boss->loot, boss->GetMap());
-
-    if (filled)
+    uint8 rewardProfile = GetRewardProfile(creature->GetEntry());
+    if (rewardProfile == REWARD_PROFILE_FINAL)
     {
-        boss->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
-        ProcessedBosses.insert(key);
+        if (FillFinalBossLoot(creature->loot, creature->GetMap()))
+            creature->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
+        return;
     }
+
+    if (rewardProfile == REWARD_PROFILE_CHECKPOINT)
+    {
+        if (FillCheckpointLoot(creature->loot, creature->GetMap()))
+            creature->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
+        return;
+    }
+
+    AddCommonMobTestDrop(creature);
 }
 }
 
@@ -271,17 +325,17 @@ public:
 
     void OnAllCreatureUpdate(Creature* creature, uint32 /*diff*/) override
     {
-        RefillBossAfterDeath(creature);
+        ProcessCreatureAfterDeath(creature);
     }
 
     void OnCreatureRemoveWorld(Creature* creature) override
     {
-        if (!creature || creature->GetMapId() != RagefireMapId || GetRewardProfile(creature->GetEntry()) == REWARD_PROFILE_NONE)
+        if (!creature || creature->GetMapId() != RagefireMapId)
             return;
 
-        uint64 key = GetBossKey(creature);
+        uint64 key = GetCreatureKey(creature);
         if (key)
-            ProcessedBosses.erase(key);
+            ProcessedCreatures.erase(key);
     }
 };
 
