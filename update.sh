@@ -33,14 +33,14 @@ python3 "$ROOT/tools/adopt_source.py" \
 
 python3 "$ROOT/tools/upgrade_apply.py" "$@"
 
-# SpellDraft v3 rebuilds the final client/server DBC bundle in one pass: normal
-# Adventurer transforms, server rank-tab/component normalization, SpellIcon.dbc
-# expansion and every BLP from the external icon pack.
-python3 "$ROOT/tools/spelldraft_v3_icons.py" "$@"
+# Gauntlet module/catalog/addon staging is shared with apply.sh. It does not
+# build or install DBC/MPQ artifacts; the final bundle is built once below.
+python3 "$ROOT/tools/khadgar_gauntlet/stage.py" "$@"
 
-# Keep the already-owned Item.dbc byte-identical in both Z archives after the
-# v3 rebuild. This is an in-place sync and does not rebuild the icon payload.
-python3 "$ROOT/tools/sync_item_dbc.py" "$@"
+# One authoritative client/server build for Aventurero + SpellDraft v3 +
+# Gauntlet. Every DBC transform and external icon is applied before the final
+# server DBCs and client Z patches are installed.
+python3 "$ROOT/tools/build_client_bundle.py" "$@"
 
 if (( has_playerbots == 1 )); then
     python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir"
