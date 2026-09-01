@@ -3,14 +3,12 @@ local STASH_ITEMS = {}
 local SLOTS = {}
 local MAX_SLOTS = 16
 local PREFIX = "AGSTASH"
-local COMMAND_PREFIX = "AGSTASH|"
 local FRAME_NAME = "AdventurerGauntletStashFrame"
 local PENDING_WITHDRAW = nil
 
 local function SendCommand(command)
-    local target = UnitName("player")
-    if not target or target == "" then return end
-    SendChatMessage(COMMAND_PREFIX .. command, "WHISPER", nil, target)
+    if not UnitName("player") then return end
+    SendAddonMessage(PREFIX, command, "WHISPER", UnitName("player"))
 end
 
 local function ItemIdFromLink(link)
@@ -150,9 +148,7 @@ if portraitButton then
     end)
     portraitButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
-if closeButton then
-    closeButton:SetScript("OnClick", function() frame:Hide() end)
-end
+if closeButton then closeButton:SetScript("OnClick", function() frame:Hide() end) end
 
 local function UpdateStashTooltip(button)
     if not button or not button.entry then GameTooltip:Hide(); return end
@@ -162,9 +158,6 @@ local function UpdateStashTooltip(button)
 end
 
 local function ConfigureSlot(button, visualIndex, stashSlot)
-    -- Preserve the working ContainerFrameTemplate geometry. Each item button is
-    -- anchored to the stash frame (or to another child button), so dragging the
-    -- window keeps the complete grid and close button together.
     button:ClearAllPoints()
     if visualIndex == 1 then
         button:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -12, -208)
@@ -249,19 +242,14 @@ local function SystemMessageFilter(self, event, message, ...)
 end
 ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", SystemMessageFilter)
 
-local function StashWhisperFilter(_, _, message, sender)
-    if sender == UnitName("player") and type(message) == "string" and string.sub(message, 1, string.len(COMMAND_PREFIX)) == COMMAND_PREFIX then
-        return true
-    end
-    return false
-end
-ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", StashWhisperFilter)
-ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", StashWhisperFilter)
-
 local eventFrame = CreateFrame("Frame")
+eventFrame:RegisterEvent("CHAT_MSG_ADDON")
 eventFrame:RegisterEvent("BAG_UPDATE")
-eventFrame:SetScript("OnEvent", function(self, event)
-    if event == "BAG_UPDATE" then
+eventFrame:SetScript("OnEvent", function(self, event, ...)
+    if event == "CHAT_MSG_ADDON" then
+        local prefix, message = ...
+        if prefix == PREFIX then HandleState(message) end
+    elseif event == "BAG_UPDATE" then
         TryPickupPendingWithdraw()
     end
 end)
