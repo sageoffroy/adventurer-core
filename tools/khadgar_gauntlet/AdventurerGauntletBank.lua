@@ -205,14 +205,89 @@ local function CreateBagFrame(bagIndex)
     return bagFrame
 end
 
+local function LayoutVirtualBagBackground(bagFrame, size)
+    local name = bagFrame:GetName()
+    local top = _G[name .. "BackgroundTop"]
+    local middle1 = _G[name .. "BackgroundMiddle1"]
+    local middle2 = _G[name .. "BackgroundMiddle2"]
+    local bottom = _G[name .. "BackgroundBottom"]
+    local oneSlot = _G[name .. "Background1Slot"]
+    local money = _G[name .. "MoneyFrame"]
+    if not top or not middle1 or not middle2 or not bottom then return end
+
+    local texture = "Interface\\ContainerFrame\\UI-Bag-Components-Bank"
+    local columns = 4
+    local rows = math.max(1, math.ceil(size / columns))
+    local remainingRows = rows - 1
+    local rowHeight = 41
+    local textureHeight = 512
+    local rowsPerMiddle = 6
+
+    if oneSlot then oneSlot:Hide() end
+    if money then money:Hide() end
+
+    top:SetTexture(texture)
+    top:Show()
+    middle1:SetTexture(texture)
+    middle2:SetTexture(texture)
+    middle1:Hide()
+    middle2:Hide()
+    bottom:SetTexture(texture)
+
+    if math.mod(size, columns) == 2 then
+        top:SetTexCoord(0, 1, 0.189453125, 0.330078125)
+        top:SetHeight(72)
+    elseif rows == 1 then
+        top:SetTexCoord(0, 1, 0.00390625, 0.16796875)
+        top:SetHeight(86)
+    else
+        top:SetTexCoord(0, 1, 0.00390625, 0.18359375)
+        top:SetHeight(94)
+    end
+
+    local middleHeight = 0
+    local lastMiddle = middle1
+    if rows == 1 then
+        bottom:ClearAllPoints()
+        bottom:SetPoint("TOP", middle1, "TOP", 0, 0)
+        bottom:Show()
+    else
+        local firstRowPixelOffset = 9
+        local firstRowTexCoordOffset = 0.353515625
+        local middleCount = math.ceil(remainingRows / rowsPerMiddle)
+        for index = 1, middleCount do
+            local middle = _G[name .. "BackgroundMiddle" .. index]
+            if middle then
+                local height
+                if remainingRows > rowsPerMiddle then
+                    height = (rowsPerMiddle * rowHeight) + firstRowTexCoordOffset
+                    remainingRows = remainingRows - rowsPerMiddle
+                else
+                    height = remainingRows * rowHeight - firstRowPixelOffset
+                    remainingRows = 0
+                end
+                middle:SetHeight(height)
+                middle:SetTexCoord(0, 1, firstRowTexCoordOffset, (height / textureHeight) + firstRowTexCoordOffset)
+                middle:Show()
+                middleHeight = middleHeight + height
+                lastMiddle = middle
+            end
+        end
+        bottom:ClearAllPoints()
+        bottom:SetPoint("TOP", lastMiddle, "BOTTOM", 0, 0)
+        bottom:Show()
+    end
+
+    bagFrame:SetWidth(192)
+    bagFrame:SetHeight(top:GetHeight() + bottom:GetHeight() + middleHeight)
+end
+
 local function ConfigureBagContents(bagIndex)
     local bag = BAGS[bagIndex]
     if not bag then return end
 
     local bagFrame = BAG_FRAMES[bagIndex] or CreateBagFrame(bagIndex)
-    local rows = math.max(1, math.ceil(bag.capacity / 4))
-    bagFrame:SetWidth(192)
-    bagFrame:SetHeight(74 + rows * 39)
+    LayoutVirtualBagBackground(bagFrame, bag.capacity)
 
     local nameText = _G[bagFrame:GetName() .. "Name"]
     if nameText then
