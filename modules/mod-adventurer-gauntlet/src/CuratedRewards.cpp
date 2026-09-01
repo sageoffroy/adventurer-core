@@ -19,6 +19,7 @@ namespace
 constexpr uint32 RagefireMapId = 389;
 constexpr uint32 GauntletItemMin = 911100;
 constexpr uint32 GauntletItemMax = 911399;
+constexpr uint32 UniversalMask = 0xFFFFFFFFu;
 
 enum RewardPool : uint8
 {
@@ -69,6 +70,12 @@ bool PassesCommonRewardRules(ItemTemplate const& item, uint8 playerLevel)
     uint32 minItemLevel = playerLevel > 3 ? playerLevel - 3 : 1;
     uint32 maxItemLevel = playerLevel + 10;
     if (item.ItemLevel < minItemLevel || item.ItemLevel > maxItemLevel)
+        return false;
+
+    // Native green rewards must be usable by the classless Adventurer. Items
+    // restricted to a stock class or race (for example Warrior-only quest
+    // weapons) are invalid rewards even when their level and quality fit.
+    if (item.AllowableClass != UniversalMask || item.AllowableRace != UniversalMask)
         return false;
 
     if (item.RequiredSkill || item.RequiredSpell || item.RequiredReputationFaction ||
