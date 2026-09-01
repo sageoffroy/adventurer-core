@@ -14,9 +14,9 @@ INSERT INTO `spell_dbc`
  `ImplicitTargetA_1`, `ImplicitTargetA_2`, `ImplicitTargetA_3`,
  `EffectAura_1`, `EffectAura_2`, `EffectAura_3`,
  `SpellIconID`,
- `SpellName_Lang_enUS`, `SpellName_Lang_esES`, `SpellName_Lang_esMX`,
- `SpellDescription_Lang_enUS`, `SpellDescription_Lang_esES`, `SpellDescription_Lang_esMX`,
- `SpellAuraDescription_Lang_enUS`, `SpellAuraDescription_Lang_esES`, `SpellAuraDescription_Lang_esMX`,
+ `Name_Lang_enUS`, `Name_Lang_esES`, `Name_Lang_esMX`,
+ `Description_Lang_enUS`, `Description_Lang_esES`, `Description_Lang_esMX`,
+ `AuraDescription_Lang_enUS`, `AuraDescription_Lang_esES`, `AuraDescription_Lang_esMX`,
  `SchoolMask`)
 VALUES
 (@LONE_WOLF, 21,
