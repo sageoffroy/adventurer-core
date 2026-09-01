@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import sys
 
+import adventurer_items
 from database import _run_mysql, query_scalar, read_database_info
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -39,14 +40,14 @@ class WorldUpdate:
 
 
 # Authoritative execution order:
-# 000 = every custom item definition (static Adventurer items + generated Gauntlet items)
+# 000 = every custom item definition (fixed catalog + generated Gauntlet items)
 # 001 = Adventurer class
 # 002 = Goldshire / Remen
 # 003 = Gauntlet templates/spells
 # 004 = Gauntlet world placement/gossip
 # 005 = Gauntlet loot policy
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
-    WorldUpdate(ROOT / "sql/world/000_adventurer_items.sql", "rev_1789000000000000000.sql"),
+    WorldUpdate(adventurer_items.CATALOG, "rev_1789000000000000000.sql"),
     WorldUpdate(ROOT / "sql/world/001_adventurer.sql", "rev_1789000000000000001.sql"),
     WorldUpdate(ROOT / "sql/world/002_adventurer_goldshire.sql", "rev_1789000000000000002.sql"),
     WorldUpdate(
@@ -83,10 +84,13 @@ def validate_core(core: Path) -> Path:
 
 
 def source_payload(update: WorldUpdate, core: Path | None = None) -> bytes:
-    if not update.source.is_file():
-        raise WorldUpdateError(f"Bundled world update missing: {update.source}")
+    if update == WORLD_UPDATES[0]:
+        payload = adventurer_items.generate_world_sql()
+    else:
+        if not update.source.is_file():
+            raise WorldUpdateError(f"Bundled world update missing: {update.source}")
+        payload = update.source.read_bytes()
 
-    payload = update.source.read_bytes()
     if update == WORLD_UPDATES[0] and core is not None:
         generated = core / GAUNTLET_GENERATED_ITEMS_RELATIVE
         if not generated.is_file():
@@ -238,7 +242,7 @@ def main() -> int:
             cleanup_database(args.core_dir, args.worldserver_conf)
             print("Adventurer maintenance DB rows and legacy fixed-talent residue cleaned.")
         return 0
-    except (WorldUpdateError, OSError) as exc:
+    except (WorldUpdateError, OSError, RuntimeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
