@@ -1,14 +1,18 @@
 -- Adventurer Gauntlet account stash UI for WoW 3.3.5a.
+-- Uses Blizzard's native BankFrame artwork while keeping account-level stash logic.
+
 local STASH_ITEMS = {}
 local SLOTS = {}
-local MAX_SLOTS = 16
+local MAX_SLOTS = 28
+local COLUMNS = 7
 local PREFIX = "AGSTASH"
 local FRAME_NAME = "AdventurerGauntletStashFrame"
 local PENDING_WITHDRAW = nil
 
 local function SendCommand(command)
-    if not UnitName("player") then return end
-    SendAddonMessage(PREFIX, command, "WHISPER", UnitName("player"))
+    local player = UnitName("player")
+    if not player then return end
+    SendAddonMessage(PREFIX, command, "WHISPER", player)
 end
 
 local function ItemIdFromLink(link)
@@ -40,6 +44,7 @@ end
 local function TryPickupPendingWithdraw()
     local pending = PENDING_WITHDRAW
     if not pending or CursorHasItem() then return end
+
     for bag = 0, NUM_BAG_SLOTS do
         for slot = 1, GetContainerNumSlots(bag) do
             local id = ItemIdFromLink(GetContainerItemLink(bag, slot))
@@ -67,6 +72,7 @@ end
 local function TryDepositCursorItem(targetSlot)
     local entry = CursorItemEntry()
     if not entry then return false end
+
     targetSlot = targetSlot or FirstFreeStashSlot()
     if not targetSlot then
         UIErrorsFrame:AddMessage("El Baúl de Expediciones está lleno.", 1.0, 0.1, 0.1, 1.0)
@@ -76,6 +82,7 @@ local function TryDepositCursorItem(targetSlot)
         UIErrorsFrame:AddMessage("Esa casilla ya está ocupada.", 1.0, 0.1, 0.1, 1.0)
         return false
     end
+
     ClearCursor()
     SendCommand("DEPOSIT|" .. entry .. "|" .. targetSlot)
     return true
@@ -83,6 +90,7 @@ end
 
 local function RequestWithdraw(button)
     if not button or not button.entry or PENDING_WITHDRAW or CursorHasItem() then return end
+
     PENDING_WITHDRAW = {
         slot = button.stashSlot,
         entry = button.entry,
@@ -91,114 +99,157 @@ local function RequestWithdraw(button)
     SendCommand("WITHDRAW|" .. button.stashSlot)
 end
 
-local frame = CreateFrame("Frame", FRAME_NAME, UIParent, "ContainerFrameTemplate")
-frame:UnregisterAllEvents()
-frame:SetScript("OnEvent", nil)
-frame:SetScript("OnShow", function() PlaySound("igBackPackOpen") end)
-frame:SetScript("OnHide", function() GameTooltip:Hide(); PlaySound("igBackPackClose") end)
-frame:SetScript("OnReceiveDrag", function() TryDepositCursorItem(nil) end)
-frame:SetID(100)
-frame.size = MAX_SLOTS
-frame:SetWidth(192)
-frame:SetHeight(240)
-frame:ClearAllPoints()
-frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -18, 92)
+local frame = CreateFrame("Frame", FRAME_NAME, UIParent)
+frame:SetWidth(384)
+frame:SetHeight(302)
+frame:SetPoint("CENTER", UIParent, "CENTER", -150, 45)
+frame:SetFrameStrata("DIALOG")
 frame:SetMovable(true)
 frame:EnableMouse(true)
 frame:RegisterForDrag("LeftButton")
-frame:SetScript("OnDragStart", function(self) if not CursorHasItem() then self:StartMoving() end end)
+frame:SetScript("OnDragStart", function(self)
+    if not CursorHasItem() then self:StartMoving() end
+end)
 frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+frame:SetScript("OnShow", function() PlaySound("igMainMenuOpen") end)
+frame:SetScript("OnHide", function()
+    GameTooltip:Hide()
+    PENDING_WITHDRAW = nil
+    PlaySound("igMainMenuClose")
+end)
 frame:Hide()
 tinsert(UISpecialFrames, FRAME_NAME)
 
-local bgTop = _G[FRAME_NAME .. "BackgroundTop"]
-local bgMiddle1 = _G[FRAME_NAME .. "BackgroundMiddle1"]
-local bgMiddle2 = _G[FRAME_NAME .. "BackgroundMiddle2"]
-local bgBottom = _G[FRAME_NAME .. "BackgroundBottom"]
-local bgOneSlot = _G[FRAME_NAME .. "Background1Slot"]
-local moneyFrame = _G[FRAME_NAME .. "MoneyFrame"]
-local nameText = _G[FRAME_NAME .. "Name"]
-local portrait = _G[FRAME_NAME .. "Portrait"]
-local portraitButton = _G[FRAME_NAME .. "PortraitButton"]
-local closeButton = _G[FRAME_NAME .. "CloseButton"]
+-- Exact Blizzard bank artwork used by the working Doan-safe version.
+local topLeft = frame:CreateTexture(nil, "BORDER")
+topLeft:SetTexture("Interface\\BankFrame\\UI-BankFrame-TopLeft")
+topLeft:SetWidth(256)
+topLeft:SetHeight(256)
+topLeft:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
 
-if bgOneSlot then bgOneSlot:Hide() end
-if bgTop then
-    bgTop:SetTexture("Interface\\ContainerFrame\\UI-BackpackBackground")
-    bgTop:SetHeight(256)
-    bgTop:SetTexCoord(0, 1, 0, 1)
-    bgTop:Show()
+local topRight = frame:CreateTexture(nil, "BORDER")
+topRight:SetTexture("Interface\\BankFrame\\UI-BankFrame-TopRight")
+topRight:SetWidth(256)
+topRight:SetHeight(256)
+topRight:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+
+local lower = CreateFrame("Frame", nil, frame)
+lower:SetPoint("TOPLEFT", frame, "TOPLEFT", 6, -248)
+lower:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 6)
+lower:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true,
+    tileSize = 32,
+    edgeSize = 18,
+    insets = { left = 5, right = 5, top = 5, bottom = 5 }
+})
+lower:SetFrameLevel(frame:GetFrameLevel())
+
+local portrait = frame:CreateTexture(nil, "ARTWORK")
+portrait:SetWidth(60)
+portrait:SetHeight(60)
+portrait:SetPoint("TOPLEFT", frame, "TOPLEFT", 7, -6)
+portrait:SetTexture("Interface\\Icons\\INV_Misc_Bag_07")
+if SetPortraitToTexture then
+    SetPortraitToTexture(portrait, "Interface\\Icons\\INV_Misc_Bag_07")
 end
-if bgMiddle1 then bgMiddle1:Hide() end
-if bgMiddle2 then bgMiddle2:Hide() end
-if bgBottom then bgBottom:Hide() end
-if moneyFrame then moneyFrame:Show() end
-if nameText then nameText:SetText("Baúl de Expediciones") end
-if portrait then
-    portrait:SetTexture("Interface\\Icons\\INV_Box_04")
-    if SetPortraitToTexture then SetPortraitToTexture(portrait, "Interface\\Icons\\INV_Box_04") end
-end
-if portraitButton then
-    portraitButton:SetID(100)
-    portraitButton:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:SetText("Baúl de Expediciones", 1.0, 1.0, 1.0)
-        GameTooltip:AddLine("Lo guardado aquí sobrevive a la muerte.", nil, nil, nil, true)
-        GameTooltip:Show()
-    end)
-    portraitButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
-end
-if closeButton then closeButton:SetScript("OnClick", function() frame:Hide() end) end
+
+local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+title:SetPoint("TOP", frame, "TOP", 12, -18)
+title:SetText("Baúl de Expediciones")
+
+local subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+subtitle:SetPoint("TOPLEFT", frame, "TOPLEFT", 70, -44)
+subtitle:SetText("Lo guardado aquí sobrevive a la muerte")
+
+local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -42, -8)
+close:SetScript("OnClick", function() frame:Hide() end)
+
+local dropTarget = CreateFrame("Frame", nil, frame)
+dropTarget:SetPoint("TOPLEFT", frame, "TOPLEFT", 34, -78)
+dropTarget:SetWidth(308)
+dropTarget:SetHeight(174)
+dropTarget:EnableMouse(true)
+dropTarget:SetScript("OnReceiveDrag", function() TryDepositCursorItem(nil) end)
+dropTarget:SetScript("OnMouseUp", function()
+    if CursorHasItem() then TryDepositCursorItem(nil) end
+end)
+
+local hint = lower:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+hint:SetPoint("CENTER", lower, "CENTER", 0, 0)
+hint:SetText("Arrastra equipo para guardar · Clic para retirar")
 
 local function UpdateStashTooltip(button)
-    if not button or not button.entry then GameTooltip:Hide(); return end
-    GameTooltip:SetOwner(button, "ANCHOR_LEFT")
+    if not button or not button.entry then
+        GameTooltip:Hide()
+        return
+    end
+    GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
     GameTooltip:SetHyperlink("item:" .. button.entry)
     GameTooltip:Show()
 end
 
-local function ConfigureSlot(button, visualIndex, stashSlot)
-    button:ClearAllPoints()
-    if visualIndex == 1 then
-        button:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -12, -208)
-    elseif ((visualIndex - 1) % 4) == 0 then
-        button:SetPoint("BOTTOMRIGHT", _G[FRAME_NAME .. "Item" .. (visualIndex - 4)], "TOPRIGHT", 0, 4)
-    else
-        button:SetPoint("BOTTOMRIGHT", _G[FRAME_NAME .. "Item" .. (visualIndex - 1)], "BOTTOMLEFT", -5, 0)
-    end
-    button.stashSlot = stashSlot
-    button:Show()
+local function CreateSlot(index)
+    local name = "AdventurerGauntletStashSlot" .. index
+    local button = CreateFrame("Button", name, frame, "ItemButtonTemplate")
+    button:SetWidth(46)
+    button:SetHeight(46)
+
+    local column = (index - 1) % COLUMNS
+    local row = math.floor((index - 1) / COLUMNS)
+    button:SetPoint("TOPLEFT", frame, "TOPLEFT", 35 + column * 43, -78 - row * 43)
+    button.stashSlot = index
+    button:SetID(index)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
+
+    local normal = button:GetNormalTexture()
+    if normal then
+        normal:SetTexture(nil)
+        normal:Hide()
+    end
+
+    local highlight = button:GetHighlightTexture()
+    if highlight then
+        highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+        highlight:SetBlendMode("ADD")
+        highlight:ClearAllPoints()
+        highlight:SetPoint("TOPLEFT", button, "TOPLEFT", 4, -4)
+        highlight:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -4, 4)
+    end
+
+    local icon = _G[name .. "IconTexture"]
+    if icon then
+        icon:ClearAllPoints()
+        icon:SetPoint("TOPLEFT", button, "TOPLEFT", 5, -5)
+        icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -5, 5)
+    end
+
+    button.entry = nil
+    button.UpdateTooltip = UpdateStashTooltip
+    button:SetScript("OnEnter", function(self) self:UpdateTooltip() end)
+    button:SetScript("OnLeave", function() GameTooltip:Hide() end)
     button:SetScript("OnClick", function(self)
-        if CursorHasItem() then TryDepositCursorItem(self.stashSlot); return end
+        if CursorHasItem() then
+            TryDepositCursorItem(self.stashSlot)
+            return
+        end
         RequestWithdraw(self)
     end)
     button:SetScript("OnDragStart", function(self) RequestWithdraw(self) end)
     button:SetScript("OnReceiveDrag", function(self) TryDepositCursorItem(self.stashSlot) end)
-    button.UpdateTooltip = UpdateStashTooltip
-    button:SetScript("OnEnter", function(self) self:UpdateTooltip() end)
-    button:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    local questTexture = _G[button:GetName() .. "IconQuestTexture"]
-    if questTexture then questTexture:Hide() end
-    local cooldown = _G[button:GetName() .. "Cooldown"]
-    if cooldown then cooldown:Hide() end
+    return button
 end
 
-for visualIndex = 1, MAX_SLOTS do
-    local button = _G[FRAME_NAME .. "Item" .. visualIndex]
-    local stashSlot = MAX_SLOTS - visualIndex + 1
-    button:SetID(stashSlot)
-    ConfigureSlot(button, visualIndex, stashSlot)
-    SLOTS[stashSlot] = button
-end
-for visualIndex = MAX_SLOTS + 1, 36 do
-    local button = _G[FRAME_NAME .. "Item" .. visualIndex]
-    if button then button:Hide() end
+for index = 1, MAX_SLOTS do
+    SLOTS[index] = CreateSlot(index)
 end
 
 local function PaintItem(button, item)
     button.entry = item and item.entry or nil
+
     if not item then
         SetItemButtonTexture(button, nil)
         SetItemButtonCount(button, 0)
@@ -206,24 +257,46 @@ local function PaintItem(button, item)
         if GameTooltip:GetOwner() == button then GameTooltip:Hide() end
         return
     end
+
     local texture = GetItemIcon(item.entry) or "Interface\\Icons\\INV_Misc_QuestionMark"
     SetItemButtonTexture(button, texture)
     SetItemButtonCount(button, item.count)
     SetItemButtonDesaturated(button, false)
+    if SetItemButtonQuality then
+        local _, _, quality = GetItemInfo(item.entry)
+        if quality then SetItemButtonQuality(button, quality, item.entry) end
+    end
     if GameTooltip:GetOwner() == button then button:UpdateTooltip() end
 end
 
 local function RefreshUI()
-    for slot = 1, MAX_SLOTS do PaintItem(SLOTS[slot], STASH_ITEMS[slot]) end
+    for slot = 1, MAX_SLOTS do
+        PaintItem(SLOTS[slot], STASH_ITEMS[slot])
+    end
 end
 
 local function HandleState(message)
-    if message == "OPEN" then STASH_ITEMS = {}; frame:Show(); return end
-    if message == "DONE" then
-        RefreshUI(); frame:Show()
-        if PENDING_WITHDRAW and STASH_ITEMS[PENDING_WITHDRAW.slot] then PENDING_WITHDRAW = nil end
+    if message == "OPEN" then
+        STASH_ITEMS = {}
+        frame:Show()
         return
     end
+
+    if message == "CLOSE" then
+        frame:Hide()
+        STASH_ITEMS = {}
+        return
+    end
+
+    if message == "DONE" then
+        RefreshUI()
+        frame:Show()
+        if PENDING_WITHDRAW and STASH_ITEMS[PENDING_WITHDRAW.slot] then
+            PENDING_WITHDRAW = nil
+        end
+        return
+    end
+
     local slot, entry, count = string.match(message, "^S|(%d+)|(%d+)|(%d+)$")
     if slot and entry and count then
         slot = tonumber(slot)
@@ -245,11 +318,14 @@ ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", SystemMessageFilter)
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("CHAT_MSG_ADDON")
 eventFrame:RegisterEvent("BAG_UPDATE")
+eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "CHAT_MSG_ADDON" then
         local prefix, message = ...
         if prefix == PREFIX then HandleState(message) end
     elseif event == "BAG_UPDATE" then
         TryPickupPendingWithdraw()
+    elseif event == "GET_ITEM_INFO_RECEIVED" and frame:IsShown() then
+        RefreshUI()
     end
 end)
