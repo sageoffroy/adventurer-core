@@ -22,13 +22,14 @@ MPQ_HEADER = struct.Struct("<4sIIHHIIII")
 ITEM_DBC = "Item.dbc"
 ITEM_INTERNAL = "DBFilesClient\\Item.dbc"
 
-# Custom Adventurer contraband entry -> native Item.dbc chassis.
+# Custom Adventurer item entry -> native Item.dbc chassis.
 # Inventory type and all other client-side item classification fields are cloned
 # exactly from the native chassis. Both custom daggers therefore remain normal
-# one-hand daggers (InventoryType 13).
+# one-hand daggers (InventoryType 13), and the travel ration remains native food.
 CONTRABAND_ITEMS: dict[int, int] = {
     910200: 1917,
     910201: 1195,
+    910202: 3220,
     910210: 25,
     910211: 8178,
     910212: 2092,
