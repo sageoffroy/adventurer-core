@@ -13,6 +13,9 @@ from database import _run_mysql, query_scalar, read_database_info
 ROOT = Path(__file__).resolve().parent.parent
 PENDING_WORLD_RELATIVE = Path("data/sql/updates/pending_db_world")
 DEFAULT_CONF_RELATIVE = Path("env/dist/etc/worldserver.conf")
+GAUNTLET_GENERATED_ITEMS_RELATIVE = Path(
+    "modules/mod-adventurer-gauntlet/data/sql/world/000_gauntlet_items.generated.sql"
+)
 
 LEGACY_FIXED_TALENT_SPELL_MIN = 290000
 LEGACY_FIXED_TALENT_SPELL_MAX = 299999
@@ -35,10 +38,29 @@ class WorldUpdate:
         return PENDING_WORLD_RELATIVE / self.name
 
 
+# Authoritative execution order:
+# 000 = every custom item definition (static Adventurer items + generated Gauntlet items)
+# 001 = Adventurer class
+# 002 = Goldshire / Remen
+# 003 = Gauntlet templates/spells
+# 004 = Gauntlet world placement/gossip
+# 005 = Gauntlet loot policy
 WORLD_UPDATES: tuple[WorldUpdate, ...] = (
     WorldUpdate(ROOT / "sql/world/000_adventurer_items.sql", "rev_1789000000000000000.sql"),
     WorldUpdate(ROOT / "sql/world/001_adventurer.sql", "rev_1789000000000000001.sql"),
     WorldUpdate(ROOT / "sql/world/002_adventurer_goldshire.sql", "rev_1789000000000000002.sql"),
+    WorldUpdate(
+        ROOT / "modules/mod-adventurer-gauntlet/data/sql/world/001_gauntlet_core.sql",
+        "rev_1789000000000000003.sql",
+    ),
+    WorldUpdate(
+        ROOT / "modules/mod-adventurer-gauntlet/data/sql/world/002_gauntlet_world.sql",
+        "rev_1789000000000000004.sql",
+    ),
+    WorldUpdate(
+        ROOT / "modules/mod-adventurer-gauntlet/data/sql/world/003_gauntlet_loot.sql",
+        "rev_1789000000000000005.sql",
+    ),
 )
 
 WORLD_UPDATE_SOURCE = WORLD_UPDATES[0].source
@@ -60,10 +82,20 @@ def validate_core(core: Path) -> Path:
     return core
 
 
-def source_payload(update: WorldUpdate = WORLD_UPDATES[0]) -> bytes:
+def source_payload(update: WorldUpdate, core: Path | None = None) -> bytes:
     if not update.source.is_file():
         raise WorldUpdateError(f"Bundled world update missing: {update.source}")
-    return update.source.read_bytes()
+
+    payload = update.source.read_bytes()
+    if update == WORLD_UPDATES[0] and core is not None:
+        generated = core / GAUNTLET_GENERATED_ITEMS_RELATIVE
+        if not generated.is_file():
+            raise WorldUpdateError(
+                "Generated Gauntlet item SQL is missing; stage the Gauntlet module before world SQL: "
+                f"{generated}"
+            )
+        payload += b"\n\n-- Generated Gauntlet item definitions.\n" + generated.read_bytes()
+    return payload
 
 
 def remove_legacy_pending(core: Path) -> list[Path]:
@@ -79,7 +111,7 @@ def remove_legacy_pending(core: Path) -> list[Path]:
 
 def install_one(core: Path, update: WorldUpdate) -> tuple[Path, bool]:
     target = core / update.relative
-    payload = source_payload(update)
+    payload = source_payload(update, core)
     if target.exists():
         if not target.is_file():
             raise WorldUpdateError(f"World update target is not a file: {target}")
@@ -100,7 +132,7 @@ def verify_one(core: Path, update: WorldUpdate) -> Path:
     target = core / update.relative
     if not target.is_file():
         raise WorldUpdateError(f"World update is not installed: {target}")
-    if target.read_bytes() != source_payload(update):
+    if target.read_bytes() != source_payload(update, core):
         raise WorldUpdateError(f"World update differs from Adventurer Core: {target}")
     return target
 
@@ -123,7 +155,7 @@ def remove_one(core: Path, update: WorldUpdate) -> tuple[Path, bool]:
         return target, False
     if not target.is_file():
         raise WorldUpdateError(f"World update target is not a file: {target}")
-    if target.read_bytes() != source_payload(update):
+    if target.read_bytes() != source_payload(update, core):
         raise WorldUpdateError(f"Refusing to remove world update with different contents: {target}")
     target.unlink()
     return target, True
