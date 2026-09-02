@@ -63,9 +63,26 @@ SPECIAL_TYPES = [
 PREFIXES = ["Errante","Ceniza","Aurora","Cuervo","Bruma","Grifo","Tormenta","Roble","Lobo","Fauce","Estrella","Runas","Hierro","Marfil","Obsidiana","Vigilia","Abismo","Relampago","Escarcha","Fenix"]
 SUFFIXES = ["del Camino","de las Ruinas","de la Frontera","del Juramento","del Viajero","de la Noche","del Alba","del Bastion","del Exilio","del Horizonte"]
 
-# These six entries are the first custom fillers we intentionally expose to the
-# live reward selector. Their stock sources are already known-good visual rows
-# used elsewhere by Adventurer, so they also give us a clean icon/display test.
+# Early sets are explicitly curated for the low-level live pool. Their stock
+# sources remain the visual/armor donor; iLvl, stats and weapon damage are ours.
+EARLY_SET_ITEM_LEVELS = {
+    "juramento_coloso": [8, 9, 10, 9, 8],
+    "guardia_alba": [8, 9, 10, 9, 8],
+    "cuero_oso": [8, 9, 10, 9, 8],
+    "martillo_ceniza": [10, 11, 12, 11, 10],
+    "colmillo_niebla": [10, 11, 12, 11, 10],
+}
+
+EARLY_SET_ARCHETYPES = {
+    "juramento_coloso": "strength",
+    "guardia_alba": "strength",
+    "cuero_oso": "agility",
+    "martillo_ceniza": "strength",
+    "colmillo_niebla": "agility",
+}
+
+# These six entries are the first standalone custom fillers we intentionally
+# expose to the live reward selector.
 EARLY_BLUE_ITEMS = [
     ("mace1h", 3, 8, "Maza Errante del Camino", "melee", {"strength":1, "stamina":1}),
     ("sword2h", 3, 9, "Mandoble Ceniza del Camino", "2h", {"strength":2}),
@@ -130,6 +147,11 @@ def apply_chassis_values(row: dict[str, str], item_type: str, level: int, qualit
         row["dmg_min1"], row["dmg_max1"], row["delay"] = f"{base:.1f}", f"{base * 1.5:.1f}", "2600"
 
 
+def clear_stats(row: dict[str, str]) -> None:
+    for column in ("strength", "agility", "stamina", "intellect", "spirit", "attack_power", "spell_power", "hit_rating", "crit_rating", "haste_rating"):
+        row[column] = ""
+
+
 def apply_curated_blue_weapon_values(row: dict[str, str], item_type: str, item_level: int, stats: dict[str, int]) -> None:
     # Classic low-level baseline: one-handed green DPS ~= 0.6 * iLvl - 0.4.
     # Rare quality adds ~10.5%; two-hand and ranged families use their classic
@@ -141,9 +163,12 @@ def apply_curated_blue_weapon_values(row: dict[str, str], item_type: str, item_l
         dps *= 1.275
 
     delays = {
+        "sword1h": 2400,
         "mace1h": 2400,
         "sword2h": 2700,
+        "mace2h": 3200,
         "dagger": 1600,
+        "rare_dagger": 1700,
         "staff": 2900,
         "bow": 2700,
         "crossbow": 2800,
@@ -154,10 +179,28 @@ def apply_curated_blue_weapon_values(row: dict[str, str], item_type: str, item_l
     row["dmg_max1"] = f"{average_hit * 1.30:.1f}"
     row["delay"] = str(delay)
 
-    for column in ("strength", "agility", "stamina", "intellect", "spirit", "attack_power", "spell_power", "hit_rating", "crit_rating", "haste_rating"):
-        row[column] = ""
+    clear_stats(row)
     for stat, value in stats.items():
         row[stat] = str(value)
+
+
+def apply_curated_set_values(row: dict[str, str], item_type: str, item_level: int, archetype: str) -> None:
+    # Preserve the stock donor's armor/block/display by leaving armor blank.
+    # Only our progression-facing values are overridden here.
+    row["armor"] = ""
+    clear_stats(row)
+
+    primary = "strength" if archetype == "strength" else "agility"
+    primary_value = 1 if item_level <= 9 else 2
+    row[primary] = str(primary_value)
+    if item_level >= 9:
+        row["stamina"] = "1"
+
+    if item_type in {"sword1h", "sword2h", "mace2h", "dagger"}:
+        weapon_stats = {primary: primary_value}
+        if item_level >= 9:
+            weapon_stats["stamina"] = 1
+        apply_curated_blue_weapon_values(row, item_type, item_level, weapon_stats)
 
 
 def make_row(entry: int, item_type: str, level: int, quality: str, name: str, archetype: str, description: str, set_key: str = "") -> dict[str, str]:
@@ -187,17 +230,22 @@ def build_catalog() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
             {"enabled":"1","set_key":key,"name":name,"pieces_required":"5","bonus_type":"expertise_rating","value":str(expertise),"spell_id":"","description":f"+{expertise} indice de pericia"},
         ])
 
-    # Set pieces remain blue. Epic/legendary discovery items are separate so the
-    # special pools do not reveal set progression or consume set-piece rarity.
+    # Set pieces remain blue. The five Req 3-5 sets are curated for the live
+    # low-level pool; later sets remain generated/blocked until we revisit them.
     for key, name, level, kind, pieces in SETS:
-        for item_type in pieces:
+        for piece_index, item_type in enumerate(pieces):
             archetype = kind if kind in {"2h", "1hshield", "caster"} else ("ranged" if item_type == "bow" else "melee")
-            rows.append(make_row(entry, item_type, level, "blue", f"{PIECE_NAMES[item_type]} de {name}", archetype, set_descriptions[key], key))
+            row = make_row(entry, item_type, level, "blue", f"{PIECE_NAMES[item_type]} de {name}", archetype, set_descriptions[key], key)
+            if key in EARLY_SET_ITEM_LEVELS:
+                item_level = EARLY_SET_ITEM_LEVELS[key][piece_index]
+                row["item_level"] = str(item_level)
+                apply_curated_set_values(row, item_type, item_level, EARLY_SET_ARCHETYPES[key])
+            rows.append(row)
             entry += 1
 
     # 130 regular blue discovery items retain broad progression. The first six
-    # are deliberately curated low-level fillers and are the only custom items
-    # currently allowed into live loot selection.
+    # are deliberately curated low-level fillers and are the only standalone
+    # custom items currently allowed into live loot selection.
     level_cycle = (LEVELS * 10)[:130]
     for index in range(130):
         if index < len(EARLY_BLUE_ITEMS):
@@ -218,8 +266,8 @@ def build_catalog() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
             archetype, "Botin excepcional de las expediciones de Khadgar."))
         entry += 1
 
-    # Hidden early-game special pool: exactly 50 epics and 20 legendaries,
-    # distributed only through levels 3, 5, 8, 12 and 15.
+    # Hidden early-game special pool remains generated but blocked from live
+    # rewards until epic/legendary design is rebuilt.
     for special_index in range(70):
         quality = "purple" if special_index < 50 else "legendary"
         local_index = special_index if quality == "purple" else special_index - 50
@@ -241,6 +289,8 @@ def build_catalog() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     for required_level in (3, 4, 5):
         if sum(int(row["required_level"]) == required_level and row["quality"] == "blue" for row in rows) < 2:
             raise RuntimeError(f"missing curated level {required_level} blue rewards")
+    if sum(row["set_key"] in EARLY_SET_ITEM_LEVELS for row in rows) != 25:
+        raise RuntimeError("expected exactly 25 curated early set pieces")
     return rows, bonuses
 
 
@@ -254,7 +304,7 @@ def write_csv(path: Path, headers: list[str], rows: list[dict[str, str]]) -> Non
 def main() -> int:
     parser = argparse.ArgumentParser(); parser.add_argument("--items", required=True, type=Path); parser.add_argument("--sets", required=True, type=Path)
     args = parser.parse_args(); items, bonuses = build_catalog(); write_csv(args.items, HEADERS, items); write_csv(args.sets, SET_HEADERS, bonuses)
-    print("Generated controlled Gauntlet catalog: 300 items (230 blue, 50 epic, 20 legendary), 100 set pieces, 20 sets. Six curated blue fillers cover required levels 3-5.")
+    print("Generated controlled Gauntlet catalog: 300 items (230 blue, 50 epic, 20 legendary), 100 set pieces, 20 sets. Curated live pool: 25 early set pieces + 6 standalone blue fillers.")
     return 0
 
 if __name__ == "__main__":
