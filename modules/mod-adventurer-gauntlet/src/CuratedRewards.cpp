@@ -19,6 +19,12 @@ constexpr uint32 RagefireMapId = 389;
 constexpr uint32 UniversalMask = 0xFFFFFFFFu;
 constexpr uint32 AdventurerItemRangeFirst = 910000;
 constexpr uint32 AdventurerItemRangeLast = 910999;
+constexpr uint32 StockItemEntryLimit = AdventurerItemRangeFirst;
+constexpr uint32 ItemClassConsumable = 0;
+constexpr uint32 ItemClassProjectile = 6;
+constexpr uint32 ItemSubclassPotion = 1;
+constexpr uint32 AmmoDropChance = 25;
+constexpr uint32 PotionDropChance = 15;
 
 enum RewardPool : uint8
 {
@@ -38,6 +44,8 @@ enum RewardProfile : uint8
 struct RewardPools
 {
     std::array<std::vector<uint32>, 4> Items;
+    std::vector<uint32> Ammo;
+    std::vector<uint32> Potions;
 };
 
 std::unordered_set<uint64> ProcessedCreatures;
@@ -86,6 +94,24 @@ bool PassesCommonRewardRules(uint32 entry, ItemTemplate const& item)
     return true;
 }
 
+bool PassesStockAuxiliaryRules(uint32 entry, ItemTemplate const& item)
+{
+    // Auxiliary drops deliberately use only original WoW rows. Custom items
+    // continue to enter the equipment pool through their normal catalog path.
+    if (entry >= StockItemEntryLimit)
+        return false;
+    if (!item.RequiredLevel)
+        return false;
+    if (item.AllowableClass != UniversalMask || item.AllowableRace != UniversalMask)
+        return false;
+    if (item.RequiredSkill || item.RequiredSpell || item.RequiredReputationFaction ||
+        item.RequiredHonorRank || item.RequiredCityRank)
+        return false;
+    if (item.HasFlag(ITEM_FLAG_DEPRECATED))
+        return false;
+    return true;
+}
+
 RewardPools BuildControlledPools()
 {
     RewardPools pools;
@@ -95,17 +121,25 @@ RewardPools BuildControlledPools()
 
     for (auto const& [entry, item] : *itemStore)
     {
-        if (!PassesCommonRewardRules(entry, item))
+        if (PassesCommonRewardRules(entry, item))
+        {
+            if (item.Quality == ITEM_QUALITY_UNCOMMON)
+                pools.Items[REWARD_GREEN].push_back(entry);
+            else if (item.Quality == ITEM_QUALITY_RARE)
+                pools.Items[REWARD_BLUE].push_back(entry);
+            else if (item.Quality == ITEM_QUALITY_EPIC)
+                pools.Items[REWARD_EPIC].push_back(entry);
+
+            // Legendary rewards remain disabled until we explicitly enable their drop rate.
+        }
+
+        if (!PassesStockAuxiliaryRules(entry, item))
             continue;
 
-        if (item.Quality == ITEM_QUALITY_UNCOMMON)
-            pools.Items[REWARD_GREEN].push_back(entry);
-        else if (item.Quality == ITEM_QUALITY_RARE)
-            pools.Items[REWARD_BLUE].push_back(entry);
-        else if (item.Quality == ITEM_QUALITY_EPIC)
-            pools.Items[REWARD_EPIC].push_back(entry);
-
-        // Legendary rewards remain disabled until we explicitly enable their drop rate.
+        if (item.Class == ItemClassProjectile)
+            pools.Ammo.push_back(entry);
+        else if (item.Class == ItemClassConsumable && item.SubClass == ItemSubclassPotion)
+            pools.Potions.push_back(entry);
     }
     return pools;
 }
@@ -153,12 +187,49 @@ uint32 SelectClosestFromPool(std::vector<uint32> const& candidates, uint8 reward
     return entry;
 }
 
-void AddLootItem(Loot& loot, uint32 itemEntry)
+uint32 SelectUsableAuxiliaryFromPool(std::vector<uint32> const& candidates, uint8 rewardLevel)
+{
+    if (candidates.empty())
+        return 0;
+
+    uint32 bestDistance = UINT32_MAX;
+    std::vector<uint32> closest;
+    for (uint32 entry : candidates)
+    {
+        ItemTemplate const* item = sObjectMgr->GetItemTemplate(entry);
+        if (!item || item->RequiredLevel > rewardLevel)
+            continue;
+
+        uint32 distance = rewardLevel - item->RequiredLevel;
+        if (distance < bestDistance)
+        {
+            bestDistance = distance;
+            closest.clear();
+            closest.push_back(entry);
+        }
+        else if (distance == bestDistance)
+            closest.push_back(entry);
+    }
+
+    if (closest.empty())
+        return 0;
+    return closest[urand(0, static_cast<uint32>(closest.size() - 1))];
+}
+
+void AddLootItem(Loot& loot, uint32 itemEntry, uint8 minCount = 1, uint8 maxCount = 1)
 {
     if (!itemEntry)
         return;
-    LootStoreItem lootItem(itemEntry, 0, 100.0f, false, LOOT_MODE_DEFAULT, 0, 1, 1);
+    LootStoreItem lootItem(itemEntry, 0, 100.0f, false, LOOT_MODE_DEFAULT, 0, minCount, maxCount);
     loot.AddItem(lootItem);
+}
+
+void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
+{
+    if (urand(1, 100) <= AmmoDropChance)
+        AddLootItem(loot, SelectUsableAuxiliaryFromPool(pools.Ammo, rewardLevel), 40, 100);
+    if (urand(1, 100) <= PotionDropChance)
+        AddLootItem(loot, SelectUsableAuxiliaryFromPool(pools.Potions, rewardLevel), 1, 2);
 }
 
 bool GetRewardContext(Map* map, uint32& survivorCount, uint8& rewardLevel)
@@ -221,6 +292,7 @@ bool FillCheckpointLoot(Loot& loot, Map* map)
     for (uint32 reward = 0; reward < survivorCount; ++reward)
         AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_GREEN], rewardLevel, usedEntries));
     AddCheckpointExtraRoll(loot, pools, rewardLevel, usedEntries);
+    AddAuxiliaryDrops(loot, pools, rewardLevel);
     return !loot.empty();
 }
 
@@ -238,6 +310,7 @@ bool FillFinalBossLoot(Loot& loot, Map* map)
     loot.gold = gold;
     AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_BLUE], rewardLevel, usedEntries));
     AddFinalExtraRoll(loot, pools, rewardLevel, usedEntries);
+    AddAuxiliaryDrops(loot, pools, rewardLevel);
     return !loot.empty();
 }
 
@@ -248,7 +321,10 @@ bool AddCommonMobTestDrop(Creature* creature)
     if (!GetRewardContext(creature->GetMap(), survivorCount, rewardLevel))
         return false;
 
-    // Temporary test rates: 20% green, 4% blue, 1% epic, 75% no extra item.
+    RewardPools pools = BuildControlledPools();
+    bool added = false;
+
+    // Temporary test rates: 20% green, 4% blue, 1% epic, 75% no extra equipment.
     uint32 roll = urand(1, 10000);
     RewardPool pool;
     if (roll <= 2000)
@@ -258,16 +334,26 @@ bool AddCommonMobTestDrop(Creature* creature)
     else if (roll <= 2500)
         pool = REWARD_EPIC;
     else
-        return false;
+        pool = REWARD_LEGENDARY;
 
-    RewardPools pools = BuildControlledPools();
-    std::unordered_set<uint32> usedEntries;
-    uint32 itemEntry = SelectClosestFromPool(pools.Items[pool], rewardLevel, usedEntries);
-    if (!itemEntry)
-        return false;
-    AddLootItem(creature->loot, itemEntry);
-    creature->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
-    return true;
+    if (pool != REWARD_LEGENDARY)
+    {
+        std::unordered_set<uint32> usedEntries;
+        uint32 itemEntry = SelectClosestFromPool(pools.Items[pool], rewardLevel, usedEntries);
+        if (itemEntry)
+        {
+            AddLootItem(creature->loot, itemEntry);
+            added = true;
+        }
+    }
+
+    size_t beforeAuxiliary = creature->loot.items.size();
+    AddAuxiliaryDrops(creature->loot, pools, rewardLevel);
+    added = added || creature->loot.items.size() > beforeAuxiliary;
+
+    if (added)
+        creature->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
+    return added;
 }
 
 void ProcessCreatureAfterDeath(Creature* creature)
