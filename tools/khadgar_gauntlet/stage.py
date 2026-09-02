@@ -41,7 +41,10 @@ def stage(core_dir: Path, server_data_dir: Path, client_dir: Path, dbc_src: Path
 
     item_catalog = module_target / "data" / "items" / "early_items.csv"
     set_catalog = module_target / "data" / "items" / "sets.csv"
-    item_sql = module_target / "data" / "sql" / "world" / "000_gauntlet_items.generated.sql"
+    # Generated item SQL is an intermediate artifact consumed only by tools/world.py.
+    # Keep it outside data/sql/world so AzerothCore's module auto-updater cannot
+    # apply the same catalog through a second update path.
+    item_sql = module_target / "data" / "generated" / "gauntlet_items.sql"
     set_include = module_target / "src" / "GeneratedGauntletSets.inc"
 
     run(str(TOOLS / "build_catalog.py"), "--items", str(item_catalog), "--sets", str(set_catalog))
