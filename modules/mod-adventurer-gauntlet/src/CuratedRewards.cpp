@@ -26,9 +26,9 @@ constexpr uint32 ItemSubclassPotion = 1;
 constexpr uint32 ItemSubclassArrow = 2;
 constexpr uint32 ItemSubclassBullet = 3;
 constexpr uint32 ItemSubclassScroll = 4;
-constexpr uint32 AmmoDropChance = 5;
+constexpr uint32 AmmoDropChance = 3;
 constexpr uint32 ConsumableDropChance = 5;
-constexpr uint32 BulletWithinAmmoChance = 5;
+constexpr uint32 BulletWithinAmmoChance = 0;
 
 enum RewardPool : uint8
 {
@@ -238,12 +238,12 @@ void AddLootItem(Loot& loot, uint32 itemEntry, uint8 minCount = 1, uint8 maxCoun
 
 void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
 {
-    // Independent 5% ammunition roll. Arrows are the normal result; bullets are
-    // intentionally rare within that successful ammunition roll.
+    // Independent 3% ammunition roll. Bullets are disabled for now, so
+    // a successful ammunition roll always yields arrows.
     if (urand(1, 100) <= AmmoDropChance)
     {
         std::vector<uint32> const& ammoPool =
-            (urand(1, 100) <= BulletWithinAmmoChance && !pools.Bullets.empty()) ? pools.Bullets : pools.Arrows;
+            (BulletWithinAmmoChance > 0 && urand(1, 100) <= BulletWithinAmmoChance && !pools.Bullets.empty()) ? pools.Bullets : pools.Arrows;
         AddLootItem(loot, SelectUsableAuxiliaryFromPool(ammoPool, rewardLevel), 40, 100);
     }
 
