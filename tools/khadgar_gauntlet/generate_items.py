@@ -21,7 +21,8 @@ REQUIRED_COLUMNS = {
     "enabled", "entry", "source_entry", "display_id", "set_key", "name", "quality",
     "required_level", "item_level", "strength", "agility", "stamina", "intellect", "spirit",
     "attack_power", "spell_power", "hit_rating", "crit_rating", "haste_rating", "armor", "block",
-    "dmg_min1", "dmg_max1", "delay", "equip_spell1", "equip_spell2", "description",
+    "dmg_min1", "dmg_max1", "delay", "equip_spell1", "equip_spell2",
+    "proc_spell1", "proc_ppm1", "description",
 }
 SET_KEY_RE = re.compile(r"^[a-z0-9_]+$")
 DBC_HEADER = struct.Struct("<4sIIII")
@@ -119,14 +120,27 @@ def generate_row(row: dict[str, str], line: int, dbc_rows) -> str:
     dmg_min = optional_number(row["dmg_min1"], "dmg_min1", line)
     dmg_max = optional_number(row["dmg_max1"], "dmg_max1", line)
     delay = optional_number(row["delay"], "delay", line, integer=True)
+
     equip_spells = [
         optional_number(row["equip_spell1"], "equip_spell1", line, integer=True),
         optional_number(row["equip_spell2"], "equip_spell2", line, integer=True),
     ]
+    proc_spell = optional_number(row["proc_spell1"], "proc_spell1", line, integer=True)
+    proc_ppm = optional_number(row["proc_ppm1"], "proc_ppm1", line)
+
     if (dmg_min is None) != (dmg_max is None):
         raise ValueError(f"line {line}: dmg_min1 and dmg_max1 must be supplied together")
     if dmg_min is not None and dmg_max < dmg_min:
         raise ValueError(f"line {line}: dmg_max1 cannot be lower than dmg_min1")
+    if proc_spell is None and proc_ppm is not None:
+        raise ValueError(f"line {line}: proc_ppm1 requires proc_spell1")
+    if proc_spell is not None:
+        if proc_spell <= 0:
+            raise ValueError(f"line {line}: proc_spell1 must be positive")
+        if proc_ppm is None or proc_ppm <= 0:
+            raise ValueError(f"line {line}: proc_ppm1 must be positive when proc_spell1 is set")
+        if any(spell is not None for spell in equip_spells):
+            raise ValueError(f"line {line}: proc_spell1 currently cannot share spell slots with equip_spell1/2")
 
     updates = [
         f"`entry` = {entry}", f"`class` = {item_class}", f"`subclass` = {subclass}",
@@ -153,11 +167,20 @@ def generate_row(row: dict[str, str], line: int, dbc_rows) -> str:
             f"`spellppmRate_{index}` = 0", f"`spellcooldown_{index}` = -1", f"`spellcategory_{index}` = 0",
             f"`spellcategorycooldown_{index}` = -1",
         ]
+
     for index, spell in enumerate(equip_spells, start=1):
         if spell is not None:
             if spell <= 0:
                 raise ValueError(f"line {line}: equip_spell{index} must be positive")
             updates += [f"`spellid_{index}` = {spell}", f"`spelltrigger_{index}` = 1"]
+
+    if proc_spell is not None:
+        # ITEM_SPELLTRIGGER_CHANCE_ON_HIT = 2 in the 3.3.5a item template contract.
+        updates += [
+            f"`spellid_1` = {proc_spell}",
+            "`spelltrigger_1` = 2",
+            f"`spellppmRate_1` = {proc_ppm:g}",
+        ]
 
     updates += [f"`description` = {sql_string(row['description'].strip())}", "`VerifiedBuild` = 0"]
     temp = f"tmp_adventurer_gauntlet_item_{entry}"
