@@ -56,7 +56,6 @@ def gauntlet_mapping(core_dir: Path) -> dict[int, int]:
 def build(args) -> None:
     core = args.core_dir.expanduser().resolve()
     clean_dbc = args.dbc_src.expanduser().resolve()
-    clean_item_dbc = clean_dbc / adventurer_apply.ITEM_DBC
     server_data = args.server_data_dir.expanduser().resolve()
     runtime_dbc = server_data.parent / "bin" / "dbc"
     stale_data_dbc = server_data / "dbc"
@@ -78,7 +77,7 @@ def build(args) -> None:
 
         item_path = work / adventurer_apply.ITEM_DBC
         before_item = item_path.read_bytes()
-        patch_gauntlet_items(item_path, mapping, clean_item_dbc)
+        patch_gauntlet_items(item_path, mapping)
         changed[adventurer_apply.ITEM_DBC] = (
             item_path.read_bytes() != before_item
             or changed.get(adventurer_apply.ITEM_DBC, False)
