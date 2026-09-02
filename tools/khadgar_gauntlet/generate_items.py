@@ -23,6 +23,17 @@ REQUIRED_COLUMNS = {
     "dmg_min1", "dmg_max1", "delay", "equip_spell1", "equip_spell2", "description",
 }
 
+# A few stock item_template rows do not carry the same display id as their
+# Item.dbc row. The custom row must match Item.dbc because AzerothCore validates
+# these client-facing chassis fields at startup. These are visual donor facts,
+# not balance values.
+DBC_DISPLAY_BY_SOURCE = {
+    4939: 26591,  # sword2h
+    7108: 18480,  # shield
+    4947: 6442,   # dagger
+    4763: 8106,   # bow
+}
+
 SET_KEY_RE = re.compile(r"^[a-z0-9_]+$")
 
 
@@ -60,6 +71,8 @@ def generate_row(row, line: int) -> str:
         raise ValueError(f"line {line}: source_entry must be a stock item, not another gauntlet item")
 
     display_id = parse_optional_number(row["display_id"], "display_id", line, integer=True)
+    if display_id is None:
+        display_id = DBC_DISPLAY_BY_SOURCE.get(source)
     if display_id is not None and display_id <= 0:
         raise ValueError(f"line {line}: display_id must be positive")
 
@@ -201,7 +214,7 @@ def main() -> int:
     header = [
         "-- GENERATED FILE. Do not edit by hand.",
         f"-- Source: {args.input.name}",
-        "-- This catalog owns 911100-911399 and replaces that range atomically on re-apply.",
+        "-- This catalog owns the complete Gauntlet item range and replaces it atomically during development.",
         "DELETE FROM `item_template` WHERE `entry` BETWEEN 911100 AND 911399;",
         "",
     ]
