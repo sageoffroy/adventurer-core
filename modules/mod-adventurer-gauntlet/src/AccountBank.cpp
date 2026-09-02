@@ -476,6 +476,12 @@ public:
         if (creature && creature->GetEntry() == KhadgarEntry)
             EnsureAccountBank(creature);
     }
+
+    void OnAllCreatureUpdate(Creature* creature, uint32 /*diff*/) override
+    {
+        if (creature && creature->GetEntry() == KhadgarEntry)
+            EnsureAccountBank(creature);
+    }
 };
 
 class AdventurerGauntletAccountBankPlayerScript : public PlayerScript
