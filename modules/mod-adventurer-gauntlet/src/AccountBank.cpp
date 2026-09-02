@@ -26,6 +26,10 @@ constexpr uint32 BankBagSlotCount = 7;
 constexpr uint32 MaxBagCapacity = 36;
 constexpr uint32 RangeCheckMs = 500;
 constexpr float UseRange = 8.0f;
+constexpr float GoldshireBankX = -9468.798f;
+constexpr float GoldshireBankY = 4.1409054f;
+constexpr float GoldshireBankZ = 49.795887f;
+constexpr float GoldshireBankO = 4.798379f;
 
 std::unordered_set<uint32> OpenBankPlayers;
 std::unordered_map<uint32, uint32> RangeTimers;
@@ -429,6 +433,22 @@ void EnsureAccountBank(Creature* khadgar)
 {
     if (!khadgar || khadgar->FindNearestGameObject(AccountBankEntry, 8.0f))
         return;
+
+    if (khadgar->GetMapId() == 0)
+    {
+        khadgar->SummonGameObject(
+            AccountBankEntry,
+            GoldshireBankX,
+            GoldshireBankY,
+            GoldshireBankZ,
+            GoldshireBankO,
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f,
+            0);
+        return;
+    }
 
     constexpr float HalfPi = 1.57079632679f;
     float angle = khadgar->GetOrientation() + HalfPi;
