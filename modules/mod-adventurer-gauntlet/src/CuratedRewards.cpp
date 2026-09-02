@@ -21,7 +21,7 @@ constexpr uint32 GauntletItemMin = 911100;
 constexpr uint32 GauntletItemMax = 911399;
 constexpr uint32 UniversalMask = 0xFFFFFFFFu;
 constexpr uint32 ClosestCandidateCount = 5;
-constexpr std::array<uint32, 6> CuratedCustomRewardEntries = {
+constexpr std::array<uint32, 6> CuratedStandaloneRewardEntries = {
     911200, 911201, 911202, 911203, 911204, 911205
 };
 
@@ -69,7 +69,17 @@ uint32 LevelDistance(uint32 requiredLevel, uint8 rewardLevel)
 
 bool IsCuratedCustomReward(uint32 entry)
 {
-    return std::find(CuratedCustomRewardEntries.begin(), CuratedCustomRewardEntries.end(), entry) != CuratedCustomRewardEntries.end();
+    // Curated early sets:
+    // 911100-911109  Juramento del Coloso + Martillo de Ceniza
+    // 911125-911129  Guardia del Alba
+    // 911135-911144  Cuero de Oso + Colmillo de Niebla
+    if ((entry >= 911100 && entry <= 911109) ||
+        (entry >= 911125 && entry <= 911129) ||
+        (entry >= 911135 && entry <= 911144))
+        return true;
+
+    return std::find(CuratedStandaloneRewardEntries.begin(), CuratedStandaloneRewardEntries.end(), entry)
+        != CuratedStandaloneRewardEntries.end();
 }
 
 bool PassesCommonRewardRules(ItemTemplate const& item)
@@ -79,18 +89,12 @@ bool PassesCommonRewardRules(ItemTemplate const& item)
     if (item.InventoryType == INVTYPE_NON_EQUIP || item.InventoryType == INVTYPE_BAG)
         return false;
 
-    // Reward selection is based on RequiredLevel proximity. Items without a
-    // real required level are intentionally excluded because quest/internal
-    // rewards frequently use 0 and make poor Gauntlet candidates.
     if (!item.RequiredLevel)
         return false;
 
-    // Keep obviously abnormal item-level relationships out of the native pool.
     if (item.ItemLevel < item.RequiredLevel || item.ItemLevel > item.RequiredLevel + 15)
         return false;
 
-    // Aventurero is classless: stock class/race restrictions are never valid
-    // Gauntlet rewards.
     if (item.AllowableClass != UniversalMask || item.AllowableRace != UniversalMask)
         return false;
 
@@ -111,10 +115,8 @@ RewardPools BuildControlledPools()
 
     for (auto const& [entry, item] : *itemStore)
     {
-        // The old generated catalog stays excluded. Only the small curated
-        // low-level filler set is allowed back into the same selector used by
-        // Blizzard items; adding future curated entries only requires adding
-        // them to this explicit allow-list.
+        // The old generated catalog stays excluded. Only curated low-level
+        // custom pieces participate alongside valid Blizzard items.
         if (entry >= GauntletItemMin && entry <= GauntletItemMax && !IsCuratedCustomReward(entry))
             continue;
 
@@ -310,7 +312,6 @@ void ProcessCreatureAfterDeath(Creature* creature)
     if (!key || ProcessedCreatures.find(key) != ProcessedCreatures.end())
         return;
 
-    // Mark first so a failed/empty roll is still processed only once.
     ProcessedCreatures.insert(key);
 
     uint8 rewardProfile = GetRewardProfile(creature->GetEntry());
