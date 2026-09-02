@@ -25,7 +25,7 @@ constexpr uint32 ItemClassProjectile = 6;
 constexpr uint32 ItemSubclassPotion = 1;
 constexpr uint32 ItemSubclassArrow = 2;
 constexpr uint32 ItemSubclassScroll = 4;
-constexpr uint32 AmmoDropChance = 3;
+constexpr uint32 AmmoDropChance = 1;
 constexpr uint32 ConsumableDropChance = 5;
 
 enum RewardPool : uint8
@@ -230,7 +230,7 @@ void AddLootItem(Loot& loot, uint32 itemEntry, uint8 minCount = 1, uint8 maxCoun
 
 void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
 {
-    // Independent 3% ammunition roll. Only arrows are eligible.
+    // Independent 1% ammunition roll. Only arrows are eligible.
     if (urand(1, 100) <= AmmoDropChance)
         AddLootItem(loot, SelectUsableAuxiliaryFromPool(pools.Arrows, rewardLevel), 40, 100);
 
