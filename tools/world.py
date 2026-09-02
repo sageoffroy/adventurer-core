@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PENDING_WORLD_RELATIVE = Path("data/sql/updates/pending_db_world")
 DEFAULT_CONF_RELATIVE = Path("env/dist/etc/worldserver.conf")
 GAUNTLET_GENERATED_ITEMS_RELATIVE = Path(
-    "modules/mod-adventurer-gauntlet/data/sql/world/000_gauntlet_items.generated.sql"
+    "modules/mod-adventurer-gauntlet/data/generated/gauntlet_items.sql"
 )
 
 LEGACY_FIXED_TALENT_SPELL_MIN = 290000
@@ -23,6 +23,9 @@ LEGACY_FIXED_TALENT_SPELL_MAX = 299999
 LEGACY_FIXED_TALENT_UPDATE_NAMES = (
     "rev_1787446800000000000.sql",
     "rev_1787779800000000000.sql",
+)
+LEGACY_GAUNTLET_GENERATED_UPDATE_NAMES = (
+    "000_gauntlet_items.generated.sql",
 )
 LEGACY_WORLD_UPDATE_NAMES = tuple(
     f"rev_1787446800000000{index:03d}.sql" for index in range(1, 15)
@@ -121,10 +124,6 @@ def install_one(core: Path, update: WorldUpdate) -> tuple[Path, bool]:
             raise WorldUpdateError(f"World update target is not a file: {target}")
         if target.read_bytes() == payload:
             return target, False
-        # rev_178900... files are fully owned generated outputs. During active
-        # development their source may legitimately change before worldserver has
-        # consumed the pending copy. Replace stale owned pending data instead of
-        # forcing a manual delete or creating corrective migrations.
         target.write_bytes(payload)
         return target, True
     target.write_bytes(payload)
@@ -184,6 +183,7 @@ def cleanup_database(core: Path, conf: Path | None = None) -> None:
         tuple(update.name for update in WORLD_UPDATES)
         + LEGACY_WORLD_UPDATE_NAMES
         + LEGACY_FIXED_TALENT_UPDATE_NAMES
+        + LEGACY_GAUNTLET_GENERATED_UPDATE_NAMES
     )
     names = ", ".join("'" + name.replace("'", "''") + "'" for name in update_names)
     sql = f"""
