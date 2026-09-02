@@ -23,8 +23,12 @@ constexpr uint32 StockItemEntryLimit = AdventurerItemRangeFirst;
 constexpr uint32 ItemClassConsumable = 0;
 constexpr uint32 ItemClassProjectile = 6;
 constexpr uint32 ItemSubclassPotion = 1;
-constexpr uint32 AmmoDropChance = 25;
-constexpr uint32 PotionDropChance = 15;
+constexpr uint32 ItemSubclassArrow = 2;
+constexpr uint32 ItemSubclassBullet = 3;
+constexpr uint32 ItemSubclassScroll = 4;
+constexpr uint32 AmmoDropChance = 5;
+constexpr uint32 ConsumableDropChance = 5;
+constexpr uint32 BulletWithinAmmoChance = 5;
 
 enum RewardPool : uint8
 {
@@ -44,8 +48,10 @@ enum RewardProfile : uint8
 struct RewardPools
 {
     std::array<std::vector<uint32>, 4> Items;
-    std::vector<uint32> Ammo;
+    std::vector<uint32> Arrows;
+    std::vector<uint32> Bullets;
     std::vector<uint32> Potions;
+    std::vector<uint32> Scrolls;
 };
 
 std::unordered_set<uint64> ProcessedCreatures;
@@ -96,11 +102,13 @@ bool PassesCommonRewardRules(uint32 entry, ItemTemplate const& item)
 
 bool PassesStockAuxiliaryRules(uint32 entry, ItemTemplate const& item)
 {
-    // Auxiliary drops deliberately use only original WoW rows. Custom items
-    // continue to enter the equipment pool through their normal catalog path.
+    // Auxiliary drops deliberately use only original WoW rows and only sane,
+    // levelled items. This keeps internal/test ammunition and consumables out.
     if (entry >= StockItemEntryLimit)
         return false;
     if (!item.RequiredLevel)
+        return false;
+    if (item.ItemLevel < item.RequiredLevel || item.ItemLevel > item.RequiredLevel + 15)
         return false;
     if (item.AllowableClass != UniversalMask || item.AllowableRace != UniversalMask)
         return false;
@@ -137,9 +145,19 @@ RewardPools BuildControlledPools()
             continue;
 
         if (item.Class == ItemClassProjectile)
-            pools.Ammo.push_back(entry);
-        else if (item.Class == ItemClassConsumable && item.SubClass == ItemSubclassPotion)
-            pools.Potions.push_back(entry);
+        {
+            if (item.SubClass == ItemSubclassArrow)
+                pools.Arrows.push_back(entry);
+            else if (item.SubClass == ItemSubclassBullet)
+                pools.Bullets.push_back(entry);
+        }
+        else if (item.Class == ItemClassConsumable)
+        {
+            if (item.SubClass == ItemSubclassPotion)
+                pools.Potions.push_back(entry);
+            else if (item.SubClass == ItemSubclassScroll)
+                pools.Scrolls.push_back(entry);
+        }
     }
     return pools;
 }
@@ -153,12 +171,6 @@ uint32 SelectClosestFromPool(std::vector<uint32> const& candidates, uint8 reward
     uint32 bestDistance = UINT32_MAX;
     std::vector<uint32> closest;
 
-    // Choose uniformly from every valid item at the nearest RequiredLevel.
-    // The old implementation sorted ties by entry and then considered only the
-    // first five rows. Stock items have much smaller IDs than our 911xxx range,
-    // so a dense stock level (notably low-level daggers) could make the entire
-    // generated Gauntlet catalog practically unreachable even though it passed
-    // every reward filter.
     for (uint32 entry : candidates)
     {
         if (usedEntries.find(entry) != usedEntries.end())
@@ -197,7 +209,7 @@ uint32 SelectUsableAuxiliaryFromPool(std::vector<uint32> const& candidates, uint
     for (uint32 entry : candidates)
     {
         ItemTemplate const* item = sObjectMgr->GetItemTemplate(entry);
-        if (!item || item->RequiredLevel > rewardLevel)
+        if (!item || !item->RequiredLevel || item->RequiredLevel > rewardLevel)
             continue;
 
         uint32 distance = rewardLevel - item->RequiredLevel;
@@ -226,10 +238,26 @@ void AddLootItem(Loot& loot, uint32 itemEntry, uint8 minCount = 1, uint8 maxCoun
 
 void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
 {
+    // Independent 5% ammunition roll. Arrows are the normal result; bullets are
+    // intentionally rare within that successful ammunition roll.
     if (urand(1, 100) <= AmmoDropChance)
-        AddLootItem(loot, SelectUsableAuxiliaryFromPool(pools.Ammo, rewardLevel), 40, 100);
-    if (urand(1, 100) <= PotionDropChance)
-        AddLootItem(loot, SelectUsableAuxiliaryFromPool(pools.Potions, rewardLevel), 1, 2);
+    {
+        std::vector<uint32> const& ammoPool =
+            (urand(1, 100) <= BulletWithinAmmoChance && !pools.Bullets.empty()) ? pools.Bullets : pools.Arrows;
+        AddLootItem(loot, SelectUsableAuxiliaryFromPool(ammoPool, rewardLevel), 40, 100);
+    }
+
+    // Independent 5% consumable roll. A success gives either a potion or scroll.
+    if (urand(1, 100) <= ConsumableDropChance)
+    {
+        bool choosePotion = urand(0, 1) == 0;
+        std::vector<uint32> const& primary = choosePotion ? pools.Potions : pools.Scrolls;
+        std::vector<uint32> const& fallback = choosePotion ? pools.Scrolls : pools.Potions;
+        uint32 itemEntry = SelectUsableAuxiliaryFromPool(primary, rewardLevel);
+        if (!itemEntry)
+            itemEntry = SelectUsableAuxiliaryFromPool(fallback, rewardLevel);
+        AddLootItem(loot, itemEntry, 1, 2);
+    }
 }
 
 bool GetRewardContext(Map* map, uint32& survivorCount, uint8& rewardLevel)
