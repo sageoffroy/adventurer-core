@@ -53,6 +53,8 @@ def gauntlet_mapping(core_dir: Path) -> dict[int, int]:
 
 def build(args) -> None:
     core = args.core_dir.expanduser().resolve()
+    clean_dbc = args.dbc_src.expanduser().resolve()
+    clean_item_dbc = clean_dbc / adventurer_apply.ITEM_DBC
     spell_ranks = core / "data" / "sql" / "base" / "db_world" / "spell_ranks.sql"
     icons, assigned = spelldraft_v3_icons.install_wrappers(
         args.icon_pack_dir.expanduser().resolve(),
@@ -67,7 +69,10 @@ def build(args) -> None:
 
         item_path = work / adventurer_apply.ITEM_DBC
         before_item = item_path.read_bytes()
-        patch_gauntlet_items(item_path, mapping)
+        # Gauntlet SQL is generated from the pristine Item.dbc donors. Clone the
+        # custom client/server rows from that same pristine file, not from the
+        # already transformed work copy, so DB and DBC chassis cannot diverge.
+        patch_gauntlet_items(item_path, mapping, clean_item_dbc)
         changed[adventurer_apply.ITEM_DBC] = (
             item_path.read_bytes() != before_item
             or changed.get(adventurer_apply.ITEM_DBC, False)
@@ -86,7 +91,7 @@ def build(args) -> None:
 
     with tempfile.TemporaryDirectory(prefix="adventurer-client-bundle-") as tmp_name:
         build_dir = Path(tmp_name)
-        client.build_patch(args.dbc_src.expanduser().resolve(), build_dir, args.locale)
+        client.build_patch(clean_dbc, build_dir, args.locale)
         client.install_server_dbcs(build_dir, args.server_data_dir.expanduser().resolve() / "dbc")
         client.install_patch(args.client_dir.expanduser().resolve(), build_dir, args.locale)
 
