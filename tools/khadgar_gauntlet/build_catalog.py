@@ -13,10 +13,10 @@ HEADERS = [
 SET_HEADERS = ["enabled","set_key","name","pieces_required","bonus_type","value","spell_id","description"]
 
 SOURCES = {
-    "sword1h":25, "sword2h":8178, "dagger":2092, "bow":2504, "cloak":1372,
+    "sword1h":25, "sword2h":4939, "dagger":4947, "bow":4763, "crossbow":27401, "staff":9514, "cloak":1372,
     "leather_chest":85, "mail_chest":2392, "leather_gloves":2125, "mail_gloves":2397,
     "cloth_gloves":2119, "shield":2133, "cloth_belt":3599, "leather_belt":2122,
-    "mail_belt":2393, "mace2h":1195, "rare_dagger":1917, "mace1h":36, "axe1h":37,
+    "mail_belt":2393, "mace2h":1195, "rare_dagger":1917, "mace1h":4948, "axe1h":37,
 }
 
 PIECE_NAMES = {
@@ -24,6 +24,7 @@ PIECE_NAMES = {
     "mail_chest":"Coselete", "mail_gloves":"Guanteletes", "mail_belt":"Cinturon",
     "leather_chest":"Jubon", "leather_gloves":"Guantes", "leather_belt":"Cinturon",
     "cloth_gloves":"Guantes", "cloth_belt":"Faja", "cloak":"Capa", "dagger":"Daga", "rare_dagger":"Daga", "bow":"Arco",
+    "crossbow":"Ballesta", "staff":"Baston",
 }
 
 SETS = [
@@ -61,6 +62,18 @@ SPECIAL_TYPES = [
 ]
 PREFIXES = ["Errante","Ceniza","Aurora","Cuervo","Bruma","Grifo","Tormenta","Roble","Lobo","Fauce","Estrella","Runas","Hierro","Marfil","Obsidiana","Vigilia","Abismo","Relampago","Escarcha","Fenix"]
 SUFFIXES = ["del Camino","de las Ruinas","de la Frontera","del Juramento","del Viajero","de la Noche","del Alba","del Bastion","del Exilio","del Horizonte"]
+
+# These six entries are the first custom fillers we intentionally expose to the
+# live reward selector. Their stock sources are already known-good visual rows
+# used elsewhere by Adventurer, so they also give us a clean icon/display test.
+EARLY_BLUE_ITEMS = [
+    ("mace1h", 3, 8, "Maza Errante del Camino", "melee", {"strength":1, "stamina":1}),
+    ("sword2h", 3, 9, "Mandoble Ceniza del Camino", "2h", {"strength":2}),
+    ("dagger", 4, 10, "Daga Aurora del Camino", "melee", {"agility":2}),
+    ("staff", 4, 11, "Baston Cuervo del Camino", "caster", {"intellect":2, "spirit":1}),
+    ("bow", 5, 11, "Arco Bruma del Camino", "ranged", {"agility":2, "stamina":1}),
+    ("crossbow", 5, 12, "Ballesta Grifo del Camino", "ranged", {"agility":2, "stamina":1}),
+]
 
 
 def blank_row() -> dict[str, str]:
@@ -117,6 +130,36 @@ def apply_chassis_values(row: dict[str, str], item_type: str, level: int, qualit
         row["dmg_min1"], row["dmg_max1"], row["delay"] = f"{base:.1f}", f"{base * 1.5:.1f}", "2600"
 
 
+def apply_curated_blue_weapon_values(row: dict[str, str], item_type: str, item_level: int, stats: dict[str, int]) -> None:
+    # Classic low-level baseline: one-handed green DPS ~= 0.6 * iLvl - 0.4.
+    # Rare quality adds ~10.5%; two-hand and ranged families use their classic
+    # family multipliers. Speed changes hit size, not the target DPS.
+    dps = max(0.1, 0.6 * item_level - 0.4) * 1.105
+    if item_type in {"sword2h", "mace2h", "staff"}:
+        dps *= 1.305
+    elif item_type in {"bow", "crossbow"}:
+        dps *= 1.275
+
+    delays = {
+        "mace1h": 2400,
+        "sword2h": 2700,
+        "dagger": 1600,
+        "staff": 2900,
+        "bow": 2700,
+        "crossbow": 2800,
+    }
+    delay = delays[item_type]
+    average_hit = dps * delay / 1000.0
+    row["dmg_min1"] = f"{average_hit * 0.70:.1f}"
+    row["dmg_max1"] = f"{average_hit * 1.30:.1f}"
+    row["delay"] = str(delay)
+
+    for column in ("strength", "agility", "stamina", "intellect", "spirit", "attack_power", "spell_power", "hit_rating", "crit_rating", "haste_rating"):
+        row[column] = ""
+    for stat, value in stats.items():
+        row[stat] = str(value)
+
+
 def make_row(entry: int, item_type: str, level: int, quality: str, name: str, archetype: str, description: str, set_key: str = "") -> dict[str, str]:
     row = blank_row()
     row.update(
@@ -152,12 +195,23 @@ def build_catalog() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
             rows.append(make_row(entry, item_type, level, "blue", f"{PIECE_NAMES[item_type]} de {name}", archetype, set_descriptions[key], key))
             entry += 1
 
-    # 130 regular blue discovery items retain broad progression. The first two
-    # explicitly guarantee level-3 one-handed mace and axe availability.
+    # 130 regular blue discovery items retain broad progression. The first six
+    # are deliberately curated low-level fillers and are the only custom items
+    # currently allowed into live loot selection.
     level_cycle = (LEVELS * 10)[:130]
     for index in range(130):
-        item_type = "mace1h" if index == 0 else ("axe1h" if index == 1 else NONSET_TYPES[index % len(NONSET_TYPES)])
-        level = 3 if index < 2 else level_cycle[index]
+        if index < len(EARLY_BLUE_ITEMS):
+            item_type, level, item_level, name, archetype, stats = EARLY_BLUE_ITEMS[index]
+            row = make_row(entry, item_type, level, "blue", name, archetype,
+                "Botin excepcional de las expediciones de Khadgar.")
+            row["item_level"] = str(item_level)
+            apply_curated_blue_weapon_values(row, item_type, item_level, stats)
+            rows.append(row)
+            entry += 1
+            continue
+
+        item_type = NONSET_TYPES[index % len(NONSET_TYPES)]
+        level = level_cycle[index]
         archetype = "ranged" if item_type == "bow" else ("caster" if item_type in {"cloth_gloves", "cloth_belt"} else "melee")
         rows.append(make_row(entry, item_type, level, "blue",
             f"{PIECE_NAMES[item_type]} {PREFIXES[index % len(PREFIXES)]} {SUFFIXES[(index // len(PREFIXES)) % len(SUFFIXES)]}",
@@ -184,9 +238,9 @@ def build_catalog() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
         raise RuntimeError(f"rarity invariant failed: {counts}")
     if any(int(row["required_level"]) > 15 for row in rows if row["quality"] in {"purple", "legendary"}):
         raise RuntimeError("epic/legendary early pool exceeds level 15")
-    for required_type in ("mace1h", "axe1h"):
-        if not any(row["required_level"] == "3" and row["source_entry"] == str(SOURCES[required_type]) for row in rows):
-            raise RuntimeError(f"missing level 3 {required_type} reward")
+    for required_level in (3, 4, 5):
+        if sum(int(row["required_level"]) == required_level and row["quality"] == "blue" for row in rows) < 2:
+            raise RuntimeError(f"missing curated level {required_level} blue rewards")
     return rows, bonuses
 
 
@@ -200,7 +254,7 @@ def write_csv(path: Path, headers: list[str], rows: list[dict[str, str]]) -> Non
 def main() -> int:
     parser = argparse.ArgumentParser(); parser.add_argument("--items", required=True, type=Path); parser.add_argument("--sets", required=True, type=Path)
     args = parser.parse_args(); items, bonuses = build_catalog(); write_csv(args.items, HEADERS, items); write_csv(args.sets, SET_HEADERS, bonuses)
-    print("Generated controlled Gauntlet catalog: 300 items (230 blue, 50 epic, 20 legendary), 100 set pieces, 20 sets. Special epic/legendary pool: levels 3-15.")
+    print("Generated controlled Gauntlet catalog: 300 items (230 blue, 50 epic, 20 legendary), 100 set pieces, 20 sets. Six curated blue fillers cover required levels 3-5.")
     return 0
 
 if __name__ == "__main__":
