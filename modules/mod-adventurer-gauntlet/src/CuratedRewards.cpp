@@ -9,7 +9,6 @@
 #include "ScriptMgr.h"
 #include "SharedDefines.h"
 
-#include <algorithm>
 #include <array>
 #include <unordered_set>
 #include <vector>
@@ -18,7 +17,6 @@ namespace
 {
 constexpr uint32 RagefireMapId = 389;
 constexpr uint32 UniversalMask = 0xFFFFFFFFu;
-constexpr uint32 ClosestCandidateCount = 5;
 
 enum RewardPool : uint8
 {
@@ -111,29 +109,39 @@ uint32 SelectClosestFromPool(std::vector<uint32> const& candidates, uint8 reward
     if (candidates.empty())
         return 0;
 
-    std::vector<uint32> ordered;
-    ordered.reserve(candidates.size());
+    uint32 bestDistance = UINT32_MAX;
+    std::vector<uint32> closest;
+
+    // Choose uniformly from every valid item at the nearest RequiredLevel.
+    // The old implementation sorted ties by entry and then considered only the
+    // first five rows. Stock items have much smaller IDs than our 911xxx range,
+    // so a dense stock level (notably low-level daggers) could make the entire
+    // generated Gauntlet catalog practically unreachable even though it passed
+    // every reward filter.
     for (uint32 entry : candidates)
-        if (usedEntries.find(entry) == usedEntries.end())
-            ordered.push_back(entry);
-    if (ordered.empty())
+    {
+        if (usedEntries.find(entry) != usedEntries.end())
+            continue;
+
+        ItemTemplate const* item = sObjectMgr->GetItemTemplate(entry);
+        if (!item)
+            continue;
+
+        uint32 distance = LevelDistance(item->RequiredLevel, rewardLevel);
+        if (distance < bestDistance)
+        {
+            bestDistance = distance;
+            closest.clear();
+            closest.push_back(entry);
+        }
+        else if (distance == bestDistance)
+            closest.push_back(entry);
+    }
+
+    if (closest.empty())
         return 0;
 
-    std::sort(ordered.begin(), ordered.end(), [rewardLevel](uint32 leftEntry, uint32 rightEntry)
-    {
-        ItemTemplate const* left = sObjectMgr->GetItemTemplate(leftEntry);
-        ItemTemplate const* right = sObjectMgr->GetItemTemplate(rightEntry);
-        if (!left || !right)
-            return leftEntry < rightEntry;
-        uint32 leftDistance = LevelDistance(left->RequiredLevel, rewardLevel);
-        uint32 rightDistance = LevelDistance(right->RequiredLevel, rewardLevel);
-        if (leftDistance != rightDistance)
-            return leftDistance < rightDistance;
-        return leftEntry < rightEntry;
-    });
-
-    uint32 closestCount = std::min<uint32>(ClosestCandidateCount, static_cast<uint32>(ordered.size()));
-    uint32 entry = ordered[urand(0, closestCount - 1)];
+    uint32 entry = closest[urand(0, static_cast<uint32>(closest.size() - 1))];
     usedEntries.insert(entry);
     return entry;
 }
