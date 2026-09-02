@@ -8,7 +8,8 @@ from pathlib import Path
 HEADERS = [
     "enabled","entry","source_entry","display_id","set_key","name","quality","required_level","item_level",
     "strength","agility","stamina","intellect","spirit","attack_power","spell_power","hit_rating","crit_rating",
-    "haste_rating","armor","block","dmg_min1","dmg_max1","delay","equip_spell1","equip_spell2","description",
+    "haste_rating","armor","block","dmg_min1","dmg_max1","delay",
+    "equip_spell1","equip_spell2","proc_spell1","proc_ppm1","description",
 ]
 SET_HEADERS = ["enabled","set_key","name","pieces_required","bonus_type","value","spell_id","description"]
 
@@ -55,12 +56,14 @@ SETS = [
 LEVELS = [3,4,5,8,12,16,20,25,30,35,40,45,50,55,60]
 SPECIAL_LEVELS = [3,4,5,8,12,15]
 LOW_LEVELS = [5,6,7,8,9,10]
-LOW_LEVEL_COUNTS = {"green": 60, "blue": 25, "purple": 5}
+LOW_LEVEL_COUNTS = {"green":60, "blue":25, "purple":5}
+PROC_COUNTS = {"blue":40, "purple":10}
 
 NONSET_TYPES = [
     "sword1h","sword2h","mace1h","mace2h","axe1h","dagger","rare_dagger","staff","bow","crossbow","shield","cloak",
     "leather_chest","leather_gloves","leather_belt","mail_chest","mail_gloves","mail_belt","cloth_gloves","cloth_belt",
 ]
+PROC_WEAPON_TYPES = ["sword1h","sword2h","mace1h","mace2h","axe1h","dagger","rare_dagger","staff","bow","crossbow"]
 SPECIAL_TYPES = NONSET_TYPES
 PREFIXES = ["Errante","Ceniza","Aurora","Cuervo","Bruma","Grifo","Tormenta","Roble","Lobo","Fauce","Estrella","Runas","Hierro","Marfil","Obsidiana","Vigilia","Abismo","Relampago","Escarcha","Fenix"]
 SUFFIXES = ["del Camino","de las Ruinas","de la Frontera","del Juramento","del Viajero","de la Noche","del Alba","del Bastion","del Exilio","del Horizonte"]
@@ -73,8 +76,8 @@ QUALITY_ILVL_BAND = {
     "purple": (5, 9),
     "legendary": (7, 11),
 }
-QUALITY_DPS = {"green": 1.00, "blue": 1.105, "purple": 1.215, "legendary": 1.35}
-QUALITY_STATS = {"green": 0.88, "blue": 1.00, "purple": 1.18, "legendary": 1.35}
+QUALITY_DPS = {"green":1.00, "blue":1.105, "purple":1.215, "legendary":1.35}
+QUALITY_STATS = {"green":0.88, "blue":1.00, "purple":1.18, "legendary":1.35}
 
 WEAPON_SPEEDS = {
     "sword1h": (2200,2400,2600), "mace1h": (2200,2400,2600), "axe1h": (2200,2400,2600),
@@ -82,6 +85,17 @@ WEAPON_SPEEDS = {
     "sword2h": (2800,3000,3200), "mace2h": (3000,3200,3400), "staff": (2800,3000,3200),
     "bow": (2400,2600,2800), "crossbow": (2600,2800,3000),
 }
+
+# Native rank-1 attack spells are intentionally used as triggered effects:
+# they already exist in the clean 3.3.5a Spell.dbc, have clear visuals, and
+# keep low-level proc damage modest without introducing another custom-spell path.
+PROC_THEMES = [
+    ("Brasas", 133, "una pequena bola de fuego"),
+    ("Escarcha", 116, "una descarga de escarcha"),
+    ("Sombras", 686, "una descarga de las Sombras"),
+    ("Luz", 585, "una punicion de Luz Sagrada"),
+    ("Raices", 5176, "una descarga de colera natural"),
+]
 
 
 def blank_row() -> dict[str, str]:
@@ -212,6 +226,33 @@ def append_low_level_pool(rows: list[dict[str, str]], entry: int) -> int:
     return entry
 
 
+def append_proc_pool(rows: list[dict[str, str]], entry: int) -> int:
+    for quality in ("blue", "purple"):
+        count = PROC_COUNTS[quality]
+        for index in range(count):
+            level = LOW_LEVELS[index % len(LOW_LEVELS)]
+            item_type = PROC_WEAPON_TYPES[(index * 3 + (1 if quality == "purple" else 0)) % len(PROC_WEAPON_TYPES)]
+            theme_name, spell_id, effect_text = PROC_THEMES[(index + level + (2 if quality == "purple" else 0)) % len(PROC_THEMES)]
+            if quality == "purple":
+                name = f"{PIECE_NAMES[item_type]} del Pacto de {theme_name}"
+                ppm = 2.0
+                description = f"Golpear puede liberar {effect_text}. Proc fuerte de {ppm:.1f} PPM."
+            else:
+                name = f"{PIECE_NAMES[item_type]} Imbuido de {theme_name}"
+                ppm = 1.5
+                description = f"Golpear puede liberar {effect_text}. Proc de {ppm:.1f} PPM."
+
+            row = make_row(
+                entry, item_type, level, quality, name,
+                archetype_for(item_type), description,
+            )
+            row["proc_spell1"] = str(spell_id)
+            row["proc_ppm1"] = f"{ppm:.1f}"
+            rows.append(row)
+            entry += 1
+    return entry
+
+
 def build_catalog() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     rows: list[dict[str, str]] = []
     bonuses: list[dict[str, str]] = []
@@ -258,15 +299,20 @@ def build_catalog() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
 
     if entry != 911400:
         raise RuntimeError(f"legacy catalog range moved unexpectedly: next entry is {entry}")
+
     entry = append_low_level_pool(rows, entry)
+    if entry != 911940:
+        raise RuntimeError(f"low-level catalog range moved unexpectedly: next entry is {entry}")
+
+    entry = append_proc_pool(rows, entry)
 
     counts = {q: sum(row["quality"] == q for row in rows) for q in ("green","blue","purple","legendary")}
-    expected_counts = {"green":360, "blue":380, "purple":80, "legendary":20}
-    if len(rows) != 840 or sum(bool(row["set_key"]) for row in rows) != 100:
+    expected_counts = {"green":360, "blue":420, "purple":90, "legendary":20}
+    if len(rows) != 890 or sum(bool(row["set_key"]) for row in rows) != 100:
         raise RuntimeError("catalog invariant failed")
     if counts != expected_counts:
         raise RuntimeError(f"rarity invariant failed: {counts}")
-    if entry != 911940:
+    if entry != 911990:
         raise RuntimeError(f"catalog end invariant failed: next entry is {entry}")
 
     for row in rows:
@@ -278,14 +324,17 @@ def build_catalog() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
 
     for level in LOW_LEVELS:
         level_counts = {
-            q: sum(row["required_level"] == str(level) and row["quality"] == q and int(row["entry"]) >= 911400 for row in rows)
+            q: sum(row["required_level"] == str(level) and row["quality"] == q and 911400 <= int(row["entry"]) < 911940 for row in rows)
             for q in ("green","blue","purple")
         }
         if level_counts != LOW_LEVEL_COUNTS:
             raise RuntimeError(f"low-level rarity invariant failed for level {level}: {level_counts}")
 
-    if not any(row["required_level"] == "4" and row["quality"] == "blue" for row in rows):
-        raise RuntimeError("missing level 4 blue rewards")
+    proc_rows = [row for row in rows if row["proc_spell1"]]
+    proc_counts = {q: sum(row["quality"] == q for row in proc_rows) for q in ("blue","purple")}
+    if proc_counts != PROC_COUNTS or len(proc_rows) != 50:
+        raise RuntimeError(f"proc pool invariant failed: {proc_counts}")
+
     return rows, bonuses
 
 
@@ -305,7 +354,10 @@ def main() -> int:
     items, bonuses = build_catalog()
     write_csv(args.items, HEADERS, items)
     write_csv(args.sets, SET_HEADERS, bonuses)
-    print("Generated unified Gauntlet catalog: 840 items; levels 5-10 each add 60 green, 25 blue and 5 purple rewards.")
+    print(
+        "Generated unified Gauntlet catalog: "
+        f"{len(items)} items, including 50 low-level proc weapons."
+    )
     return 0
 
 
