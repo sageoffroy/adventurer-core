@@ -41,12 +41,12 @@ def gauntlet_mapping(core_dir: Path) -> dict[int, int]:
                 continue
             mapping[int(row["entry"])] = int(row["source_entry"])
 
-    expected = set(range(911100, 911400))
+    expected = set(range(911100, 911940))
     if set(mapping) != expected:
         missing = sorted(expected - set(mapping))
         extra = sorted(set(mapping) - expected)
         raise RuntimeError(
-            "Gauntlet catalog must own exactly 911100-911399; "
+            "Gauntlet catalog must own exactly 911100-911939; "
             f"missing={missing[:10]} extra={extra[:10]}"
         )
     return mapping
@@ -119,7 +119,7 @@ def build(args) -> None:
         )
 
     print(
-        f"Final client/server bundle installed in one pass: 300 Gauntlet items, "
+        f"Final client/server bundle installed in one pass: {len(mapping)} Gauntlet items, "
         f"Gauntlet spells and {len(icons)} SpellDraft v3 icon textures. "
         f"Server DBCs: {runtime_dbc}."
     )
