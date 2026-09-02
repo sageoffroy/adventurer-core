@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -55,6 +56,13 @@ def build(args) -> None:
     core = args.core_dir.expanduser().resolve()
     clean_dbc = args.dbc_src.expanduser().resolve()
     clean_item_dbc = clean_dbc / adventurer_apply.ITEM_DBC
+    server_data = args.server_data_dir.expanduser().resolve()
+    runtime_dbc = server_data.parent / "bin" / "dbc"
+    stale_data_dbc = server_data / "dbc"
+
+    if not runtime_dbc.is_dir():
+        raise RuntimeError(f"worldserver runtime DBC directory not found: {runtime_dbc}")
+
     spell_ranks = core / "data" / "sql" / "base" / "db_world" / "spell_ranks.sql"
     icons, assigned = spelldraft_v3_icons.install_wrappers(
         args.icon_pack_dir.expanduser().resolve(),
@@ -92,8 +100,15 @@ def build(args) -> None:
     with tempfile.TemporaryDirectory(prefix="adventurer-client-bundle-") as tmp_name:
         build_dir = Path(tmp_name)
         client.build_patch(clean_dbc, build_dir, args.locale)
-        client.install_server_dbcs(build_dir, args.server_data_dir.expanduser().resolve() / "dbc")
+        client.install_server_dbcs(build_dir, runtime_dbc)
         client.install_patch(args.client_dir.expanduser().resolve(), build_dir, args.locale)
+
+    # A previous bundle bug installed a second DBC tree under env/dist/data/dbc,
+    # while worldserver actually runs from env/dist/bin with DataDir="./" and
+    # therefore consumes env/dist/bin/dbc. Remove that stale duplicate so there
+    # is only one authoritative server DBC location.
+    if stale_data_dbc != runtime_dbc and stale_data_dbc.is_dir():
+        shutil.rmtree(stale_data_dbc)
 
     lone_key = spelldraft_v3_icons.normalized_path(spelldraft_v3_icons.LONE_WOLF_DBC_PATH)
     lone_id = assigned.get(lone_key)
@@ -105,7 +120,8 @@ def build(args) -> None:
 
     print(
         f"Final client/server bundle installed in one pass: 300 Gauntlet items, "
-        f"Gauntlet spells and {len(icons)} SpellDraft v3 icon textures."
+        f"Gauntlet spells and {len(icons)} SpellDraft v3 icon textures. "
+        f"Server DBCs: {runtime_dbc}."
     )
 
 
