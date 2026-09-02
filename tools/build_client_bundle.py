@@ -9,24 +9,37 @@ before the final DBCs and MPQs are installed.
 from __future__ import annotations
 
 import argparse
+import csv
 import tempfile
 from pathlib import Path
 
 import adventurer_apply  # noqa: F401
 import client
 import spelldraft_v3_icons
-from khadgar_gauntlet.build_catalog import build_catalog
 from khadgar_gauntlet.patch_item_dbc import patch as patch_gauntlet_items
 from khadgar_gauntlet.patch_spell_dbc import patch as patch_gauntlet_spells
 
 
-def gauntlet_mapping() -> dict[int, int]:
-    rows, _bonuses = build_catalog()
-    mapping = {
-        int(row["entry"]): int(row["source_entry"])
-        for row in rows
-        if (row.get("enabled") or "").strip().lower() in {"1", "true", "yes", "on"}
-    }
+def gauntlet_mapping(core_dir: Path) -> dict[int, int]:
+    # stage.py generates this catalog immediately before the client/server bundle.
+    # Read that exact artifact instead of regenerating the catalog independently:
+    # SQL, server Item.dbc and client Item.dbc must always describe the same rows.
+    catalog = (
+        core_dir.expanduser().resolve()
+        / "modules" / "mod-adventurer-gauntlet" / "data" / "items" / "early_items.csv"
+    )
+    if not catalog.is_file():
+        raise RuntimeError(f"staged Gauntlet item catalog not found: {catalog}")
+
+    mapping: dict[int, int] = {}
+    with catalog.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter=";")
+        for row in reader:
+            enabled = (row.get("enabled") or "").strip().lower()
+            if enabled not in {"1", "true", "yes", "on"}:
+                continue
+            mapping[int(row["entry"])] = int(row["source_entry"])
+
     expected = set(range(911100, 911400))
     if set(mapping) != expected:
         missing = sorted(expected - set(mapping))
@@ -46,7 +59,7 @@ def build(args) -> None:
         spell_ranks,
     )
 
-    mapping = gauntlet_mapping()
+    mapping = gauntlet_mapping(core)
     original_patch_dbc_copy = client.patch_dbc_copy
 
     def patch_dbc_copy(source: Path, work: Path):
