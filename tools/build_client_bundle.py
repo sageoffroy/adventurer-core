@@ -22,9 +22,6 @@ from khadgar_gauntlet.patch_spell_dbc import patch as patch_gauntlet_spells
 
 
 def gauntlet_mapping(core_dir: Path) -> dict[int, int]:
-    # stage.py generates this catalog immediately before the client/server bundle.
-    # Read that exact artifact instead of regenerating the catalog independently:
-    # SQL, server Item.dbc and client Item.dbc must always describe the same rows.
     catalog = (
         core_dir.expanduser().resolve()
         / "modules" / "mod-adventurer-gauntlet" / "data" / "items" / "early_items.csv"
@@ -41,13 +38,17 @@ def gauntlet_mapping(core_dir: Path) -> dict[int, int]:
                 continue
             mapping[int(row["entry"])] = int(row["source_entry"])
 
-    expected = set(range(911100, 911940))
+    if not mapping:
+        raise RuntimeError("Gauntlet item catalog has no enabled rows")
+    first, last = min(mapping), max(mapping)
+    if first != 911100:
+        raise RuntimeError(f"Gauntlet catalog must start at 911100, found {first}")
+    expected = set(range(first, last + 1))
     if set(mapping) != expected:
         missing = sorted(expected - set(mapping))
-        extra = sorted(set(mapping) - expected)
         raise RuntimeError(
-            "Gauntlet catalog must own exactly 911100-911939; "
-            f"missing={missing[:10]} extra={extra[:10]}"
+            "Gauntlet catalog must be one contiguous owned range; "
+            f"missing={missing[:10]}"
         )
     return mapping
 
@@ -77,9 +78,6 @@ def build(args) -> None:
 
         item_path = work / adventurer_apply.ITEM_DBC
         before_item = item_path.read_bytes()
-        # Gauntlet SQL is generated from the pristine Item.dbc donors. Clone the
-        # custom client/server rows from that same pristine file, not from the
-        # already transformed work copy, so DB and DBC chassis cannot diverge.
         patch_gauntlet_items(item_path, mapping, clean_item_dbc)
         changed[adventurer_apply.ITEM_DBC] = (
             item_path.read_bytes() != before_item
@@ -103,10 +101,6 @@ def build(args) -> None:
         client.install_server_dbcs(build_dir, runtime_dbc)
         client.install_patch(args.client_dir.expanduser().resolve(), build_dir, args.locale)
 
-    # A previous bundle bug installed a second DBC tree under env/dist/data/dbc,
-    # while worldserver actually runs from env/dist/bin with DataDir="./" and
-    # therefore consumes env/dist/bin/dbc. Remove that stale duplicate so there
-    # is only one authoritative server DBC location.
     if stale_data_dbc != runtime_dbc and stale_data_dbc.is_dir():
         shutil.rmtree(stale_data_dbc)
 
@@ -118,9 +112,10 @@ def build(args) -> None:
             f"{spelldraft_v3_icons.LONE_WOLF_ICON_ID}, found {lone_id}"
         )
 
+    first, last = min(mapping), max(mapping)
     print(
-        f"Final client/server bundle installed in one pass: {len(mapping)} Gauntlet items, "
-        f"Gauntlet spells and {len(icons)} SpellDraft v3 icon textures. "
+        f"Final client/server bundle installed in one pass: {len(mapping)} Gauntlet items "
+        f"({first}-{last}), Gauntlet spells and {len(icons)} SpellDraft v3 icon textures. "
         f"Server DBCs: {runtime_dbc}."
     )
 
