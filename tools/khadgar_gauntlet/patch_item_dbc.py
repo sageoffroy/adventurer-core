@@ -31,8 +31,13 @@ def load_mapping(path: Path) -> dict[int, int]:
             if not 911000 <= entry <= 911999:
                 raise RuntimeError(f"custom entry outside Gauntlet range: {entry}")
             mapping[entry] = source
-    if len(mapping) != 300:
-        raise RuntimeError(f"expected 300 enabled Gauntlet items, found {len(mapping)}")
+    if not mapping:
+        raise RuntimeError("Gauntlet item catalog has no enabled rows")
+    first, last = min(mapping), max(mapping)
+    expected = set(range(first, last + 1))
+    if set(mapping) != expected:
+        missing = sorted(expected - set(mapping))
+        raise RuntimeError(f"Gauntlet item range must be contiguous; missing={missing[:10]}")
     return mapping
 
 
@@ -98,7 +103,8 @@ def main() -> int:
     args = parser.parse_args()
     mapping = load_mapping(args.catalog)
     changed = patch(args.dbc, mapping, args.donor_dbc)
-    print(f"Gauntlet Item.dbc: {'patched' if changed else 'already current'} ({len(mapping)} custom rows).")
+    first, last = min(mapping), max(mapping)
+    print(f"Gauntlet Item.dbc: {'patched' if changed else 'already current'} ({len(mapping)} custom rows, {first}-{last}).")
     return 0
 
 
