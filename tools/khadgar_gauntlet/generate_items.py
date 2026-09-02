@@ -198,7 +198,13 @@ def main() -> int:
                 raise SystemExit(str(exc)) from exc
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    header = ["-- GENERATED FILE. Do not edit by hand.", f"-- Source: {args.input.name}", ""]
+    header = [
+        "-- GENERATED FILE. Do not edit by hand.",
+        f"-- Source: {args.input.name}",
+        "-- This catalog owns 911100-911399 and replaces that range atomically on re-apply.",
+        "DELETE FROM `item_template` WHERE `entry` BETWEEN 911100 AND 911399;",
+        "",
+    ]
     args.output.write_text("\n".join(header + blocks) + "\n", encoding="utf-8")
     print(f"Generated {enabled_count} Gauntlet item_template rows -> {args.output}")
     return 0
