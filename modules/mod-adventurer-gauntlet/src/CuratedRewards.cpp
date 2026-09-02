@@ -1,6 +1,7 @@
 #include "Creature.h"
 #include "DatabaseEnv.h"
 #include "ItemTemplate.h"
+#include "Log.h"
 #include "LootMgr.h"
 #include "Map.h"
 #include "ObjectMgr.h"
@@ -74,9 +75,6 @@ uint32 LevelDistance(uint32 requiredLevel, uint8 rewardLevel)
 
 bool PassesCommonRewardRules(uint32 entry, ItemTemplate const& item)
 {
-    // 910xxx are fixed Adventurer/vendor/starting items, not Gauntlet rewards.
-    // Keeping them out of the procedural pool also prevents retired legacy
-    // "contrabando" rows left in a development DB from resurfacing as loot.
     if (entry >= AdventurerItemRangeFirst && entry <= AdventurerItemRangeLast)
         return false;
     if (item.Class != ITEM_CLASS_WEAPON && item.Class != ITEM_CLASS_ARMOR)
@@ -99,8 +97,6 @@ bool PassesCommonRewardRules(uint32 entry, ItemTemplate const& item)
 
 bool PassesStockAuxiliaryRules(uint32 entry, ItemTemplate const& item)
 {
-    // Auxiliary drops deliberately use only original WoW rows and only sane,
-    // levelled items. This keeps internal/test ammunition and consumables out.
     if (entry >= StockItemEntryLimit)
         return false;
     if (!item.RequiredLevel)
@@ -134,8 +130,6 @@ RewardPools BuildControlledPools()
                 pools.Items[REWARD_BLUE].push_back(entry);
             else if (item.Quality == ITEM_QUALITY_EPIC)
                 pools.Items[REWARD_EPIC].push_back(entry);
-
-            // Legendary rewards remain disabled until we explicitly enable their drop rate.
         }
 
         if (!PassesStockAuxiliaryRules(entry, item))
@@ -228,14 +222,40 @@ void AddLootItem(Loot& loot, uint32 itemEntry, uint8 minCount = 1, uint8 maxCoun
     loot.AddItem(lootItem);
 }
 
+void LogSelectedItem(char const* label, uint32 entry)
+{
+    ItemTemplate const* item = sObjectMgr->GetItemTemplate(entry);
+    if (!item)
+    {
+        LOG_INFO("module", "[GauntletLoot] {} item={} TEMPLATE_MISSING", label, entry);
+        return;
+    }
+
+    LOG_INFO("module",
+        "[GauntletLoot] {} item={} class={} subclass={} quality={} requiredLevel={} itemLevel={} inventoryType={}",
+        label, entry, item->Class, item->SubClass, item->Quality, item->RequiredLevel, item->ItemLevel, item->InventoryType);
+}
+
 void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
 {
-    // Independent 1% ammunition roll. Only arrows are eligible.
-    if (urand(1, 100) <= AmmoDropChance)
-        AddLootItem(loot, SelectUsableAuxiliaryFromPool(pools.Arrows, rewardLevel), 40, 100);
+    uint32 ammoRoll = urand(1, 100);
+    LOG_INFO("module",
+        "[GauntletLoot] AUX level={} ammoRoll={} ammoChance={} arrowPool={} potionPool={} scrollPool={}",
+        rewardLevel, ammoRoll, AmmoDropChance, pools.Arrows.size(), pools.Potions.size(), pools.Scrolls.size());
 
-    // Independent 5% consumable roll. A success gives either a potion or scroll.
-    if (urand(1, 100) <= ConsumableDropChance)
+    if (ammoRoll <= AmmoDropChance)
+    {
+        uint32 arrowEntry = SelectUsableAuxiliaryFromPool(pools.Arrows, rewardLevel);
+        LOG_INFO("module", "[GauntletLoot] >>> AMMO SUCCESS roll={} selected={}", ammoRoll, arrowEntry);
+        if (arrowEntry)
+            LogSelectedItem("AMMO_SELECTED", arrowEntry);
+        AddLootItem(loot, arrowEntry, 40, 100);
+    }
+
+    uint32 consumableRoll = urand(1, 100);
+    LOG_INFO("module", "[GauntletLoot] AUX consumableRoll={} consumableChance={}", consumableRoll, ConsumableDropChance);
+
+    if (consumableRoll <= ConsumableDropChance)
     {
         bool choosePotion = urand(0, 1) == 0;
         std::vector<uint32> const& primary = choosePotion ? pools.Potions : pools.Scrolls;
@@ -243,6 +263,11 @@ void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
         uint32 itemEntry = SelectUsableAuxiliaryFromPool(primary, rewardLevel);
         if (!itemEntry)
             itemEntry = SelectUsableAuxiliaryFromPool(fallback, rewardLevel);
+
+        LOG_INFO("module", "[GauntletLoot] >>> CONSUMABLE SUCCESS roll={} type={} selected={}",
+            consumableRoll, choosePotion ? "potion" : "scroll", itemEntry);
+        if (itemEntry)
+            LogSelectedItem("CONSUMABLE_SELECTED", itemEntry);
         AddLootItem(loot, itemEntry, 1, 2);
     }
 }
@@ -339,8 +364,11 @@ bool AddCommonMobTestDrop(Creature* creature)
     RewardPools pools = BuildControlledPools();
     bool added = false;
 
-    // Temporary test rates: 20% green, 4% blue, 1% epic, 75% no extra equipment.
     uint32 roll = urand(1, 10000);
+    LOG_INFO("module",
+        "[GauntletLoot] COMMON entry={} guid={} instance={} rewardLevel={} survivors={} equipRoll={}",
+        creature->GetEntry(), creature->GetGUID().GetCounter(), creature->GetInstanceId(), rewardLevel, survivorCount, roll);
+
     RewardPool pool;
     if (roll <= 2000)
         pool = REWARD_GREEN;
@@ -355,16 +383,23 @@ bool AddCommonMobTestDrop(Creature* creature)
     {
         std::unordered_set<uint32> usedEntries;
         uint32 itemEntry = SelectClosestFromPool(pools.Items[pool], rewardLevel, usedEntries);
+        LOG_INFO("module", "[GauntletLoot] EQUIPMENT pool={} selected={}", static_cast<uint32>(pool), itemEntry);
         if (itemEntry)
         {
+            LogSelectedItem("EQUIPMENT_SELECTED", itemEntry);
             AddLootItem(creature->loot, itemEntry);
             added = true;
         }
     }
+    else
+        LOG_INFO("module", "[GauntletLoot] EQUIPMENT no drop");
 
     size_t beforeAuxiliary = creature->loot.items.size();
     AddAuxiliaryDrops(creature->loot, pools, rewardLevel);
     added = added || creature->loot.items.size() > beforeAuxiliary;
+
+    LOG_INFO("module", "[GauntletLoot] COMMON done entry={} guid={} lootItemsBeforeAux={} lootItemsAfterAux={} added={}",
+        creature->GetEntry(), creature->GetGUID().GetCounter(), beforeAuxiliary, creature->loot.items.size(), added);
 
     if (added)
         creature->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
@@ -375,24 +410,34 @@ void ProcessCreatureAfterDeath(Creature* creature)
 {
     if (!creature || creature->IsAlive() || creature->GetMapId() != RagefireMapId)
         return;
+
     uint64 key = GetCreatureKey(creature);
     if (!key || ProcessedCreatures.find(key) != ProcessedCreatures.end())
         return;
     ProcessedCreatures.insert(key);
 
     uint8 rewardProfile = GetRewardProfile(creature->GetEntry());
+    LOG_INFO("module",
+        "[GauntletLoot] DEATH entry={} guid={} instance={} key={} profile={} level={}",
+        creature->GetEntry(), creature->GetGUID().GetCounter(), creature->GetInstanceId(), key,
+        static_cast<uint32>(rewardProfile), creature->GetLevel());
+
     if (rewardProfile == REWARD_PROFILE_FINAL)
     {
+        LOG_INFO("module", "[GauntletLoot] ROUTE final boss");
         if (FillFinalBossLoot(creature->loot, creature->GetMap()))
             creature->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
         return;
     }
     if (rewardProfile == REWARD_PROFILE_CHECKPOINT)
     {
+        LOG_INFO("module", "[GauntletLoot] ROUTE checkpoint");
         if (FillCheckpointLoot(creature->loot, creature->GetMap()))
             creature->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
         return;
     }
+
+    LOG_INFO("module", "[GauntletLoot] ROUTE common mob");
     AddCommonMobTestDrop(creature);
 }
 }
