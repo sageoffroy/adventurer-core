@@ -54,6 +54,9 @@ SETS = [
 
 LEVELS = [3,4,5,8,12,16,20,25,30,35,40,45,50,55,60]
 SPECIAL_LEVELS = [3,4,5,8,12,15]
+LOW_LEVELS = [5,6,7,8,9,10]
+LOW_LEVEL_COUNTS = {"green": 60, "blue": 25, "purple": 5}
+
 NONSET_TYPES = [
     "sword1h","sword2h","mace1h","mace2h","axe1h","dagger","rare_dagger","staff","bow","crossbow","shield","cloak",
     "leather_chest","leather_gloves","leather_belt","mail_chest","mail_gloves","mail_belt","cloth_gloves","cloth_belt",
@@ -61,14 +64,17 @@ NONSET_TYPES = [
 SPECIAL_TYPES = NONSET_TYPES
 PREFIXES = ["Errante","Ceniza","Aurora","Cuervo","Bruma","Grifo","Tormenta","Roble","Lobo","Fauce","Estrella","Runas","Hierro","Marfil","Obsidiana","Vigilia","Abismo","Relampago","Escarcha","Fenix"]
 SUFFIXES = ["del Camino","de las Ruinas","de la Frontera","del Juramento","del Viajero","de la Noche","del Alba","del Bastion","del Exilio","del Horizonte"]
+LOW_PREFIXES = ["Polvoriento","Quebrado","Curtido","Errante","Ahumado","Sombrio","Agrietado","Viejo","Cobrizo","Musgoso","Ceniza","Bruma","Lobo","Cuervo","Roble","Hierro","Aurora","Runa","Fauce","Escarcha","Feral","Nomada","Tiznado","Delgado","Firme","Rugoso","Salvaje","Vigia","Rastro","Peregrino"]
+LOW_SUFFIXES = ["de la Garganta","del Sendero","de la Cantera","del Arroyo","del Campamento","de la Frontera","de las Brasas","del Bosque","de la Cueva","del Exilio","de la Guardia","de la Colina","de la Mina","del Vado","de la Niebla"]
 
 QUALITY_ILVL_BAND = {
+    "green": (4, 6),
     "blue": (5, 7),
     "purple": (5, 9),
     "legendary": (7, 11),
 }
-QUALITY_DPS = {"blue": 1.105, "purple": 1.215, "legendary": 1.35}
-QUALITY_STATS = {"blue": 1.00, "purple": 1.18, "legendary": 1.35}
+QUALITY_DPS = {"green": 1.00, "blue": 1.105, "purple": 1.215, "legendary": 1.35}
+QUALITY_STATS = {"green": 0.88, "blue": 1.00, "purple": 1.18, "legendary": 1.35}
 
 WEAPON_SPEEDS = {
     "sword1h": (2200,2400,2600), "mace1h": (2200,2400,2600), "axe1h": (2200,2400,2600),
@@ -176,6 +182,36 @@ def make_row(entry: int, item_type: str, required_level: int, quality: str, name
     return row
 
 
+def low_level_name(level: int, quality: str, index: int, item_type: str) -> str:
+    prefix = LOW_PREFIXES[(level * 7 + index * 3) % len(LOW_PREFIXES)]
+    suffix = LOW_SUFFIXES[(level * 5 + index * 2 + (0 if quality == "green" else 3)) % len(LOW_SUFFIXES)]
+    if quality == "purple":
+        titles = ["Reliquia de las Primeras Brasas","Eco del Caminante","Juramento de la Garganta","Memoria del Viejo Reino","Tesoro del Umbral"]
+        return f"{PIECE_NAMES[item_type]} {titles[index % len(titles)]}"
+    return f"{PIECE_NAMES[item_type]} {prefix} {suffix}"
+
+
+def append_low_level_pool(rows: list[dict[str, str]], entry: int) -> int:
+    for level in LOW_LEVELS:
+        for quality in ("green", "blue", "purple"):
+            count = LOW_LEVEL_COUNTS[quality]
+            for index in range(count):
+                if quality == "green":
+                    item_type = NONSET_TYPES[index % len(NONSET_TYPES)]
+                elif quality == "blue":
+                    item_type = NONSET_TYPES[(index * 7 + level) % len(NONSET_TYPES)]
+                else:
+                    item_type = NONSET_TYPES[(index * 11 + level * 3) % len(NONSET_TYPES)]
+                rows.append(make_row(
+                    entry, item_type, level, quality,
+                    low_level_name(level, quality, index, item_type),
+                    archetype_for(item_type),
+                    f"Botin de nivel {level} preparado para las primeras expediciones.",
+                ))
+                entry += 1
+    return entry
+
+
 def build_catalog() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     rows: list[dict[str, str]] = []
     bonuses: list[dict[str, str]] = []
@@ -220,15 +256,34 @@ def build_catalog() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
             archetype_for(item_type), "Reliquia excepcional recuperada en las expediciones de Khadgar."))
         entry += 1
 
-    counts = {q: sum(row["quality"] == q for row in rows) for q in ("blue", "purple", "legendary")}
-    if len(rows) != 300 or sum(bool(row["set_key"]) for row in rows) != 100:
+    if entry != 911400:
+        raise RuntimeError(f"legacy catalog range moved unexpectedly: next entry is {entry}")
+    entry = append_low_level_pool(rows, entry)
+
+    counts = {q: sum(row["quality"] == q for row in rows) for q in ("green","blue","purple","legendary")}
+    expected_counts = {"green":360, "blue":380, "purple":80, "legendary":20}
+    if len(rows) != 840 or sum(bool(row["set_key"]) for row in rows) != 100:
         raise RuntimeError("catalog invariant failed")
-    if counts != {"blue":230, "purple":50, "legendary":20}:
+    if counts != expected_counts:
         raise RuntimeError(f"rarity invariant failed: {counts}")
+    if entry != 911940:
+        raise RuntimeError(f"catalog end invariant failed: next entry is {entry}")
+
     for row in rows:
-        req = int(row["required_level"]); ilvl = int(row["item_level"]); low, high = QUALITY_ILVL_BAND[row["quality"]]
+        req = int(row["required_level"])
+        ilvl = int(row["item_level"])
+        low, high = QUALITY_ILVL_BAND[row["quality"]]
         if not req + low <= ilvl <= req + high:
             raise RuntimeError(f"item-level band invariant failed for {row['entry']}")
+
+    for level in LOW_LEVELS:
+        level_counts = {
+            q: sum(row["required_level"] == str(level) and row["quality"] == q and int(row["entry"]) >= 911400 for row in rows)
+            for q in ("green","blue","purple")
+        }
+        if level_counts != LOW_LEVEL_COUNTS:
+            raise RuntimeError(f"low-level rarity invariant failed for level {level}: {level_counts}")
+
     if not any(row["required_level"] == "4" and row["quality"] == "blue" for row in rows):
         raise RuntimeError("missing level 4 blue rewards")
     return rows, bonuses
@@ -238,14 +293,21 @@ def write_csv(path: Path, headers: list[str], rows: list[dict[str, str]]) -> Non
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=headers, delimiter=";", lineterminator="\n")
-        writer.writeheader(); writer.writerows(rows)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(); parser.add_argument("--items", required=True, type=Path); parser.add_argument("--sets", required=True, type=Path)
-    args = parser.parse_args(); items, bonuses = build_catalog(); write_csv(args.items, HEADERS, items); write_csv(args.sets, SET_HEADERS, bonuses)
-    print("Generated unified Gauntlet catalog: 300 items, all using RequiredLevel -> ItemLevel -> quality/type formulas.")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--items", required=True, type=Path)
+    parser.add_argument("--sets", required=True, type=Path)
+    args = parser.parse_args()
+    items, bonuses = build_catalog()
+    write_csv(args.items, HEADERS, items)
+    write_csv(args.sets, SET_HEADERS, bonuses)
+    print("Generated unified Gauntlet catalog: 840 items; levels 5-10 each add 60 green, 25 blue and 5 purple rewards.")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
