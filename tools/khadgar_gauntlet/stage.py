@@ -18,16 +18,20 @@ def run(*args: str) -> None:
     subprocess.run([sys.executable, *args], check=True)
 
 
-def stage(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
+def stage(core_dir: Path, server_data_dir: Path, client_dir: Path, dbc_src: Path) -> None:
     core = core_dir.expanduser().resolve()
     data = server_data_dir.expanduser().resolve()
     client = client_dir.expanduser().resolve()
+    clean_dbc = dbc_src.expanduser().resolve()
+    item_dbc = clean_dbc / "Item.dbc"
     module_target = core / "modules" / "mod-adventurer-gauntlet"
 
     if not (core / "modules").is_dir():
         raise RuntimeError(f"AzerothCore modules directory not found: {core / 'modules'}")
     if not MODULE_SOURCE.is_dir():
         raise RuntimeError(f"Gauntlet module source not found: {MODULE_SOURCE}")
+    if not item_dbc.is_file():
+        raise RuntimeError(f"clean Item.dbc not found: {item_dbc}")
 
     if module_target.exists():
         shutil.rmtree(module_target)
@@ -37,15 +41,17 @@ def stage(core_dir: Path, server_data_dir: Path, client_dir: Path) -> None:
 
     item_catalog = module_target / "data" / "items" / "early_items.csv"
     set_catalog = module_target / "data" / "items" / "sets.csv"
-    # Item SQL is generated into the module, but deliberately outside AzerothCore's
-    # module auto-update directory. tools/world.py merges it into the authoritative
-    # 000 item payload so every custom item is created before class/Goldshire/Gauntlet.
     item_sql = module_target / "data" / "sql" / "world" / "000_gauntlet_items.generated.sql"
     set_include = module_target / "src" / "GeneratedGauntletSets.inc"
 
     run(str(TOOLS / "build_catalog.py"), "--items", str(item_catalog), "--sets", str(set_catalog))
     item_sql.parent.mkdir(parents=True, exist_ok=True)
-    run(str(TOOLS / "generate_items.py"), "--input", str(item_catalog), "--output", str(item_sql))
+    run(
+        str(TOOLS / "generate_items.py"),
+        "--input", str(item_catalog),
+        "--output", str(item_sql),
+        "--item-dbc", str(item_dbc),
+    )
     run(
         str(TOOLS / "generate_sets.py"),
         "--items", str(item_catalog),
@@ -84,9 +90,10 @@ def main() -> int:
     parser.add_argument("--core-dir", required=True, type=Path)
     parser.add_argument("--server-data-dir", required=True, type=Path)
     parser.add_argument("--client-dir", required=True, type=Path)
+    parser.add_argument("--dbc-src", required=True, type=Path)
     args, _unknown = parser.parse_known_args()
     try:
-        stage(args.core_dir, args.server_data_dir, args.client_dir)
+        stage(args.core_dir, args.server_data_dir, args.client_dir, args.dbc_src)
     except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
         parser.error(str(exc))
         return 2
