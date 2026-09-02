@@ -41,7 +41,7 @@ def load_mapping(path: Path) -> dict[int, int]:
     return mapping
 
 
-def load_rows(path: Path) -> tuple[list[bytearray], bytes, bytes, int, int]:
+def patch(path: Path, mapping: dict[int, int]) -> bool:
     raw = path.read_bytes()
     if len(raw) < HEADER.size:
         raise RuntimeError(f"{path}: Item.dbc too small")
@@ -62,27 +62,16 @@ def load_rows(path: Path) -> tuple[list[bytearray], bytes, bytes, int, int]:
     ]
     strings = raw[records_end:strings_end]
     trailing = raw[strings_end:]
-    return records, strings, trailing, fields, record_size
-
-
-def patch(path: Path, mapping: dict[int, int], donor_path: Path | None = None) -> bool:
-    raw = path.read_bytes()
-    records, strings, trailing, fields, record_size = load_rows(path)
-
-    donor = donor_path if donor_path is not None else path
-    donor_records, _donor_strings, _donor_trailing, donor_fields, donor_record_size = load_rows(donor)
-    if donor_fields != fields or donor_record_size != record_size:
-        raise RuntimeError(f"{donor}: Item.dbc layout differs from target {path}")
 
     owned = set(mapping)
     base_rows = [row for row in records if u32(row, 0) not in owned]
-    donor_lookup = {u32(row, 0): row for row in donor_records if u32(row, 0) not in owned}
+    lookup = {u32(row, 0): row for row in base_rows}
     rebuilt = list(base_rows)
 
     for entry, source_entry in sorted(mapping.items()):
-        source = donor_lookup.get(source_entry)
+        source = lookup.get(source_entry)
         if source is None:
-            raise RuntimeError(f"{donor}: source Item.dbc row {source_entry} missing for {entry}")
+            raise RuntimeError(f"{path}: source Item.dbc row {source_entry} missing for {entry}")
         row = bytearray(source)
         set_u32(row, 0, entry)
         rebuilt.append(row)
@@ -99,10 +88,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--catalog", required=True, type=Path)
     parser.add_argument("--dbc", required=True, type=Path)
-    parser.add_argument("--donor-dbc", type=Path)
     args = parser.parse_args()
     mapping = load_mapping(args.catalog)
-    changed = patch(args.dbc, mapping, args.donor_dbc)
+    changed = patch(args.dbc, mapping)
     first, last = min(mapping), max(mapping)
     print(f"Gauntlet Item.dbc: {'patched' if changed else 'already current'} ({len(mapping)} custom rows, {first}-{last}).")
     return 0
