@@ -5,42 +5,21 @@ import re
 from pathlib import Path
 
 QUALITY = {
-    "2": 2,
-    "green": 2,
-    "verde": 2,
-    "uncommon": 2,
-    "3": 3,
-    "blue": 3,
-    "azul": 3,
-    "rare": 3,
-    "4": 4,
-    "purple": 4,
-    "violet": 4,
-    "violeta": 4,
-    "epic": 4,
-    "5": 5,
-    "orange": 5,
-    "legendary": 5,
-    "legendario": 5,
+    "2": 2, "green": 2, "verde": 2, "uncommon": 2,
+    "3": 3, "blue": 3, "azul": 3, "rare": 3,
+    "4": 4, "purple": 4, "violet": 4, "violeta": 4, "epic": 4,
+    "5": 5, "orange": 5, "legendary": 5, "legendario": 5,
 }
 
 STAT_COLUMNS = [
-    ("strength", 4),
-    ("agility", 3),
-    ("stamina", 7),
-    ("intellect", 5),
-    ("spirit", 6),
-    ("attack_power", 38),
-    ("spell_power", 45),
-    ("hit_rating", 31),
-    ("crit_rating", 32),
-    ("haste_rating", 36),
+    ("strength", 4), ("agility", 3), ("stamina", 7), ("intellect", 5), ("spirit", 6),
+    ("attack_power", 38), ("spell_power", 45), ("hit_rating", 31), ("crit_rating", 32), ("haste_rating", 36),
 ]
 
 REQUIRED_COLUMNS = {
     "enabled", "entry", "source_entry", "display_id", "set_key", "name", "quality",
     "required_level", "item_level", "strength", "agility", "stamina", "intellect", "spirit",
-    "attack_power", "spell_power", "hit_rating", "crit_rating", "haste_rating", "armor",
+    "attack_power", "spell_power", "hit_rating", "crit_rating", "haste_rating", "armor", "block",
     "dmg_min1", "dmg_max1", "delay", "equip_spell1", "equip_spell2", "description",
 }
 
@@ -56,7 +35,6 @@ def parse_int(value: str, field: str, line: int, *, minimum=None, maximum=None) 
         number = int(value)
     except ValueError as exc:
         raise ValueError(f"line {line}: {field} must be an integer, got {value!r}") from exc
-
     if minimum is not None and number < minimum:
         raise ValueError(f"line {line}: {field} must be >= {minimum}")
     if maximum is not None and number > maximum:
@@ -111,11 +89,11 @@ def generate_row(row, line: int) -> str:
         value = parse_int(raw, column, line)
         if value:
             stats.append((stat_type, value))
-
     if len(stats) > 10:
         raise ValueError(f"line {line}: WoW 3.3.5a supports at most 10 item stats")
 
     armor = parse_optional_number(row["armor"], "armor", line, integer=True)
+    block = parse_optional_number(row["block"], "block", line, integer=True)
     dmg_min = parse_optional_number(row["dmg_min1"], "dmg_min1", line)
     dmg_max = parse_optional_number(row["dmg_max1"], "dmg_max1", line)
     delay = parse_optional_number(row["delay"], "delay", line, integer=True)
@@ -128,6 +106,8 @@ def generate_row(row, line: int) -> str:
         raise ValueError(f"line {line}: dmg_max1 cannot be lower than dmg_min1")
     if armor is not None and armor < 0:
         raise ValueError(f"line {line}: armor cannot be negative")
+    if block is not None and block < 0:
+        raise ValueError(f"line {line}: block cannot be negative")
     if delay is not None and delay <= 0:
         raise ValueError(f"line {line}: delay must be positive")
     for field, spell in (("equip_spell1", equip_spell1), ("equip_spell2", equip_spell2)):
@@ -135,18 +115,10 @@ def generate_row(row, line: int) -> str:
             raise ValueError(f"line {line}: {field} must be positive")
 
     updates = [
-        f"`entry` = {entry}",
-        f"`name` = {sql_string(name)}",
-        f"`Quality` = {quality}",
-        f"`RequiredLevel` = {required_level}",
-        f"`ItemLevel` = {item_level}",
-        # Gauntlet rewards are classless Aventurero gear. Stock source items can
-        # carry Rogue/Warrior/etc. masks; never inherit those restrictions.
-        "`AllowableClass` = -1",
-        "`AllowableRace` = -1",
-        "`itemset` = 0",
+        f"`entry` = {entry}", f"`name` = {sql_string(name)}", f"`Quality` = {quality}",
+        f"`RequiredLevel` = {required_level}", f"`ItemLevel` = {item_level}",
+        "`AllowableClass` = -1", "`AllowableRace` = -1", "`itemset` = 0",
     ]
-
     if display_id is not None:
         updates.append(f"`displayid` = {display_id}")
 
@@ -160,6 +132,8 @@ def generate_row(row, line: int) -> str:
 
     if armor is not None:
         updates.append(f"`armor` = {armor}")
+    if block is not None:
+        updates.append(f"`block` = {block}")
     if dmg_min is not None:
         updates.append(f"`dmg_min1` = {dmg_min:g}")
         updates.append(f"`dmg_max1` = {dmg_max:g}")
@@ -168,25 +142,15 @@ def generate_row(row, line: int) -> str:
 
     for index in range(1, 6):
         updates.extend([
-            f"`spellid_{index}` = 0",
-            f"`spelltrigger_{index}` = 0",
-            f"`spellcharges_{index}` = 0",
-            f"`spellppmRate_{index}` = 0",
-            f"`spellcooldown_{index}` = -1",
-            f"`spellcategory_{index}` = 0",
+            f"`spellid_{index}` = 0", f"`spelltrigger_{index}` = 0", f"`spellcharges_{index}` = 0",
+            f"`spellppmRate_{index}` = 0", f"`spellcooldown_{index}` = -1", f"`spellcategory_{index}` = 0",
             f"`spellcategorycooldown_{index}` = -1",
         ])
-
     for index, spell in enumerate((equip_spell1, equip_spell2), start=1):
-        if spell is None:
-            continue
-        updates.extend([
-            f"`spellid_{index}` = {spell}",
-            f"`spelltrigger_{index}` = 1",
-        ])
+        if spell is not None:
+            updates.extend([f"`spellid_{index}` = {spell}", f"`spelltrigger_{index}` = 1"])
 
-    description = row["description"].strip()
-    updates.append(f"`description` = {sql_string(description)}")
+    updates.append(f"`description` = {sql_string(row['description'].strip())}")
     updates.append("`VerifiedBuild` = 0")
 
     temp = f"tmp_adventurer_gauntlet_item_{entry}"
@@ -223,7 +187,6 @@ def main() -> int:
                 continue
             if enabled not in {"1", "true", "yes", "on"}:
                 raise SystemExit(f"line {line}: enabled must be 0/1")
-
             try:
                 entry = parse_int(row["entry"].strip(), "entry", line, minimum=911000, maximum=911999)
                 if entry in seen_entries:
@@ -235,18 +198,10 @@ def main() -> int:
                 raise SystemExit(str(exc)) from exc
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    header = [
-        "-- GENERATED FILE. Do not edit by hand.",
-        f"-- Source: {args.input.name}",
-        f"-- Enabled custom items: {enabled_count}",
-        "-- The CSV is authoritative for the reserved gauntlet item range.",
-        "DELETE FROM `item_template` WHERE `entry` BETWEEN 911000 AND 911999;",
-        "",
-    ]
+    header = ["-- GENERATED FILE. Do not edit by hand.", f"-- Source: {args.input.name}", ""]
     args.output.write_text("\n".join(header + blocks) + "\n", encoding="utf-8")
-    print(f"Generated {enabled_count} Adventurer Gauntlet item(s): {args.output}")
+    print(f"Generated {enabled_count} Gauntlet item_template rows -> {args.output}")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
