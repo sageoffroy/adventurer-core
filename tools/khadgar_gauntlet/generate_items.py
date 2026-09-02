@@ -26,7 +26,10 @@ REQUIRED_COLUMNS = {
 
 SET_KEY_RE = re.compile(r"^[a-z0-9_]+$")
 DBC_HEADER = struct.Struct("<4sIIII")
-DBC_ROW = struct.Struct("<8I")
+# Item.dbc stores SoundOverrideSubclass and Material as signed int32 values.
+# Reading every field as uint32 turns stock -1 into 4294967295, which cannot be
+# written back to AzerothCore's signed item_template columns.
+DBC_ROW = struct.Struct("<IIIiiIII")
 
 
 def sql_string(value: str) -> str:
