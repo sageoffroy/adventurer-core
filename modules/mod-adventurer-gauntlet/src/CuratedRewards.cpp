@@ -17,6 +17,8 @@
 namespace
 {
 constexpr uint32 RagefireMapId = 389;
+constexpr uint32 GauntletItemMin = 911100;
+constexpr uint32 GauntletItemMax = 911399;
 constexpr uint32 UniversalMask = 0xFFFFFFFFu;
 constexpr uint32 ClosestCandidateCount = 5;
 
@@ -76,8 +78,6 @@ bool PassesCommonRewardRules(ItemTemplate const& item)
         return false;
 
     // Keep obviously abnormal item-level relationships out of the native pool.
-    // Custom items added later pass through the same rule, so they naturally
-    // join the selector when their template is sane.
     if (item.ItemLevel < item.RequiredLevel || item.ItemLevel > item.RequiredLevel + 15)
         return false;
 
@@ -103,6 +103,13 @@ RewardPools BuildControlledPools()
 
     for (auto const& [entry, item] : *itemStore)
     {
+        // During this validation phase we want a pure Blizzard baseline. The
+        // old generated Gauntlet catalog remains installed, but it must not
+        // participate in reward selection until we rebuild it with the new
+        // item-level rules.
+        if (entry >= GauntletItemMin && entry <= GauntletItemMax)
+            continue;
+
         if (!PassesCommonRewardRules(item))
             continue;
 
