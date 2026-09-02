@@ -24,11 +24,9 @@ constexpr uint32 ItemClassConsumable = 0;
 constexpr uint32 ItemClassProjectile = 6;
 constexpr uint32 ItemSubclassPotion = 1;
 constexpr uint32 ItemSubclassArrow = 2;
-constexpr uint32 ItemSubclassBullet = 3;
 constexpr uint32 ItemSubclassScroll = 4;
 constexpr uint32 AmmoDropChance = 3;
 constexpr uint32 ConsumableDropChance = 5;
-constexpr uint32 BulletWithinAmmoChance = 0;
 
 enum RewardPool : uint8
 {
@@ -49,7 +47,6 @@ struct RewardPools
 {
     std::array<std::vector<uint32>, 4> Items;
     std::vector<uint32> Arrows;
-    std::vector<uint32> Bullets;
     std::vector<uint32> Potions;
     std::vector<uint32> Scrolls;
 };
@@ -144,13 +141,8 @@ RewardPools BuildControlledPools()
         if (!PassesStockAuxiliaryRules(entry, item))
             continue;
 
-        if (item.Class == ItemClassProjectile)
-        {
-            if (item.SubClass == ItemSubclassArrow)
-                pools.Arrows.push_back(entry);
-            else if (item.SubClass == ItemSubclassBullet)
-                pools.Bullets.push_back(entry);
-        }
+        if (item.Class == ItemClassProjectile && item.SubClass == ItemSubclassArrow)
+            pools.Arrows.push_back(entry);
         else if (item.Class == ItemClassConsumable)
         {
             if (item.SubClass == ItemSubclassPotion)
@@ -238,14 +230,9 @@ void AddLootItem(Loot& loot, uint32 itemEntry, uint8 minCount = 1, uint8 maxCoun
 
 void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
 {
-    // Independent 3% ammunition roll. Bullets are disabled for now, so
-    // a successful ammunition roll always yields arrows.
+    // Independent 3% ammunition roll. Only arrows are eligible.
     if (urand(1, 100) <= AmmoDropChance)
-    {
-        std::vector<uint32> const& ammoPool =
-            (BulletWithinAmmoChance > 0 && urand(1, 100) <= BulletWithinAmmoChance && !pools.Bullets.empty()) ? pools.Bullets : pools.Arrows;
-        AddLootItem(loot, SelectUsableAuxiliaryFromPool(ammoPool, rewardLevel), 40, 100);
-    }
+        AddLootItem(loot, SelectUsableAuxiliaryFromPool(pools.Arrows, rewardLevel), 40, 100);
 
     // Independent 5% consumable roll. A success gives either a potion or scroll.
     if (urand(1, 100) <= ConsumableDropChance)
