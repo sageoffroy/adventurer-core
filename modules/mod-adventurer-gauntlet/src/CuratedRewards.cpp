@@ -21,6 +21,9 @@ constexpr uint32 GauntletItemMin = 911100;
 constexpr uint32 GauntletItemMax = 911399;
 constexpr uint32 UniversalMask = 0xFFFFFFFFu;
 constexpr uint32 ClosestCandidateCount = 5;
+constexpr std::array<uint32, 6> CuratedCustomRewardEntries = {
+    911200, 911201, 911202, 911203, 911204, 911205
+};
 
 enum RewardPool : uint8
 {
@@ -64,6 +67,11 @@ uint32 LevelDistance(uint32 requiredLevel, uint8 rewardLevel)
     return requiredLevel > rewardLevel ? requiredLevel - rewardLevel : rewardLevel - requiredLevel;
 }
 
+bool IsCuratedCustomReward(uint32 entry)
+{
+    return std::find(CuratedCustomRewardEntries.begin(), CuratedCustomRewardEntries.end(), entry) != CuratedCustomRewardEntries.end();
+}
+
 bool PassesCommonRewardRules(ItemTemplate const& item)
 {
     if (item.Class != ITEM_CLASS_WEAPON && item.Class != ITEM_CLASS_ARMOR)
@@ -103,11 +111,11 @@ RewardPools BuildControlledPools()
 
     for (auto const& [entry, item] : *itemStore)
     {
-        // During this validation phase we want a pure Blizzard baseline. The
-        // old generated Gauntlet catalog remains installed, but it must not
-        // participate in reward selection until we rebuild it with the new
-        // item-level rules.
-        if (entry >= GauntletItemMin && entry <= GauntletItemMax)
+        // The old generated catalog stays excluded. Only the small curated
+        // low-level filler set is allowed back into the same selector used by
+        // Blizzard items; adding future curated entries only requires adding
+        // them to this explicit allow-list.
+        if (entry >= GauntletItemMin && entry <= GauntletItemMax && !IsCuratedCustomReward(entry))
             continue;
 
         if (!PassesCommonRewardRules(item))
