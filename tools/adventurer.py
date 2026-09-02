@@ -233,7 +233,10 @@ def runtime_paths(core: Path, args) -> tuple[Path, Path, Path]:
         if args.server_data_dir
         else core / "env" / "dist" / "data"
     )
-    server_dbc = data_dir / "dbc"
+    # --server-data-dir remains the AzerothCore data directory. worldserver is
+    # installed under env/dist/bin and, with DataDir="./", consumes bin/dbc.
+    # Keep every apply/update path pointed at that one authoritative DBC tree.
+    server_dbc = data_dir.parent / "bin" / "dbc"
     dbc_source = (
         args.dbc_src.expanduser().resolve()
         if args.dbc_src
