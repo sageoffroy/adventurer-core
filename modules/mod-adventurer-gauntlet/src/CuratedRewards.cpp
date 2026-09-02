@@ -17,6 +17,8 @@ namespace
 {
 constexpr uint32 RagefireMapId = 389;
 constexpr uint32 UniversalMask = 0xFFFFFFFFu;
+constexpr uint32 AdventurerItemRangeFirst = 910000;
+constexpr uint32 AdventurerItemRangeLast = 910999;
 
 enum RewardPool : uint8
 {
@@ -59,8 +61,13 @@ uint32 LevelDistance(uint32 requiredLevel, uint8 rewardLevel)
     return requiredLevel > rewardLevel ? requiredLevel - rewardLevel : rewardLevel - requiredLevel;
 }
 
-bool PassesCommonRewardRules(ItemTemplate const& item)
+bool PassesCommonRewardRules(uint32 entry, ItemTemplate const& item)
 {
+    // 910xxx are fixed Adventurer/vendor/starting items, not Gauntlet rewards.
+    // Keeping them out of the procedural pool also prevents retired legacy
+    // "contrabando" rows left in a development DB from resurfacing as loot.
+    if (entry >= AdventurerItemRangeFirst && entry <= AdventurerItemRangeLast)
+        return false;
     if (item.Class != ITEM_CLASS_WEAPON && item.Class != ITEM_CLASS_ARMOR)
         return false;
     if (item.InventoryType == INVTYPE_NON_EQUIP || item.InventoryType == INVTYPE_BAG)
@@ -88,7 +95,7 @@ RewardPools BuildControlledPools()
 
     for (auto const& [entry, item] : *itemStore)
     {
-        if (!PassesCommonRewardRules(item))
+        if (!PassesCommonRewardRules(entry, item))
             continue;
 
         if (item.Quality == ITEM_QUALITY_UNCOMMON)
