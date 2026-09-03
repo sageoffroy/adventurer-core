@@ -736,10 +736,10 @@ closeDraft:SetPoint("LEFT", debugButton, "RIGHT", 0, 0)
 -- button center on the minimap's left edge keeps it seated on the circular rim
 -- instead of floating inside the map at a resolution-dependent offset.
 local minimapButton = CreateFrame("Button", "AdventurerDraftMinimapButton", Minimap)
-minimapButton:SetWidth(31)
-minimapButton:SetHeight(31)
+minimapButton:SetWidth(32)
+minimapButton:SetHeight(32)
 minimapButton:SetFrameStrata("MEDIUM")
-minimapButton:SetPoint("CENTER", Minimap, "LEFT", 0, 0)
+minimapButton:SetPoint("CENTER", Minimap, "LEFT", -5, -25)
 minimapButton:EnableMouse(true)
 
 minimapButton.icon = minimapButton:CreateTexture(nil, "ARTWORK")
@@ -752,7 +752,7 @@ minimapButton.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 minimapButton.border = minimapButton:CreateTexture(nil, "OVERLAY")
 minimapButton.border:SetWidth(53)
 minimapButton.border:SetHeight(53)
-minimapButton.border:SetPoint("TOPLEFT", minimapButton, "TOPLEFT", -11, 11)
+minimapButton.border:SetPoint("TOPLEFT", minimapButton, "TOPLEFT", 0, 0)
 minimapButton.border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
 
 minimapButton:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
