@@ -3,14 +3,6 @@
 -- 920020-920031: Embate brutal
 -- 920040-920051: Tajo despiadado
 
--- Adventurer class mask = 512. Stock shield-capable classes receive skill 433
--- through playercreateinfo_skills; use the same native character-creation path.
-DELETE FROM `playercreateinfo_skills`
-WHERE `classMask` = 512 AND `skill` = 433;
-
-INSERT INTO `playercreateinfo_skills` (`raceMask`, `classMask`, `skill`, `rank`, `comment`) VALUES
-(0,512,433,0,'Shield');
-
 DELETE FROM `spell_script_names`
 WHERE `spell_id` BETWEEN 920000 AND 920011
    OR `spell_id` BETWEEN 920020 AND 920031
