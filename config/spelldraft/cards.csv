@@ -220,7 +220,7 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 229;dual_wield_specialization;talent;10;common;100;13715/13848/13849/13851/13852;;;;1;Especialización en doble empuñadura
 230;warrior_enrage;talent;10;common;100;12317/13045/13046/13047/13048;;;;1;Enfurecer
 231;warrior_precision;talent;10;common;100;29590/29591/29592;;;;1;Precisión
-232;warrior_flurry;talent;10;common;100;12319/12971/12972/12973/12974;;;;1;Aluvión
+232;shaman_flurry;talent;10;common;100;16256/16281/16282/16283/16284;;;;1;Aluvión
 233;furious_attacks;talent;10;common;100;46910/46911;;;;1;Ataques furiosos
 234;rampage;talent;10;common;100;29801;;;;1;Desenfreno
 235;titans_grip;talent;10;common;100;46917;;;;1;Empuñadura de titán
@@ -292,3 +292,13 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 301;blessed_resilience;talent;10;common;100;33142/33145/33146;;;;1;Temple bendito
 302;spirit_tap;talent;10;common;100;15270/15335/15336;;;;1;Transfusión de espíritu
 303;divine_aegis;talent;10;common;100;47509/47511/47515;;;;1;Égida divina
+304;elemental_focus;talent;10;common;100;16164;;;;1;Enfoque elemental
+305;unrelenting_storm;talent;10;common;100;30664/30665/30666;;;;1;Tormenta incansable
+306;astral_shift;talent;10;common;100;51474/51478/51479;;;;1;Cambio astral
+307;spirit_weapons;talent;10;common;100;16268;;;;1;Armas espirituales
+308;weapon_mastery_shaman;talent;10;common;100;29082/29084/29086;;;;1;Maestría con armas
+309;unleashed_rage;talent;10;common;100;30802/30808/30809;;;;1;Ira desatada
+310;mental_dexterity;talent;10;common;100;51883/51884/51885;;;;1;Destreza mental
+311;ancestral_healing;talent;10;common;100;16176/16235/16240;;;;1;Sanación ancestral
+312;natures_guardian_shaman;talent;10;common;100;30881/30883/30884/30885/30886;;;;1;Guardián de la Naturaleza
+313;blessing_of_the_eternals;talent;10;common;100;51554/51555;;;;1;Bendición de los Eternos
