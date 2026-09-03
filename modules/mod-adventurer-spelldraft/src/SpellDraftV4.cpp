@@ -2,11 +2,13 @@
 #include "Player.h"
 #include "ScriptDefines/PlayerScript.h"
 #include "SpellInfo.h"
+#include "SpellMgr.h"
 #include "SpellScript.h"
 #include "SpellScriptLoader.h"
 #include "Util.h"
 
 #include <algorithm>
+#include <array>
 
 namespace
 {
@@ -15,6 +17,7 @@ constexpr uint8 SinisterDaggerPercent = 100;
 constexpr uint8 RuthlessCleaveWeaponPercent = 65;
 constexpr uint32 AdventurerClassId = 10;
 constexpr uint32 ShieldProficiencySpell = 9116;
+constexpr std::array<uint32, 3> CustomRankRoots = { 920000, 920020, 920040 };
 
 bool UsesMainHandDagger(Player* player)
 {
@@ -27,6 +30,19 @@ bool UsesMainHandDagger(Player* player)
 
     ItemTemplate const* item = weapon->GetTemplate();
     return item && item->Class == ITEM_CLASS_WEAPON && item->SubClass == ITEM_SUBCLASS_WEAPON_DAGGER;
+}
+
+bool HasEquippedShield(Player* player)
+{
+    if (!player)
+        return false;
+
+    Item* shield = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND);
+    if (!shield)
+        return false;
+
+    ItemTemplate const* item = shield->GetTemplate();
+    return item && item->Class == ITEM_CLASS_ARMOR && item->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD;
 }
 
 int32 FlatRankBonus(SpellInfo const* spellInfo, Unit* caster)
@@ -53,6 +69,56 @@ void EnsureShieldProficiency(Player* player)
 
     if (!player->HasSpell(ShieldProficiencySpell))
         player->learnSpell(ShieldProficiencySpell);
+}
+
+bool KnowsAnyRank(Player* player, uint32 rootSpellId)
+{
+    if (!player)
+        return false;
+
+    uint32 current = sSpellMgr->GetFirstSpellInChain(rootSpellId);
+    while (current)
+    {
+        if (player->HasSpell(current))
+            return true;
+        current = sSpellMgr->GetNextSpellInChain(current);
+    }
+    return false;
+}
+
+void UpgradeCustomRankChain(Player* player, uint32 rootSpellId)
+{
+    if (!player || !KnowsAnyRank(player, rootSpellId))
+        return;
+
+    uint32 current = sSpellMgr->GetFirstSpellInChain(rootSpellId);
+    uint32 best = 0;
+    uint32 level = player->GetLevel();
+
+    while (current)
+    {
+        SpellInfo const* info = sSpellMgr->GetSpellInfo(current);
+        if (!info)
+            break;
+
+        uint32 requiredLevel = std::max(info->BaseLevel, info->SpellLevel);
+        if (requiredLevel <= level)
+            best = current;
+
+        current = sSpellMgr->GetNextSpellInChain(current);
+    }
+
+    if (best && !player->HasSpell(best))
+        player->learnSpell(best);
+}
+
+void UpgradeKnownCustomRanks(Player* player)
+{
+    if (!player || player->getClass() != AdventurerClassId)
+        return;
+
+    for (uint32 rootSpellId : CustomRankRoots)
+        UpgradeCustomRankChain(player, rootSpellId);
 }
 }
 
@@ -94,6 +160,14 @@ class spell_adventurer_brutal_slam : public SpellScript
         return GetCaster() && GetCaster()->IsPlayer();
     }
 
+    SpellCastResult CheckCast()
+    {
+        Player* player = GetCaster()->ToPlayer();
+        if (!HasEquippedShield(player))
+            return SPELL_FAILED_EQUIPPED_ITEM_CLASS;
+        return SPELL_CAST_OK;
+    }
+
     void HandleHit()
     {
         Unit* caster = GetCaster();
@@ -111,6 +185,7 @@ class spell_adventurer_brutal_slam : public SpellScript
 
     void Register() override
     {
+        OnCheckCast += SpellCheckCastFn(spell_adventurer_brutal_slam::CheckCast);
         OnHit += SpellHitFn(spell_adventurer_brutal_slam::HandleHit);
     }
 };
@@ -170,11 +245,17 @@ public:
     void OnPlayerLogin(Player* player) override
     {
         EnsureShieldProficiency(player);
+        UpgradeKnownCustomRanks(player);
     }
 
     void OnPlayerCreate(Player* player) override
     {
         EnsureShieldProficiency(player);
+    }
+
+    void OnPlayerLevelChanged(Player* player, uint8 /*oldLevel*/) override
+    {
+        UpgradeKnownCustomRanks(player);
     }
 };
 
