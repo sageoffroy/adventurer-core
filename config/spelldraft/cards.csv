@@ -309,3 +309,4 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 318;natures_grace;talent;10;common;100;16880/61345/61346;;;;1;Gracia de la Naturaleza
 319;living_spirit;talent;10;common;100;34151/34152/34153;;;;1;Espíritu vivo
 320;natural_perfection;talent;10;common;100;33881/33882/33883;;;;1;Perfección natural
+321;mental_strength;talent;10;common;100;18551/18552/18553/18554/18555;;;;1;Fortaleza mental
