@@ -48,8 +48,6 @@ RUTHLESS_CLEAVE_ICON_PATH = "Interface\\Icons\\Ability_DemonHunter_SoulCleave"
 
 POWER_ENERGY = 3
 SPELL_EFFECT_SCHOOL_DAMAGE = 2
-ITEM_CLASS_ARMOR = 4
-ITEM_SUBCLASS_ARMOR_SHIELD = 6
 
 EFFECT_FIELD_STARTS = (
     71, 74, 77, 80, 83, 86, 89, 92, 95,
@@ -90,9 +88,17 @@ def _set_text(
 def _clear_effect(row: bytearray, index: int) -> None:
     for start in EFFECT_FIELD_STARTS:
         set_u32(row, start + index, 0)
-    # EffectSpellClassMask is three uint32 values per effect.
     for field in range(122 + index * 3, 125 + index * 3):
         set_u32(row, field, 0)
+
+
+def _copy_effect(row: bytearray, source: bytearray, index: int) -> None:
+    for start in EFFECT_FIELD_STARTS:
+        set_u32(row, start + index, u32(source, start + index))
+    for field in range(122 + index * 3, 125 + index * 3):
+        set_u32(row, field, u32(source, field))
+    set_u32(row, 216 + index, u32(source, 216 + index))
+    set_u32(row, 229 + index, u32(source, 229 + index))
 
 
 def _clear_spell_family(row: bytearray) -> None:
@@ -114,15 +120,13 @@ def _set_energy_cost(row: bytearray, cost: int) -> None:
 
 
 def _copy_primary_targeting(row: bytearray, source: bytearray) -> None:
-    # Preserve Sinister Strike's damage formula/flat bonus but borrow Cleave's
-    # primary + nearby-target selection metadata.
     for field in (86, 89, 92, 104):
         set_u32(row, field, u32(source, field))
 
 
 def _prepare_common(row: bytearray, spell_id: int, cost: int) -> None:
     set_u32(row, 0, spell_id)
-    set_u32(row, 1, 0)  # no native class category ownership
+    set_u32(row, 1, 0)
     _set_energy_cost(row, cost)
     _clear_spell_family(row)
 
@@ -149,31 +153,32 @@ def _build_sinister(
 
 def _build_brutal_slam(
     dbc: DBC,
-    source: bytearray,
-    shield_visual: bytearray,
+    rank_source: bytearray,
+    shield_source: bytearray,
     spell_id: int,
     rank: int,
     icon_id: int,
 ) -> bytearray:
-    row = bytearray(source)
+    # Start from the stock Shield Slam row so its native shield requirement and
+    # client/core validation remain intact. Only the SpellDraft-owned parts are
+    # replaced below.
+    row = bytearray(shield_source)
     _prepare_common(row, spell_id, 40)
 
-    # Sinister Strike gives us the same rank-by-rank flat bonus and a reliable
-    # combo-point effect. Replace only the primary damage effect with physical
-    # spell damage; the SpellScript adds Shield Slam-style block-value damage.
+    # Use Sinister Strike only as the rank progression source: level cadence,
+    # flat bonus, GCD and combo generation. Shield Slam remains the spell shell.
+    for field in (29, 30, 37, 38, 39, 205, 206):
+        set_u32(row, field, u32(rank_source, field))
+
     set_u32(row, 71, SPELL_EFFECT_SCHOOL_DAMAGE)
+    for field in (74, 77, 80, 83, 98, 101, 104, 107, 110, 113, 116, 119, 216, 229):
+        set_u32(row, field, u32(rank_source, field))
+
+    # Shield Slam's secondary effect is its magic dispel. Embate brutal does not
+    # dispel; it uses Sinister Strike's combo-point effect instead.
+    _copy_effect(row, rank_source, 1)
     _clear_effect(row, 2)
 
-    # Declare only the actual equipment category needed by this custom spell.
-    # Copying Shield Slam's full stock requirement also imported assumptions
-    # tied to stock classes/proficiencies and could reject an Adventurer even
-    # while a valid shield was equipped. Runtime validation remains authoritative.
-    set_u32(row, 68, ITEM_CLASS_ARMOR)
-    set_u32(row, 69, 1 << ITEM_SUBCLASS_ARMOR_SHIELD)
-    set_u32(row, 70, 0)
-
-    set_u32(row, 131, u32(shield_visual, 131))
-    set_u32(row, 132, u32(shield_visual, 132))
     set_u32(row, 133, icon_id)
     set_u32(row, 134, 0)
 
@@ -198,9 +203,6 @@ def _build_ruthless_cleave(
 ) -> bytearray:
     row = bytearray(source)
     _prepare_common(row, spell_id, 50)
-
-    # Combo is conditional and is therefore granted by the SpellScript only
-    # when two different enemies are actually hit.
     _clear_effect(row, 1)
     _clear_effect(row, 2)
     _copy_primary_targeting(row, cleave_source)

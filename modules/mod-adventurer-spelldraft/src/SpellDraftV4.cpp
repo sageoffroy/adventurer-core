@@ -32,19 +32,6 @@ bool UsesMainHandDagger(Player* player)
     return item && item->Class == ITEM_CLASS_WEAPON && item->SubClass == ITEM_SUBCLASS_WEAPON_DAGGER;
 }
 
-bool HasEquippedShield(Player* player)
-{
-    if (!player)
-        return false;
-
-    Item* shield = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND);
-    if (!shield)
-        return false;
-
-    ItemTemplate const* item = shield->GetTemplate();
-    return item && item->Class == ITEM_CLASS_ARMOR && item->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD;
-}
-
 int32 FlatRankBonus(SpellInfo const* spellInfo, Unit* caster)
 {
     if (!spellInfo || !caster)
@@ -160,14 +147,6 @@ class spell_adventurer_brutal_slam : public SpellScript
         return GetCaster() && GetCaster()->IsPlayer();
     }
 
-    SpellCastResult CheckCast()
-    {
-        Player* player = GetCaster()->ToPlayer();
-        if (!HasEquippedShield(player))
-            return SPELL_FAILED_EQUIPPED_ITEM_CLASS;
-        return SPELL_CAST_OK;
-    }
-
     void HandleHit()
     {
         Unit* caster = GetCaster();
@@ -185,7 +164,6 @@ class spell_adventurer_brutal_slam : public SpellScript
 
     void Register() override
     {
-        OnCheckCast += SpellCheckCastFn(spell_adventurer_brutal_slam::CheckCast);
         OnHit += SpellHitFn(spell_adventurer_brutal_slam::HandleHit);
     }
 };
