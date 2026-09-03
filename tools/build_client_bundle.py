@@ -18,6 +18,7 @@ import adventurer_apply  # noqa: F401
 import client
 import spelldraft_custom_spells
 import spelldraft_v3_icons
+import spelldraft_v4_talents
 from khadgar_gauntlet.patch_item_dbc import patch as patch_gauntlet_items
 from khadgar_gauntlet.patch_spell_dbc import patch as patch_gauntlet_spells
 
@@ -87,6 +88,7 @@ def build(args) -> None:
         spell_path = work / "Spell.dbc"
         before_spell = spell_path.read_bytes()
         spelldraft_custom_spells.patch(spell_path, assigned)
+        spelldraft_v4_talents.patch(spell_path, work / "Talent.dbc", assigned)
         patch_gauntlet_spells(spell_path)
         changed["Spell.dbc"] = (
             spell_path.read_bytes() != before_spell
