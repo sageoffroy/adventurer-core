@@ -16,7 +16,6 @@ constexpr uint8 SinisterWeaponPercent = 75;
 constexpr uint8 SinisterDaggerPercent = 100;
 constexpr uint8 RuthlessCleaveWeaponPercent = 65;
 constexpr uint32 AdventurerClassId = 10;
-constexpr uint32 ShieldProficiencySpell = 9116;
 constexpr std::array<uint32, 3> CustomRankRoots = { 920000, 920020, 920040 };
 
 bool UsesMainHandDagger(Player* player)
@@ -47,15 +46,6 @@ int32 ScaleWeaponPortion(int32 totalDamage, int32 flatBonus, uint8 percent)
 
     int32 weaponPortion = std::max<int32>(0, totalDamage - flatBonus);
     return flatBonus + CalculatePct(weaponPortion, percent);
-}
-
-void EnsureShieldProficiency(Player* player)
-{
-    if (!player || player->getClass() != AdventurerClassId)
-        return;
-
-    if (!player->HasSpell(ShieldProficiencySpell))
-        player->learnSpell(ShieldProficiencySpell);
 }
 
 bool KnowsAnyRank(Player* player, uint32 rootSpellId)
@@ -222,13 +212,7 @@ public:
 
     void OnPlayerLogin(Player* player) override
     {
-        EnsureShieldProficiency(player);
         UpgradeKnownCustomRanks(player);
-    }
-
-    void OnPlayerCreate(Player* player) override
-    {
-        EnsureShieldProficiency(player);
     }
 
     void OnPlayerLevelChanged(Player* player, uint8 /*oldLevel*/) override
