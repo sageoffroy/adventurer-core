@@ -1,0 +1,1 @@
+void AddAdventurerSpellDraftV4Scripts();
