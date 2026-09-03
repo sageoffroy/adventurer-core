@@ -263,3 +263,22 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 272;eye_for_an_eye;talent;10;common;100;9799/25988;;;;1;Ojo por ojo
 273;crusade;talent;10;common;100;31866/31867/31868;;;;1;Cruzada
 274;vengeance_paladin;talent;10;common;100;20050/20052/20053;;;;1;Venganza
+275;endurance_training;talent;10;common;100;19583/19584/19585/19586/19587;;;;1;Entrenamiento de resistencia
+276;serpents_swiftness;talent;10;common;100;34466/34467/34468/34469/34470;;;;1;Rapidez de serpiente
+277;lethal_shots;talent;10;common;100;19426/19427/19429/19430/19431;;;;1;Disparos letales
+278;focused_aim;talent;10;common;100;53620/53621/53622;;;;1;Puntería centrada
+279;careful_aim;talent;10;common;100;34482/34483/34484;;;;1;Puntería cuidadosa
+280;mortal_shots;talent;10;common;100;19485/19487/19488/19489/19490;;;;1;Disparos mortales
+281;combat_experience_hunter;talent;10;common;100;34475/34476;;;;1;Experiencia de combate
+282;ranged_weapon_specialization;talent;10;common;100;19507/19508/19509;;;;1;Especialización en armas a distancia
+283;master_marksman;talent;10;common;100;34485/34486/34487/34488/34489;;;;1;Maestro tirador
+284;wild_quiver;talent;10;common;100;53215/53216/53217;;;;1;Carcaj salvaje
+285;hawk_eye;talent;10;common;100;19498/19499/19500;;;;1;Ojo de halcón
+286;survival_instincts_hunter;talent;10;common;100;34494/34496;;;;1;Instintos de supervivencia
+287;survivalist;talent;10;common;100;19255/19256/19257/19258/19259;;;;1;Superviviente
+288;killer_instinct_hunter;talent;10;common;100;19370/19371/19373;;;;1;Instinto asesino
+289;lightning_reflexes_hunter;talent;10;common;100;19168/19180/19181/24296/24297;;;;1;Reflejos de relámpago
+290;surefooted;talent;10;common;100;19290/19294/24283;;;;1;Pies firmes
+291;expose_weakness;talent;10;common;100;34500/34502/34503;;;;1;Exponer debilidad
+292;master_tactician_hunter;talent;10;common;100;34506/34507/34508/34838/34839;;;;1;Maestro táctico
+293;hunter_vs_wild;talent;10;common;100;56339/56340/56341;;;;1;Cazador contra naturaleza
