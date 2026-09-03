@@ -290,7 +290,16 @@ def row_applies_to_adventurer(row: bytearray) -> bool:
 
 
 def class_bound_skill_ids(records: list[bytearray]) -> set[int]:
-    return {u32(r, 1) for r in records if u32(r, 3) != 0 and u32(r, 1) not in RACE_NATIVE_SKILL_IDS}
+    present = {u32(row, 1) for row in records}
+    class_bound = {
+        u32(row, 1)
+        for row in records
+        if u32(row, 3) != 0 and u32(row, 1) not in RACE_NATIVE_SKILL_IDS
+    }
+    # Universal weapon/armor proficiencies must also exist for Adventurer even
+    # when their stock SkillRaceClassInfo template is not class-bound. In
+    # particular this keeps skill 433 (Shields) usable/client-visible.
+    return class_bound | (UNIVERSAL_SKILLS & present)
 
 
 def covers_all_adventurer_races(records: list[bytearray], skill: int) -> bool:
