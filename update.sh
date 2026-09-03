@@ -67,17 +67,51 @@ if (( has_playerbots == 1 )); then
     python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir"
 fi
 
+# SpellDraft runtime files are loaded through Worldserver's DataDir, not through
+# the bundle's --server-data-dir argument. Our installed server is launched from
+# env/dist/bin and currently uses DataDir=".", so resolve that setting here and
+# install the catalog where the running worldserver actually reads it.
+spelldraft_data_dir="$server_data_dir"
+worldserver_conf="$core_dir/env/dist/etc/worldserver.conf"
+if [[ -f "$worldserver_conf" ]]; then
+    configured_data_dir="$(sed -nE 's/^[[:space:]]*DataDir[[:space:]]*=[[:space:]]*"?([^"#;]+)"?.*$/\1/p' "$worldserver_conf" | head -n1 | xargs || true)"
+    if [[ -n "$configured_data_dir" ]]; then
+        if [[ "$configured_data_dir" == "." ]]; then
+            spelldraft_data_dir="$core_dir/env/dist/bin"
+        elif [[ "$configured_data_dir" == /* ]]; then
+            spelldraft_data_dir="$configured_data_dir"
+        else
+            spelldraft_data_dir="$core_dir/env/dist/bin/$configured_data_dir"
+        fi
+    fi
+fi
+
 # Structural SpellDraft data is source-owned. Never let an old runtime copy of
 # cards/metadata/subclass mappings survive a repository update; only
 # spelldraft.conf remains intentionally editable/mergeable at runtime.
-runtime_dir="$server_data_dir/spelldraft"
+runtime_dir="$spelldraft_data_dir/spelldraft"
 rm -f \
   "$runtime_dir/cards.csv" \
   "$runtime_dir/catalog_metadata.csv" \
   "$runtime_dir/subclasses.json" \
   "$runtime_dir/card_subclasses.csv"
 
-python3 "$ROOT/tools/spelldraft_runtime.py" install "$@"
+# Remove stale structural copies from the bundle data directory when it differs
+# from Worldserver's actual DataDir, so there is only one authoritative runtime
+# catalog to inspect and maintain.
+if [[ "$spelldraft_data_dir" != "$server_data_dir" ]]; then
+    stale_runtime_dir="$server_data_dir/spelldraft"
+    rm -f \
+      "$stale_runtime_dir/cards.csv" \
+      "$stale_runtime_dir/catalog_metadata.csv" \
+      "$stale_runtime_dir/subclasses.json" \
+      "$stale_runtime_dir/card_subclasses.csv"
+fi
+
+python3 "$ROOT/tools/spelldraft_runtime.py" install \
+  --core-dir "$core_dir" \
+  --server-data-dir "$spelldraft_data_dir" \
+  "${args[@]}"
 
 if (( has_playerbots == 1 )); then
     python3 "$ROOT/tools/playerbots_runtime.py" install --core-dir "$core_dir"
@@ -90,4 +124,5 @@ if (( has_playerbots == 1 )); then
 else
     printf '%s\n' "Adventurer Core update staged for stock AzerothCore; Playerbots integration skipped."
 fi
+printf '%s\n' "SpellDraft runtime installed in Worldserver DataDir: $spelldraft_data_dir"
 printf '%s\n' "Rebuild worldserver when core source changed; runtime-only SpellDraft config changes require only a restart."
