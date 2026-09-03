@@ -67,9 +67,9 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 68;earthbind_totem;active;6;common;100;2484;;;;0;Tótem Nexo terrestre
 69;lightning_shield;active;8;common;100;324;;;;0;Escudo de relámpagos
 70;stoneclaw_totem;active;8;common;100;5730;;;;0;Tótem Garra de piedra
-71;flame_shock;active;10;common;100;8050;;;;0;Choque de llamas
-72;flametongue_weapon;active;10;common;100;8024;;;;0;Arma Lengua de Fuego
-73;searing_totem;active;10;common;100;3599;;;;0;Tótem abrasador
+71;flame_shock;active;10;uncommon;100;8050;;;;0;Choque de llamas
+72;flametongue_weapon;active;10;rare;100;8024;;;;0;Arma Lengua de Fuego
+73;searing_totem;active;10;uncommon;100;3599;;;;0;Tótem abrasador
 74;strength_of_earth_totem;active;10;common;100;8075;;;;0;Tótem Fuerza de la tierra
 75;frost_armor;active;1;common;100;168;;;;0;Armadura de Escarcha
 76;conjure_water;active;4;common;80;5504;;;;0;Crear agua
