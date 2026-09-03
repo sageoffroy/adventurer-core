@@ -140,6 +140,15 @@ if not DraftFrame then
 end
 
 DraftFrame:SetHeight(350)
+DraftFrame:SetBackdrop({
+    bgFile = "Interface\\Buttons\\WHITE8X8",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true,
+    tileSize = 32,
+    edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+})
+DraftFrame:SetBackdropColor(0.015, 0.015, 0.02, 1.0)
 if DraftFrame.hint then
     DraftFrame.hint:ClearAllPoints()
     DraftFrame.hint:SetPoint("BOTTOM", DraftFrame, "BOTTOM", 0, 48)
@@ -201,6 +210,36 @@ for i = 1, 3 do
         button.adventurerMetaBadge:SetPoint("TOPRIGHT", button, "TOPRIGHT", -8, -7)
         button.adventurerMetaBadge:SetText("")
         button.adventurerExtraIcons = {}
+        button:SetBackdropColor(0.01, 0.01, 0.015, 1.0)
+
+        -- Keep the card body black on hover. Feedback comes from a brighter
+        -- border instead of the old blue-tinted background, which clashed with
+        -- the black-backed spell icons.
+        button:SetScript("OnEnter", function(self)
+            if not self.spellId then
+                return
+            end
+            local r, g, b, a = self:GetBackdropBorderColor()
+            self.adventurerRestBorder = { r, g, b, a }
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink("spell:" .. self.spellId)
+            GameTooltip:Show()
+            self:SetBackdropColor(0.01, 0.01, 0.015, 1.0)
+            self:SetBackdropBorderColor(
+                math.min(1, r + 0.25),
+                math.min(1, g + 0.25),
+                math.min(1, b + 0.25),
+                1.0
+            )
+        end)
+        button:SetScript("OnLeave", function(self)
+            GameTooltip:Hide()
+            self:SetBackdropColor(0.01, 0.01, 0.015, 1.0)
+            local color = self.adventurerRestBorder
+            if color then
+                self:SetBackdropBorderColor(color[1], color[2], color[3], color[4] or 0.9)
+            end
+        end)
 
         for iconIndex = 1, 4 do
             local iconButton = CreateFrame("Button", nil, button)
@@ -277,17 +316,18 @@ end
 local debugFrame = CreateFrame("Frame", "AdventurerDraftPoolDebugFrame", UIParent)
 debugFrame:SetWidth(760)
 debugFrame:SetHeight(475)
-debugFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 10)
+debugFrame:SetPoint("CENTER", DraftFrame, "CENTER", 0, 0)
 debugFrame:SetFrameStrata("FULLSCREEN_DIALOG")
+debugFrame:SetFrameLevel(DraftFrame:GetFrameLevel() + 20)
 debugFrame:SetBackdrop({
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    bgFile = "Interface\\Buttons\\WHITE8X8",
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
     tile = true,
     tileSize = 32,
     edgeSize = 32,
     insets = { left = 11, right = 12, top = 12, bottom = 11 },
 })
-debugFrame:SetBackdropColor(0.04, 0.04, 0.07, 0.98)
+debugFrame:SetBackdropColor(0.015, 0.015, 0.02, 1.0)
 debugFrame:EnableMouse(true)
 debugFrame:SetMovable(true)
 debugFrame:RegisterForDrag("LeftButton")
@@ -436,6 +476,9 @@ local function ToggleDebugPool()
     if debugFrame:IsShown() then
         debugFrame:Hide()
     else
+        debugFrame:ClearAllPoints()
+        debugFrame:SetPoint("CENTER", DraftFrame, "CENTER", 0, 0)
+        debugFrame:SetFrameLevel(DraftFrame:GetFrameLevel() + 20)
         debugFrame:Show()
         RequestDebugPool()
     end
@@ -473,6 +516,7 @@ local function RefreshMetaUI()
     for _, button in ipairs(cardButtons) do
         local cardId = button.cardId
         local isDestroyed = cardId and state.destroyed[cardId]
+        button:SetBackdropColor(0.01, 0.01, 0.015, 1.0)
         if isDestroyed then
             button:Disable()
             button:SetAlpha(0.30)
@@ -772,6 +816,7 @@ local function MinimizeDraftChooser()
     end
     userMinimized = true
     DraftFrame:Hide()
+    debugFrame:Hide()
     RefreshDraftMinimapButton()
     RefreshMetaUI()
 end
@@ -821,6 +866,7 @@ DraftUxEventFrame:SetScript("OnEvent", function(self, event, ...)
             hasPendingOffer = false
             userMinimized = false
             minimapButton:Hide()
+            debugFrame:Hide()
         end
         return
     end
@@ -829,6 +875,7 @@ DraftUxEventFrame:SetScript("OnEvent", function(self, event, ...)
         if hasPendingOffer then
             userMinimized = true
             DraftFrame:Hide()
+            debugFrame:Hide()
             RefreshDraftMinimapButton()
             RefreshMetaUI()
         end
@@ -848,11 +895,13 @@ DraftUxEventFrame:SetScript("OnEvent", function(self, event, ...)
                 userMinimized = true
             end
             DraftFrame:Hide()
+            debugFrame:Hide()
             RefreshMetaUI()
         end
     elseif message == "C" then
         hasPendingOffer = false
         userMinimized = false
         minimapButton:Hide()
+        debugFrame:Hide()
     end
 end)
