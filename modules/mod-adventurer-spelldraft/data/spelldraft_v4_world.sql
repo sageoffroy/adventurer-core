@@ -3,6 +3,15 @@
 -- 920020-920031: Embate brutal
 -- 920040-920051: Tajo despiadado
 
+-- Adventurer class mask = 512. Grant Shield proficiency through the same
+-- native character-creation table used by stock shield-capable classes, so it
+-- is present before the client's first login state is built.
+DELETE FROM `playercreateinfo_spell`
+WHERE `classmask` = 512 AND `Spell` = 9116;
+
+INSERT INTO `playercreateinfo_spell` (`racemask`, `classmask`, `Spell`, `Note`) VALUES
+(0,512,9116,'Shield');
+
 DELETE FROM `spell_script_names`
 WHERE `spell_id` BETWEEN 920000 AND 920011
    OR `spell_id` BETWEEN 920020 AND 920031
