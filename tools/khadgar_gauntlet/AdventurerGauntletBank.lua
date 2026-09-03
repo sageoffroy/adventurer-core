@@ -13,6 +13,7 @@ local PURCHASED_BAGS = 0
 local NEXT_BAG_PRICE = 0
 local BAG_FRAMES = {}
 local PENDING_WITHDRAW = nil
+local PICKED_UP_SOURCE = nil
 local ACTIVE = false
 local CLOSING_FROM_SERVER = false
 
@@ -97,6 +98,39 @@ local function SnapshotInventoryEntry(entry)
     return snapshot
 end
 
+local function HidePickedUpSource()
+    local source = PICKED_UP_SOURCE
+    if not source or not CursorHasItem() then
+        PICKED_UP_SOURCE = nil
+        return
+    end
+
+    for frameIndex = 1, NUM_CONTAINER_FRAMES do
+        local frame = _G["ContainerFrame" .. frameIndex]
+        if frame and frame:IsShown() and frame:GetID() == source.bag then
+            for visual = 1, GetContainerNumSlots(source.bag) do
+                local button = _G[frame:GetName() .. "Item" .. visual]
+                if button and button:GetID() == source.slot then
+                    local icon = _G[button:GetName() .. "IconTexture"]
+                    local count = _G[button:GetName() .. "Count"]
+                    if icon then icon:Hide() end
+                    if count then count:SetText("") end
+                    break
+                end
+            end
+            break
+        end
+    end
+
+    PICKED_UP_SOURCE = nil
+end
+
+local cursorVisualFix = CreateFrame("Frame")
+cursorVisualFix:SetScript("OnUpdate", function(self)
+    if not PICKED_UP_SOURCE then return end
+    HidePickedUpSource()
+end)
+
 local function TryPickupPendingWithdraw()
     local pending = PENDING_WITHDRAW
     if not pending or CursorHasItem() then return end
@@ -110,6 +144,7 @@ local function TryPickupPendingWithdraw()
                 if (count or 1) > before then
                     PENDING_WITHDRAW = nil
                     PickupContainerItem(bag, slot)
+                    PICKED_UP_SOURCE = { bag = bag, slot = slot }
                     return
                 end
             end
@@ -400,6 +435,7 @@ local function RestoreNativeBank()
     end
 
     PENDING_WITHDRAW = nil
+    PICKED_UP_SOURCE = nil
 end
 
 local function CloseExpeditionBank(fromServer)
