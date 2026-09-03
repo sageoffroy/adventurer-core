@@ -1,28 +1,17 @@
--- Keep Blizzard minimap controls untouched. The custom SpellDraft button and
--- its book icon must stay together: use the book's current position as the
--- authoritative one, then center the round button frame and its border there.
+-- Keep all Blizzard minimap controls untouched. Only move the custom SpellDraft
+-- button slightly outside the left rim so it does not overlap the stock tracker.
+-- The tracking border is centered on the icon itself; the icon is not moved.
 local function RepositionAdventurerDraftButton()
     local draft = _G["AdventurerDraftMinimapButton"]
-    if not draft or not draft.icon then return end
-
-    local x, y = draft.icon:GetCenter()
-    if not x or not y then return end
-
-    local parent = draft:GetParent() or UIParent
-    local scale = parent:GetEffectiveScale()
-    local uiScale = UIParent:GetEffectiveScale()
-    x = x * scale / uiScale
-    y = y * scale / uiScale
+    local minimap = _G["Minimap"]
+    if not draft or not minimap then return end
 
     draft:ClearAllPoints()
-    draft:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+    draft:SetPoint("RIGHT", minimap, "LEFT", 6, -18)
 
-    draft.icon:ClearAllPoints()
-    draft.icon:SetPoint("CENTER", draft, "CENTER", 0, 0)
-
-    if draft.border then
+    if draft.border and draft.icon then
         draft.border:ClearAllPoints()
-        draft.border:SetPoint("CENTER", draft, "CENTER", 0, 0)
+        draft.border:SetPoint("CENTER", draft.icon, "CENTER", 0, 0)
     end
 end
 
