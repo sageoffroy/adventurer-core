@@ -12,9 +12,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from dbc import DBC, DBCError, set_u32, u32
+from subclasses import (
+    SKILLLINEABILITY_FIELDS,
+    SKILLLINEABILITY_RECORD_SIZE,
+    SLA_SKILL_LINE,
+    SLA_SPELL,
+    normalize_custom_skill_line_ability,
+)
 
 SPELL_FIELDS = 234
 SPELL_RECORD_SIZE = SPELL_FIELDS * 4
+MERCENARY_SKILL_LINE_ID = 900
 
 SINISTER_SOURCE_RANKS = (
     1752, 1757, 1758, 1759, 1760, 8621,
@@ -277,4 +285,49 @@ def patch(path: Path, icon_ids: dict[str, int]) -> bool:
     missing = sorted(CUSTOM_SPELL_IDS - present)
     if missing:
         raise DBCError(f"{path}: custom SpellDraft spell rows missing after patch: {missing}")
+    return after != before
+
+
+def patch_skill_line_ability(path: Path) -> bool:
+    """Expose every custom rank in the Mercenary spellbook tab."""
+    dbc = DBC.read(path)
+    if dbc.fields != SKILLLINEABILITY_FIELDS or dbc.record_size != SKILLLINEABILITY_RECORD_SIZE:
+        raise DBCError(
+            f"{path}: unexpected SkillLineAbility layout {dbc.fields}/{dbc.record_size}"
+        )
+
+    before = dbc.to_bytes()
+    dbc.records = [
+        row for row in dbc.records
+        if u32(row, SLA_SPELL) not in CUSTOM_SPELL_IDS
+    ]
+    next_id = max((u32(row, 0) for row in dbc.records), default=0) + 1
+
+    for spell_id in sorted(CUSTOM_SPELL_IDS):
+        row = bytearray(SKILLLINEABILITY_RECORD_SIZE)
+        normalize_custom_skill_line_ability(
+            row,
+            next_id,
+            MERCENARY_SKILL_LINE_ID,
+            spell_id,
+        )
+        next_id += 1
+        dbc.records.append(row)
+
+    dbc.records.sort(key=lambda row: u32(row, 0))
+    after = dbc.to_bytes()
+    if after != before:
+        path.write_bytes(after)
+
+    verify = DBC.read(path)
+    present = {
+        u32(row, SLA_SPELL)
+        for row in verify.records
+        if u32(row, SLA_SKILL_LINE) == MERCENARY_SKILL_LINE_ID
+    }
+    missing = sorted(CUSTOM_SPELL_IDS - present)
+    if missing:
+        raise DBCError(
+            f"{path}: custom SpellDraft ranks missing from Mercenary skill line: {missing}"
+        )
     return after != before
