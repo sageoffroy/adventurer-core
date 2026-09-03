@@ -16,6 +16,7 @@ from pathlib import Path
 
 import adventurer_apply  # noqa: F401
 import client
+import spelldraft_custom_spells
 import spelldraft_v3_icons
 from khadgar_gauntlet.patch_item_dbc import patch as patch_gauntlet_items
 from khadgar_gauntlet.patch_spell_dbc import patch as patch_gauntlet_spells
@@ -85,10 +86,19 @@ def build(args) -> None:
 
         spell_path = work / "Spell.dbc"
         before_spell = spell_path.read_bytes()
+        spelldraft_custom_spells.patch(spell_path, assigned)
         patch_gauntlet_spells(spell_path)
         changed["Spell.dbc"] = (
             spell_path.read_bytes() != before_spell
             or changed.get("Spell.dbc", False)
+        )
+
+        skill_path = work / "SkillLineAbility.dbc"
+        before_skill = skill_path.read_bytes()
+        spelldraft_custom_spells.patch_skill_line_ability(skill_path)
+        changed["SkillLineAbility.dbc"] = (
+            skill_path.read_bytes() != before_skill
+            or changed.get("SkillLineAbility.dbc", False)
         )
         return changed
 
@@ -114,8 +124,8 @@ def build(args) -> None:
     first, last = min(mapping), max(mapping)
     print(
         f"Final client/server bundle installed in one pass: {len(mapping)} Gauntlet items "
-        f"({first}-{last}), Gauntlet spells and {len(icons)} SpellDraft v3 icon textures. "
-        f"Server DBCs: {runtime_dbc}."
+        f"({first}-{last}), {len(spelldraft_custom_spells.CUSTOM_SPELL_IDS)} SpellDraft v4 custom spell ranks, "
+        f"Gauntlet spells and {len(icons)} SpellDraft icon textures. Server DBCs: {runtime_dbc}."
     )
 
 
