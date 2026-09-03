@@ -3,6 +3,7 @@
 #include "SpellInfo.h"
 #include "SpellScript.h"
 #include "SpellScriptLoader.h"
+#include "Util.h"
 
 #include <algorithm>
 
@@ -12,7 +13,7 @@ constexpr uint8 SinisterWeaponPercent = 75;
 constexpr uint8 SinisterDaggerPercent = 100;
 constexpr uint8 RuthlessCleaveWeaponPercent = 65;
 
-bool UsesMainHandDagger(Player const* player)
+bool UsesMainHandDagger(Player* player)
 {
     if (!player)
         return false;
@@ -25,12 +26,12 @@ bool UsesMainHandDagger(Player const* player)
     return item && item->Class == ITEM_CLASS_WEAPON && item->SubClass == ITEM_SUBCLASS_WEAPON_DAGGER;
 }
 
-int32 FlatRankBonus(SpellScript const* script)
+int32 FlatRankBonus(SpellInfo const* spellInfo, Unit* caster)
 {
-    if (!script || !script->GetSpellInfo() || !script->GetCaster())
+    if (!spellInfo || !caster)
         return 0;
 
-    return std::max<int32>(0, script->GetSpellInfo()->Effects[EFFECT_0].CalcValue(script->GetCaster()));
+    return std::max<int32>(0, spellInfo->Effects[EFFECT_0].CalcValue(caster));
 }
 
 int32 ScaleWeaponPortion(int32 totalDamage, int32 flatBonus, uint8 percent)
@@ -59,7 +60,11 @@ class spell_adventurer_sinister_strike : public SpellScript
             return;
 
         uint8 percent = UsesMainHandDagger(player) ? SinisterDaggerPercent : SinisterWeaponPercent;
-        SetHitDamage(ScaleWeaponPortion(GetHitDamage(), FlatRankBonus(this), percent));
+        SetHitDamage(
+            ScaleWeaponPortion(
+                GetHitDamage(),
+                FlatRankBonus(GetSpellInfo(), GetCaster()),
+                percent));
     }
 
     void Register() override
@@ -116,7 +121,10 @@ class spell_adventurer_ruthless_cleave : public SpellScript
             return;
 
         SetHitDamage(
-            ScaleWeaponPortion(GetHitDamage(), FlatRankBonus(this), RuthlessCleaveWeaponPercent));
+            ScaleWeaponPortion(
+                GetHitDamage(),
+                FlatRankBonus(GetSpellInfo(), GetCaster()),
+                RuthlessCleaveWeaponPercent));
 
         ++_successfulHits;
         if (_successfulHits < 2 || _comboGranted)
