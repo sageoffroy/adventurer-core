@@ -48,9 +48,6 @@ RUTHLESS_CLEAVE_ICON_PATH = "Interface\\Icons\\Ability_DemonHunter_SoulCleave"
 
 POWER_ENERGY = 3
 SPELL_EFFECT_SCHOOL_DAMAGE = 2
-ITEM_CLASS_ARMOR = 4
-ITEM_SUBCLASS_ARMOR_SHIELD = 6
-INVTYPE_SHIELD = 14
 
 EFFECT_FIELD_STARTS = (
     71, 74, 77, 80, 83, 86, 89, 92, 95,
@@ -165,9 +162,13 @@ def _build_brutal_slam(
     set_u32(row, 71, SPELL_EFFECT_SCHOOL_DAMAGE)
     _clear_effect(row, 2)
 
-    set_u32(row, 68, ITEM_CLASS_ARMOR)
-    set_u32(row, 69, 1 << ITEM_SUBCLASS_ARMOR_SHIELD)
-    set_u32(row, 70, 1 << INVTYPE_SHIELD)
+    # Do not use Spell.dbc's generic EquippedItemClass requirement here. The
+    # Adventurer owns shield proficiency outside the stock class matrix, so the
+    # authoritative requirement is checked directly against the equipped
+    # off-hand item by the SpellScript.
+    set_u32(row, 68, 0xFFFFFFFF)
+    set_u32(row, 69, 0)
+    set_u32(row, 70, 0)
 
     set_u32(row, 131, u32(shield_visual, 131))
     set_u32(row, 132, u32(shield_visual, 132))
