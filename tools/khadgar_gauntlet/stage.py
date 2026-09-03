@@ -64,23 +64,25 @@ def stage(core_dir: Path, server_data_dir: Path, client_dir: Path, dbc_src: Path
 
     addon_dir = client / "Interface" / "AddOns" / "AdventurerGauntlet"
     addon_dir.mkdir(parents=True, exist_ok=True)
-    stale = addon_dir / "AdventurerGauntletStash.lua"
-    if stale.exists():
-        stale.unlink()
+    for stale_name in (
+        "AdventurerGauntletStash.lua",
+        "AdventurerMinimapFix.lua",
+    ):
+        stale = addon_dir / stale_name
+        if stale.exists():
+            stale.unlink()
 
     (addon_dir / "AdventurerGauntlet.toc").write_text(
         "## Interface: 30300\n"
         "## Title: Adventurer Gauntlet\n"
         "## Notes: Gauntlet account bank, item collection and client integration for Aventureros de Azeroth.\n"
         "AdventurerGauntletBank.lua\n"
-        "AdventurerGauntletBook.lua\n"
-        "AdventurerMinimapFix.lua\n",
+        "AdventurerGauntletBook.lua\n",
         encoding="utf-8",
     )
     for name in (
         "AdventurerGauntletBank.lua",
         "AdventurerGauntletBook.lua",
-        "AdventurerMinimapFix.lua",
     ):
         shutil.copy2(TOOLS / name, addon_dir / name)
 
