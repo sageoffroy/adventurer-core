@@ -3,6 +3,7 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 core_dir=""
+server_data_dir=""
 args=("$@")
 for ((i=0; i<${#args[@]}; i++)); do
     case "${args[$i]}" in
@@ -14,12 +15,24 @@ for ((i=0; i<${#args[@]}; i++)); do
         --core-dir=*)
             core_dir="${args[$i]#*=}"
             ;;
+        --server-data-dir)
+            if (( i + 1 < ${#args[@]} )); then
+                server_data_dir="${args[$((i + 1))]}"
+            fi
+            ;;
+        --server-data-dir=*)
+            server_data_dir="${args[$i]#*=}"
+            ;;
     esac
 done
 
 if [[ -z "$core_dir" ]]; then
     printf '%s\n' "ERROR: --core-dir is required" >&2
     exit 2
+fi
+
+if [[ -z "$server_data_dir" ]]; then
+    server_data_dir="$core_dir/env/dist/data"
 fi
 
 has_playerbots=0
@@ -53,6 +66,16 @@ python3 "$ROOT/tools/build_client_bundle.py" "$@"
 if (( has_playerbots == 1 )); then
     python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir"
 fi
+
+# Structural SpellDraft data is source-owned. Never let an old runtime copy of
+# cards/metadata/subclass mappings survive a repository update; only
+# spelldraft.conf remains intentionally editable/mergeable at runtime.
+runtime_dir="$server_data_dir/spelldraft"
+rm -f \
+  "$runtime_dir/cards.csv" \
+  "$runtime_dir/catalog_metadata.csv" \
+  "$runtime_dir/subclasses.json" \
+  "$runtime_dir/card_subclasses.csv"
 
 python3 "$ROOT/tools/spelldraft_runtime.py" install "$@"
 
