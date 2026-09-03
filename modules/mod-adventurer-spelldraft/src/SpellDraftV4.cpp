@@ -1,5 +1,6 @@
 #include "Item.h"
 #include "Player.h"
+#include "ScriptDefines/PlayerScript.h"
 #include "SpellInfo.h"
 #include "SpellScript.h"
 #include "SpellScriptLoader.h"
@@ -12,6 +13,8 @@ namespace
 constexpr uint8 SinisterWeaponPercent = 75;
 constexpr uint8 SinisterDaggerPercent = 100;
 constexpr uint8 RuthlessCleaveWeaponPercent = 65;
+constexpr uint32 AdventurerClassId = 10;
+constexpr uint32 ShieldProficiencySpell = 9116;
 
 bool UsesMainHandDagger(Player* player)
 {
@@ -41,6 +44,15 @@ int32 ScaleWeaponPortion(int32 totalDamage, int32 flatBonus, uint8 percent)
 
     int32 weaponPortion = std::max<int32>(0, totalDamage - flatBonus);
     return flatBonus + CalculatePct(weaponPortion, percent);
+}
+
+void EnsureShieldProficiency(Player* player)
+{
+    if (!player || player->getClass() != AdventurerClassId)
+        return;
+
+    if (!player->HasSpell(ShieldProficiencySpell))
+        player->learnSpell(ShieldProficiencySpell);
 }
 }
 
@@ -149,9 +161,27 @@ private:
     bool _comboGranted = false;
 };
 
+class AdventurerSpellDraftV4PlayerScript : public PlayerScript
+{
+public:
+    AdventurerSpellDraftV4PlayerScript()
+        : PlayerScript("AdventurerSpellDraftV4PlayerScript") { }
+
+    void OnPlayerLogin(Player* player) override
+    {
+        EnsureShieldProficiency(player);
+    }
+
+    void OnPlayerCreate(Player* player) override
+    {
+        EnsureShieldProficiency(player);
+    }
+};
+
 void AddAdventurerSpellDraftV4Scripts()
 {
     RegisterSpellScript(spell_adventurer_sinister_strike);
     RegisterSpellScript(spell_adventurer_brutal_slam);
     RegisterSpellScript(spell_adventurer_ruthless_cleave);
+    new AdventurerSpellDraftV4PlayerScript();
 }
