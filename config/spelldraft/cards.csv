@@ -226,7 +226,7 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 235;titans_grip;talent;10;common;100;46917;;;;1;Empuñadura de titán
 236;shield_specialization;talent;10;common;100;12298/12724/12725/12726/12727;;;;1;Especialización en escudos
 237;toughness;talent;10;common;100;12299/12761/12762/12763/12764;;;;1;Dureza
-238;one_handed_weapon_specialization;talent;10;common;100;16538/16539/16540/16541/16542;;;;1;Especialización en armas de una mano
+238;one_handed_weapon_specialization;talent;10;common;100;20196/20197/20198;;;;1;Especialización en armas de una mano
 239;vitality;talent;10;common;100;29140/29143/29144;;;;1;Vitalidad
 240;damage_shield;talent;10;common;100;58872/58874;;;;1;Escudo de daño
 241;vigor;talent;10;common;100;14983;;;;1;Vigor
@@ -249,3 +249,17 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 258;enveloping_shadows;talent;10;common;100;31211/31212/31213;;;;1;Sombras envolventes
 259;cheat_death;talent;10;common;100;31228/31229/31230;;;;1;Burlar a la muerte
 260;honor_among_thieves;talent;10;common;100;51698/51700/51701;;;;1;Honor entre ladrones
+261;divine_intellect;talent;10;common;100;20257/20258/20259/20260/20261;;;;1;Intelecto divino
+262;unyielding_faith;talent;10;common;100;9453/25836;;;;1;Fe implacable
+263;divine_strength;talent;10;common;100;20262/20263/20264/20265/20266;;;;1;Fuerza divina
+264;divinity;talent;10;common;100;63646/63647/63648/63649/63650;;;;1;Divinidad
+265;stoicism;talent;10;common;100;31844/31845;;;;1;Estoicismo
+266;spiritual_attunement;talent;10;common;100;31785/33776;;;;1;Armonización espiritual
+267;ardent_defender;talent;10;common;100;31850/31851/31852;;;;1;Defensor candente
+268;combat_expertise_paladin;talent;10;common;100;31858/31859/31860;;;;1;Experiencia en combate
+269;touched_by_the_light;talent;10;common;100;53590/53591/53592;;;;1;Tocado por la Luz
+270;conviction;talent;10;common;100;20049/20056/20057/20058/20059;;;;1;Convicción
+271;pursuit_of_justice;talent;10;common;100;26022/26023;;;;1;Búsqueda de justicia
+272;eye_for_an_eye;talent;10;common;100;9799/25988;;;;1;Ojo por ojo
+273;crusade;talent;10;common;100;31866/31867/31868;;;;1;Cruzada
+274;vengeance_paladin;talent;10;common;100;20050/20052/20053;;;;1;Venganza
