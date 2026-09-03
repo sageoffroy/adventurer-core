@@ -34,9 +34,7 @@ CUSTOM_TALENT_IDS = frozenset(
     (*IMPROVED_SINISTER_RANKS, *IMPROVED_BRUTAL_RANKS, *IMPROVED_RUTHLESS_RANKS)
 )
 
-# Visible talent roots whose native rank chains are read from Talent.dbc.
 TALENT_MASK_EXTENSIONS = (
-    # root, effect index, affected custom generators
     (14082, 1, "all"),       # Actos reprobables: low-health special damage
     (18427, 0, "sin_tajo"),  # Agresión
     (31234, 0, "all"),       # Descubrir debilidad: direct ability damage
@@ -47,7 +45,6 @@ TALENT_MASK_EXTENSIONS = (
     (14177, 0, "all"),       # Sangre fría
 )
 
-# Internal/trigger spells. These are mechanics, not talent cards.
 TRIGGER_MASK_EXTENSIONS = (
     (14143, 0, "all"),  # Sin remordimientos rank 1 buff
     (14149, 0, "all"),  # Sin remordimientos rank 2 buff
@@ -104,6 +101,37 @@ def _talent_aliases(path: Path) -> dict[int, tuple[int, ...]]:
     return aliases
 
 
+def _patch_talent_dbc(path: Path) -> bool:
+    """Expose the three two-rank custom talents to SpellDraft's Talent.dbc scan."""
+    dbc = DBC.read(path)
+    if dbc.fields < 9:
+        raise DBCError(f"{path}: unexpected Talent.dbc layout {dbc.fields}/{dbc.record_size}")
+
+    before = dbc.to_bytes()
+    kept: list[bytearray] = []
+    for row in dbc.records:
+        ranks = {u32(row, field) for field in range(4, 9)}
+        if ranks & CUSTOM_TALENT_IDS:
+            continue
+        kept.append(row)
+
+    next_id = max((u32(row, 0) for row in kept), default=0) + 1
+    for ranks in (IMPROVED_SINISTER_RANKS, IMPROVED_BRUTAL_RANKS, IMPROVED_RUTHLESS_RANKS):
+        row = bytearray(dbc.record_size)
+        set_u32(row, 0, next_id)
+        next_id += 1
+        set_u32(row, 4, ranks[0])
+        set_u32(row, 5, ranks[1])
+        kept.append(row)
+
+    dbc.records = kept
+    dbc.records.sort(key=lambda row: u32(row, 0))
+    after = dbc.to_bytes()
+    if after != before:
+        path.write_bytes(after)
+    return after != before
+
+
 def _allocate_family_bits(rows: list[bytearray], rogue_family: int) -> tuple[int, int, int]:
     used = [0, 0, 0]
     for row in rows:
@@ -132,7 +160,11 @@ def _bit_words(bit: int) -> tuple[int, int, int]:
 
 
 def _or_words(*values: tuple[int, int, int]) -> tuple[int, int, int]:
-    return tuple(a | b | c for a, b, c in zip(*values))  # type: ignore[return-value]
+    merged = [0, 0, 0]
+    for value in values:
+        for index in range(3):
+            merged[index] |= value[index]
+    return tuple(merged)  # type: ignore[return-value]
 
 
 def _set_spell_family(row: bytearray, rogue_family: int, words: tuple[int, int, int]) -> None:
@@ -154,8 +186,6 @@ def _set_effect_mask(row: bytearray, effect_index: int, words: tuple[int, int, i
 
 def _extend_effect_mask(row: bytearray, effect_index: int, words: tuple[int, int, int]) -> None:
     current = _effect_mask(row, effect_index)
-    # Zero means the stock spell does not use a SpellClassMask for this effect;
-    # do not turn a global effect into a restricted one accidentally.
     if not any(current):
         return
     _set_effect_mask(row, effect_index, tuple(a | b for a, b in zip(current, words)))
@@ -268,7 +298,8 @@ def _patch_tooltips(
         )
 
 
-def patch(spell_path: Path, talent_path: Path, icon_ids: dict[str, int]) -> bool:
+def patch(spell_path: Path, talent_path: Path, icon_ids: dict[str, int]) -> tuple[bool, bool]:
+    talent_changed = _patch_talent_dbc(talent_path)
     dbc = DBC.read(spell_path)
     if dbc.fields != SPELL_FIELDS or dbc.record_size != SPELL_RECORD_SIZE:
         raise DBCError(
@@ -349,7 +380,8 @@ def patch(spell_path: Path, talent_path: Path, icon_ids: dict[str, int]) -> bool
 
     dbc.records.sort(key=lambda row: u32(row, 0))
     after = dbc.to_bytes()
-    if after != before:
+    spell_changed = after != before
+    if spell_changed:
         spell_path.write_bytes(after)
 
     verify = DBC.read(spell_path)
@@ -357,4 +389,4 @@ def patch(spell_path: Path, talent_path: Path, icon_ids: dict[str, int]) -> bool
     missing = sorted(CUSTOM_TALENT_IDS - present)
     if missing:
         raise DBCError(f"SpellDraft v4 custom talent rows missing after patch: {missing}")
-    return after != before
+    return spell_changed, talent_changed
