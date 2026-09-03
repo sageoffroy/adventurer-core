@@ -108,12 +108,14 @@ if [[ "$spelldraft_data_dir" != "$server_data_dir" ]]; then
       "$stale_runtime_dir/card_subclasses.csv"
 fi
 
-# Keep all original install arguments (notably --dbc-src), then append the
-# resolved core/DataDir values so argparse's final occurrence wins.
+# Runtime talent synthesis must inspect the patched Talent.dbc produced above,
+# because it now contains the three Adventurer-owned improved talent chains.
+# Keep original arguments first, then append resolved values so they win.
 python3 "$ROOT/tools/spelldraft_runtime.py" install \
   "${args[@]}" \
   --core-dir "$core_dir" \
-  --server-data-dir "$spelldraft_data_dir"
+  --server-data-dir "$spelldraft_data_dir" \
+  --dbc-src "$core_dir/env/dist/bin/dbc"
 
 if (( has_playerbots == 1 )); then
     python3 "$ROOT/tools/playerbots_runtime.py" install --core-dir "$core_dir"
