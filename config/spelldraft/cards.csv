@@ -229,3 +229,23 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 238;one_handed_weapon_specialization;talent;10;common;100;16538/16539/16540/16541/16542;;;;1;Especialización en armas de una mano
 239;vitality;talent;10;common;100;29140/29143/29144;;;;1;Vitalidad
 240;damage_shield;talent;10;common;100;58872/58874;;;;1;Escudo de daño
+241;vigor;talent;10;common;100;14983;;;;1;Vigor
+242;fleet_footed;talent;10;common;100;31208/31209;;;;1;Pies de galgo
+243;deadened_nerves;talent;10;common;100;31380/31382/31383;;;;1;Nervios entumecidos
+244;focused_attacks;talent;10;common;100;51634/51635/51636;;;;1;Ataques centrados
+245;rogue_precision;talent;10;common;100;13705/13832/13843/13844/13845;;;;1;Precisión
+246;close_quarters_combat;talent;10;common;100;13706/13804/13805/13806/13807;;;;1;Combate cuerpo a cuerpo
+247;lightning_reflexes;talent;10;common;100;13787/13788/13789;;;;1;Reflejos de relámpago
+248;weapon_expertise_rogue;talent;10;common;100;30919/30920;;;;1;Experiencia con armas
+249;rogue_vitality;talent;10;common;100;31122/31123/61329;;;;1;Vitalidad
+250;nerves_of_steel;talent;10;common;100;31130/31131;;;;1;Nervios de acero
+251;combat_potency;talent;10;common;100;35541/35550/35551/35552/35553;;;;1;Potencia de combate
+252;unfair_advantage;talent;10;common;100;51672/51674;;;;1;Ventaja desleal
+253;prey_on_the_weak;talent;10;common;100;51685/51686/51687/51688/51689;;;;1;Abusar de los débiles
+254;master_of_deception;talent;10;common;100;13958/13970/13971;;;;1;Maestro del engaño
+255;setup;talent;10;common;100;13983/14070/14071;;;;1;Preparación
+256;heightened_senses;talent;10;common;100;30894/30895;;;;1;Sentidos agudizados
+257;rogue_deadliness;talent;10;common;100;30902/30903/30904/30905/30906;;;;1;Letalidad
+258;enveloping_shadows;talent;10;common;100;31211/31212/31213;;;;1;Sombras envolventes
+259;cheat_death;talent;10;common;100;31228/31229/31230;;;;1;Burlar a la muerte
+260;honor_among_thieves;talent;10;common;100;51698/51700/51701;;;;1;Honor entre ladrones
