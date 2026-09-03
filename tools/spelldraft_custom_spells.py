@@ -162,13 +162,11 @@ def _build_brutal_slam(
     set_u32(row, 71, SPELL_EFFECT_SCHOOL_DAMAGE)
     _clear_effect(row, 2)
 
-    # Do not use Spell.dbc's generic EquippedItemClass requirement here. The
-    # Adventurer owns shield proficiency outside the stock class matrix, so the
-    # authoritative requirement is checked directly against the equipped
-    # off-hand item by the SpellScript.
-    set_u32(row, 68, 0xFFFFFFFF)
-    set_u32(row, 69, 0)
-    set_u32(row, 70, 0)
+    # Mirror Shield Slam's equipped-item requirement so the client knows this
+    # ability requires a shield. The SpellScript still validates the actual
+    # equipped off-hand item server-side.
+    for field in (68, 69, 70):
+        set_u32(row, field, u32(shield_visual, field))
 
     set_u32(row, 131, u32(shield_visual, 131))
     set_u32(row, 132, u32(shield_visual, 132))
