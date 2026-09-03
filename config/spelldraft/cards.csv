@@ -201,3 +201,31 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 105;improved_frostbolt;talent;10;uncommon;180;11070/12473/16763/16765/16766;3:1;;;1;Descarga de Escarcha mejorada
 106;tactical_mastery;talent;10;uncommon;250;12295/12676/12677;1:1;;;1;Maestría táctica
 107;improved_heroic_strike;talent;10;uncommon;180;12282/12663/12664;8:1;;;1;Golpe heroico mejorado
+213;iron_will;talent;10;common;100;12300/12959/12960;;;;1;Voluntad de hierro
+214;anger_management;talent;10;common;100;12296;;;;1;Control de ira
+215;deep_wounds;talent;10;common;100;12834/12849/12867;;;;1;Heridas profundas
+216;two_handed_weapon_specialization;talent;10;common;100;12163/12711/12712;;;;1;Especialización en armas de dos manos
+217;poleaxe_specialization;talent;10;common;100;12700/12781/12783/12784/12785;;;;1;Especialización en hachas y armas de asta
+218;mace_specialization;talent;10;common;100;12284/12701/12702/12703/12704;;;;1;Especialización en mazas
+219;sword_specialization;talent;10;common;100;12281/12812/12813/12814/12815;;;;1;Especialización en espadas
+220;weapon_mastery;talent;10;common;100;20504/20505;;;;1;Maestría en armas
+221;trauma;talent;10;common;100;46854/46855;;;;1;Trauma
+222;second_wind;talent;10;common;100;29834/29838;;;;1;Segundo aliento
+223;strength_of_arms;talent;10;common;100;46865/46866;;;;1;Fuerza de armas
+224;endless_rage;talent;10;common;100;29623;;;;1;Ira infinita
+225;wrecking_crew;talent;10;common;100;46867/56611/56612/56613/56614;;;;1;Equipo de demolición
+226;armored_to_the_teeth;talent;10;common;100;61216/61221/61222;;;;1;Armado hasta los dientes
+227;unbridled_wrath;talent;10;common;100;12322/12999/13000/13001/13002;;;;1;Ira desbocada
+228;blood_craze;talent;10;common;100;16487/16489/16492;;;;1;Manía sangrienta
+229;dual_wield_specialization;talent;10;common;100;23584/23585/23586/23587/23588;;;;1;Especialización en doble empuñadura
+230;warrior_enrage;talent;10;common;100;12317/13045/13046/13047/13048;;;;1;Enfurecer
+231;warrior_precision;talent;10;common;100;29590/29591/29592;;;;1;Precisión
+232;warrior_flurry;talent;10;common;100;12319/12971/12972/12973/12974;;;;1;Aluvión
+233;furious_attacks;talent;10;common;100;46910/46911;;;;1;Ataques furiosos
+234;rampage;talent;10;common;100;29801;;;;1;Desenfreno
+235;titans_grip;talent;10;common;100;46917;;;;1;Empuñadura de titán
+236;shield_specialization;talent;10;common;100;12298/12724/12725/12726/12727;;;;1;Especialización en escudos
+237;toughness;talent;10;common;100;12299/12761/12762/12763/12764;;;;1;Dureza
+238;one_handed_weapon_specialization;talent;10;common;100;16538/16539/16540/16541/16542;;;;1;Especialización en armas de una mano
+239;vitality;talent;10;common;100;29140/29143/29144;;;;1;Vitalidad
+240;damage_shield;talent;10;common;100;58872/58874;;;;1;Escudo de daño
