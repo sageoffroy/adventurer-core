@@ -43,6 +43,7 @@ for index = 1, BASE_SLOTS do
         OnReceiveDrag = button:GetScript("OnReceiveDrag"),
         OnEnter = button:GetScript("OnEnter"),
         OnLeave = button:GetScript("OnLeave"),
+        UpdateTooltip = button.UpdateTooltip,
     }
 end
 
@@ -154,6 +155,7 @@ local function ConfigureItemButton(button, bankSlot)
     button.entry = nil
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
+    button.UpdateTooltip = UpdateTooltip
     button:SetScript("OnEnter", UpdateTooltip)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
     button:SetScript("OnClick", function(self)
@@ -376,6 +378,7 @@ local function RestoreNativeBank()
         button:SetScript("OnReceiveDrag", scripts.OnReceiveDrag)
         button:SetScript("OnEnter", scripts.OnEnter)
         button:SetScript("OnLeave", scripts.OnLeave)
+        button.UpdateTooltip = scripts.UpdateTooltip
         button.expeditionBankSlot = nil
         button.entry = nil
     end
