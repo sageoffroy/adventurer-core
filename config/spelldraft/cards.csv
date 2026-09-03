@@ -249,7 +249,7 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 258;enveloping_shadows;talent;10;common;100;31211/31212/31213;;;;1;Sombras envolventes
 259;cheat_death;talent;10;common;100;31228/31229/31230;;;;1;Burlar a la muerte
 260;honor_among_thieves;talent;10;common;100;51698/51700/51701;;;;1;Honor entre ladrones
-261;divine_intellect;talent;10;common;100;20257/20258/20259/20260/20261;;;;1;Intelecto divino
+261;mental_strength;talent;10;common;100;18551/18552/18553/18554/18555;;;;1;Fortaleza mental
 262;unyielding_faith;talent;10;common;100;9453/25836;;;;1;Fe implacable
 263;divine_strength;talent;10;common;100;20262/20263/20264/20265/20266;;;;1;Fuerza divina
 264;divinity;talent;10;common;100;63646/63647/63648/63649/63650;;;;1;Divinidad
@@ -282,3 +282,13 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 291;expose_weakness;talent;10;common;100;34500/34502/34503;;;;1;Exponer debilidad
 292;master_tactician_hunter;talent;10;common;100;34506/34507/34508/34838/34839;;;;1;Maestro táctico
 293;hunter_vs_wild;talent;10;common;100;56339/56340/56341;;;;1;Cazador contra naturaleza
+294;unbreakable_will;talent;10;common;100;14522/14788/14789/14790/14791;;;;1;Voluntad inquebrantable
+295;meditation_priest;talent;10;common;100;14521/14776/14777;;;;1;Meditación
+296;focused_will;talent;10;common;100;45234/45243/45244;;;;1;Voluntad centrada
+297;spell_warding;talent;10;common;100;27900/27901/27902/27903/27904;;;;1;Protección contra hechizos
+298;blessed_recovery;talent;10;common;100;27811/27815/27816;;;;1;Recuperación bendita
+299;spirit_of_redemption;talent;10;common;100;20711;;;;1;Espíritu redentor
+300;spiritual_guidance;talent;10;common;100;14901/15028/15029/15030/15031;;;;1;Guía espiritual
+301;blessed_resilience;talent;10;common;100;33142/33145/33146;;;;1;Temple bendito
+302;spirit_tap;talent;10;common;100;15270/15335/15336;;;;1;Transfusión de espíritu
+303;divine_aegis;talent;10;common;100;47509/47511/47515;;;;1;Égida divina
