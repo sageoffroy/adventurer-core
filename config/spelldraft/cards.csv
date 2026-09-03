@@ -11,7 +11,7 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 10;stealth;active;1;uncommon;120;1784+921+6770;;;;0;Sigilo
 12;arcane_intellect;active;1;common;90;1459;;;;0;Intelecto Arcano
 13;healing_wave;active;1;common;100;331;;;;0;Ola de sanación
-14;sinister_strike;active;1;common;100;1752;;;50,55;0;Golpe siniestro
+14;sinister_strike;active;1;common;100;920000;;;50,55;0;Golpe siniestro
 15;defensive_stance;active;10;common;100;71+355;;;24,25;0;Actitud defensiva
 16;healing_touch;active;1;common;100;5185;;;;0;Toque de sanación
 17;mark_of_the_wild;active;1;uncommon;100;1126;;;;0;Marca de lo salvaje
@@ -47,11 +47,11 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 47;aspect_of_the_hawk;active;10;common;100;13165;;;;0;Aspecto del halcón
 48;track_humanoids;active;10;common;90;19883;;;;0;Rastrear humanoides
 49;tame_beast;active;10;epic;100;1515+883+2641+6991+982;;;;0;Domesticar bestia
-50;eviscerate;active;1;common;100;2098;;14:1|51:1|53:1;;0;Eviscerar
+50;eviscerate;active;1;common;100;2098;;14:1|51:1|53:1|211:1|212:1;;0;Eviscerar
 51;backstab;active;4;common;100;53;;;50,55;0;Puñalada
 53;gouge;active;6;common;100;1776;;;50,55;0;Gubia
 54;evasion;active;8;common;100;5277;;;;0;Evasión
-55;slice_and_dice;active;10;common;100;5171;;14:1|51:1|53:1;;0;Hacer picadillo
+55;slice_and_dice;active;10;common;100;5171;;14:1|51:1|53:1|211:1|212:1;;0;Hacer picadillo
 56;sprint;active;10;common;100;2983;;;;0;Sprint
 57;lesser_heal;active;1;common;100;2050;;;;0;Sanación inferior
 58;power_word_fortitude;active;1;common;100;1243;;;;0;Palabra de poder: entereza
@@ -140,12 +140,12 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 156;freezing_trap;active;20;epic;100;1499;;;;0;Trampa congelante
 157;kick;active;12;common;100;1766;;;;0;Patada
 158;garrote;active;14;uncommon;100;703;10:1;;;0;Garrote
-159;expose_armor;active;14;uncommon;100;8647;;14:1|51:1|53:1;;0;Exponer armadura
+159;expose_armor;active;14;uncommon;100;8647;;14:1|51:1|53:1|211:1|212:1;;0;Exponer armadura
 160;feint;active;16;uncommon;100;1966;;;;0;Amago
 161;pick_lock;active;16;common;100;1804;;;;0;Forzar cerradura
 162;ambush;active;18;common;100;8676;10:1;;;0;Emboscada
 163;dismantle;active;20;uncommon;100;51722;;;;0;Desmantelar
-164;rupture;active;20;uncommon;100;1943;;14:1|51:1|53:1;;0;Ruptura
+164;rupture;active;20;uncommon;100;1943;;14:1|51:1|53:1|211:1|212:1;;0;Ruptura
 165;inner_fire;active;12;common;100;588;;;;0;Fuego interno
 166;cure_disease;active;14;common;100;528;;;;0;Curar enfermedad
 167;psychic_scream;active;14;rare;100;8122;;;;0;Alarido psíquico
@@ -192,6 +192,8 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 208;summon_succubus;active;20;epic;100;712;90:1;;;0;Invocar súcubo
 209;rain_of_fire;active;20;rare;100;5740;;;;0;Lluvia de Fuego
 210;felsteed;active;20;rare;100;5784;;;;0;Corcel nefasto
+211;brutal_slam;active;1;common;100;920020;;;50,55;0;Embate brutal
+212;ruthless_cleave;active;1;common;100;920040;;;50,55;0;Tajo despiadado
 101;cruelty;talent;10;common;120;12320/12852/12853/12855/12856;;;;1;Crueldad
 102;deflection;talent;10;common;100;16462/16463/16464/16465/16466;;;;1;Desvío
 103;anticipation;talent;10;common;90;12297/12750/12751/12752/12753;;;;1;Anticipación
