@@ -37,6 +37,14 @@ python3 "$ROOT/tools/upgrade_apply.py" "$@"
 python3 "$ROOT/tools/khadgar_gauntlet/stage.py" "$@"
 python3 "$ROOT/tools/spelldraft_v4_stage.py" --core-dir "$core_dir"
 
+# A newly staged AzerothCore module is invisible to an already-configured build
+# tree until CMake regenerates it. Reconfigure in place when this installation
+# already has a build directory; cached build options are preserved.
+build_dir="$core_dir/build"
+if [[ -f "$build_dir/CMakeCache.txt" ]]; then
+    cmake -S "$core_dir" -B "$build_dir"
+fi
+
 # One authoritative client/server build for Aventurero + SpellDraft + Gauntlet.
 # Every DBC transform and external icon is applied before the final server DBCs
 # and client Z patches are installed.
