@@ -310,3 +310,22 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 319;living_spirit;talent;10;common;100;34151/34152/34153;;;;1;Espíritu vivo
 320;natural_perfection;talent;10;common;100;33881/33882/33883;;;;1;Perfección natural
 321;mental_strength;talent;10;common;100;18551/18552/18553/18554/18555;;;;1;Fortaleza mental
+322;arcane_fortitude;talent;10;common;100;28574/54658;;;;1;Fortaleza Arcana
+323;magic_absorption;talent;10;common;100;29441/29444;;;;1;Absorción de magia
+324;mind_mastery;talent;10;common;100;31584/31585/31586/31587/31588;;;;1;Maestría mental
+325;netherwind_presence;talent;10;common;100;44400/44402/44403;;;;1;Presencia viento abisal
+326;spell_power;talent;10;common;100;35578/35581;;;;1;Poder con hechizos
+327;burning_determination;talent;10;common;100;54747/54749;;;;1;Determinación ardiente
+328;master_of_elements;talent;10;common;100;29074/29075/29076;;;;1;Maestro de los elementos
+329;playing_with_fire;talent;10;common;100;31638/31639/31640;;;;1;Jugando con fuego
+330;critical_mass;talent;10;common;100;11095/12872/12873;;;;1;Masa crítica
+331;blazing_speed;talent;10;common;100;31641/31642;;;;1;Velocidad llameante
+332;fire_power;talent;10;common;100;11124/12378/12398/12399/12400;;;;1;Poder de Fuego
+333;pyromaniac;talent;10;common;100;34293/34295/34296;;;;1;Pirómano
+334;molten_fury;talent;10;common;100;31679/31680;;;;1;Furia de arrabio
+335;ice_shards;talent;10;common;100;11207/12672/15047;;;;1;Fragmentos de hielo
+336;mage_precision;talent;10;common;100;29438/29439/29440;;;;1;Precisión
+337;piercing_ice;talent;10;common;100;11151/12952/12953;;;;1;Hielo penetrante
+338;frost_channeling;talent;10;common;100;11160/12518/12519;;;;1;Canalización de Escarcha
+339;shatter;talent;10;common;100;11170/12982/12983;;;;1;Trizar
+340;arctic_winds;talent;10;common;100;31674/31675/31676/31677/31678;;;;1;Vientos árticos
