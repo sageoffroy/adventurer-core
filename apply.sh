@@ -31,15 +31,17 @@ python3 "$ROOT/tools/database.py" prepare "$@"
 status=0
 python3 "$ROOT/tools/adventurer_apply.py" apply "$@" || status=$?
 
-# Gauntlet module/catalog/addon staging is shared with update.sh. It does not
-# build or install DBC/MPQ artifacts; the final bundle is built once below.
+# Stage owned gameplay modules before the single final DBC/client build.
 if (( status == 0 )); then
     python3 "$ROOT/tools/khadgar_gauntlet/stage.py" "$@" || status=$?
 fi
+if (( status == 0 )); then
+    python3 "$ROOT/tools/spelldraft_v4_stage.py" --core-dir "$core_dir" || status=$?
+fi
 
-# One authoritative client/server build for Aventurero + SpellDraft v3 +
-# Gauntlet. Every DBC transform and external icon is applied before the final
-# server DBCs and client Z patches are installed.
+# One authoritative client/server build for Aventurero + SpellDraft + Gauntlet.
+# Every DBC transform and external icon is applied before the final server DBCs
+# and client Z patches are installed.
 if (( status == 0 )); then
     python3 "$ROOT/tools/build_client_bundle.py" "$@" || status=$?
 fi
