@@ -86,13 +86,23 @@ def build(args) -> None:
         )
 
         spell_path = work / "Spell.dbc"
+        talent_path = work / "Talent.dbc"
         before_spell = spell_path.read_bytes()
+        before_talent = talent_path.read_bytes()
         spelldraft_custom_spells.patch(spell_path, assigned)
-        spelldraft_v4_talents.patch(spell_path, work / "Talent.dbc", assigned)
+        _spell_changed, _talent_changed = spelldraft_v4_talents.patch(
+            spell_path,
+            talent_path,
+            assigned,
+        )
         patch_gauntlet_spells(spell_path)
         changed["Spell.dbc"] = (
             spell_path.read_bytes() != before_spell
             or changed.get("Spell.dbc", False)
+        )
+        changed["Talent.dbc"] = (
+            talent_path.read_bytes() != before_talent
+            or changed.get("Talent.dbc", False)
         )
 
         skill_path = work / "SkillLineAbility.dbc"
@@ -127,7 +137,8 @@ def build(args) -> None:
     print(
         f"Final client/server bundle installed in one pass: {len(mapping)} Gauntlet items "
         f"({first}-{last}), {len(spelldraft_custom_spells.CUSTOM_SPELL_IDS)} SpellDraft v4 custom spell ranks, "
-        f"Gauntlet spells and {len(icons)} SpellDraft icon textures. Server DBCs: {runtime_dbc}."
+        f"6 custom talent ranks, Gauntlet spells and {len(icons)} SpellDraft icon textures. "
+        f"Server DBCs: {runtime_dbc}."
     )
 
 
