@@ -52,6 +52,37 @@ The Libro de Objetos is an account-wide discovery collection for Gauntlet-create
 
 Persistence lives in `adventurer_gauntlet_account_collection` in the characters database.
 
+## Persistent company runs
+
+Gauntlet progression is modeled as a persistent **company run**. Runtime maps and AzerothCore instance IDs are not the authoritative source of progression.
+
+The characters database owns two tables:
+
+- `adventurer_gauntlet_runs`: company name, leader, initial party size, run level, current dungeon/map/checkpoint, best dungeon reached, status and timestamps.
+- `adventurer_gauntlet_run_members`: member identity, original return point, last dungeon position and fallen state.
+
+All database access for these tables is encapsulated by `src/RunProgress.h/.cpp`.
+
+```text
+gameplay orchestration ─┐
+                       ├─> RunProgress API ─> characters DB
+reconnect policy ──────┘
+```
+
+The gameplay layer may ask to start a run, advance a dungeon, save a checkpoint, mark a death, load the active run, or save/load a resume position. It must not duplicate SQL for these tables.
+
+### Resume semantics
+
+A logout records the last position only when the character is inside a supported Gauntlet dungeon. On login, the active run determines the authoritative current dungeon. If the saved position belongs to that same dungeon, reconnect attempts to return there; otherwise it falls back to that dungeon's safe entrance.
+
+The intended save model is checkpoint-based, not a byte-for-byte snapshot of an AzerothCore instance. Individual dungeon implementations are responsible for reconstructing boss/door/world state from the saved checkpoint. This keeps progression stable across instance destruction and worldserver restarts.
+
+### Historical board
+
+Run rows are intentionally retained after the run ends. The planned company board/ranking should query this history directly. In particular, `party_size` is the number of adventurers that **started** the run and remains immutable for ranking purposes even if members later disconnect or die.
+
+Current statuses are `active`, `fallen`, `completed`, and `abandoned`.
+
 ## Module location
 
 Server-side Gauntlet implementation:
@@ -62,7 +93,9 @@ modules/mod-adventurer-gauntlet/
 
 Important areas:
 
-- `src/AdventurerGauntlet.cpp` — main dungeon-run gameplay orchestration.
+- `src/AdventurerGauntlet.cpp` — main dungeon-run gameplay orchestration; it does not own persistence SQL.
+- `src/RunProgress.h/.cpp` — persistence boundary for company runs, members, dungeon/checkpoint progress and saved positions.
+- `src/RunReconnect.cpp` — reconnect policy built on the `RunProgress` API; it does not query the run tables directly.
 - `src/GauntletScaling.cpp` — Gauntlet creature/group scaling and Lobo solitario state.
 - `src/GauntletPermadeath.cpp` — run death/permadeath behavior.
 - `src/CuratedRewards.cpp` — controlled boss reward generation; current checkpoint/final rewards are written directly to boss corpse loot.

@@ -31,7 +31,9 @@ Khadgar es parte de la experiencia, pero no define el alcance completo del modul
 
 ### `src/`
 
-- `AdventurerGauntlet.cpp` — orquestacion principal de la run y comportamiento general del modo.
+- `AdventurerGauntlet.cpp` — orquestacion principal de gameplay: inicio, transicion entre mazmorras, bosses y Khadgar. No contiene SQL de persistencia.
+- `RunProgress.h/.cpp` — unica frontera de persistencia de las companias/runs: crea la run, guarda dungeon/checkpoint, integrantes, caidas y posiciones de reanudacion.
+- `RunReconnect.cpp` — politica de reconexion. Consulta `RunProgress` y decide donde reubicar al personaje; no accede directamente a la base.
 - `GauntletScaling.cpp` — escalado de criaturas/grupo.
 - `GauntletPermadeath.cpp` — muerte/permadeath de la run.
 - `CuratedRewards.cpp` — seleccion y escritura de recompensas controladas en bosses.
@@ -48,6 +50,50 @@ Khadgar es parte de la experiencia, pero no define el alcance completo del modul
 ### `data/sql/`
 
 Actualizaciones de base de datos propiedad de Gauntlet. No moverlas al SQL base de SpellDraft salvo que realmente dejen de ser especificas del modulo.
+
+## Persistencia de companias y reanudacion
+
+La run es una entidad persistente de **compania**, no una coleccion de variables temporales del worldserver.
+
+Fuente de verdad en la base `characters`:
+
+- `adventurer_gauntlet_runs` — una fila por expedicion. Guarda nombre, lider, tamano inicial del grupo, nivel base, dungeon actual, checkpoint, mejor dungeon alcanzada, estado y fechas.
+- `adventurer_gauntlet_run_members` — integrantes de cada expedicion, posicion exterior de retorno, ultima posicion guardada en dungeon y estado de caida.
+
+Regla de encapsulamiento:
+
+```text
+AdventurerGauntlet.cpp  ----\
+                         > RunProgress.h/.cpp ---> CharacterDatabase
+RunReconnect.cpp       ----/
+```
+
+Ningun otro archivo de gameplay debe escribir directamente estas tablas. Si aparece un nuevo dato persistente de la run, se agrega primero a la API de `RunProgress` y luego se consume desde el gameplay.
+
+Flujo actual:
+
+1. Khadgar inicia la expedicion: `RunProgress::StartRun` crea la compania y sus integrantes. `party_size` representa el tamano inicial y no cambia por desconexiones posteriores.
+2. Al cambiar de dungeon: `RunProgress::AdvanceDungeon` actualiza dungeon/mapa, reinicia el checkpoint local y conserva la mejor dungeon alcanzada.
+3. Al matar bosses/checkpoints: `RunProgress::SaveCheckpoint` guarda el progreso significativo.
+4. Al desconectar dentro de una dungeon: `RunProgress::SaveLogoutPosition` guarda la ultima posicion.
+5. Al reconectar: `RunReconnect.cpp` usa `RunProgress::LoadResumePoint`. Si la ultima posicion pertenece a la dungeon actual, intenta volver alli; si no, usa la entrada segura de esa dungeon.
+6. Al morir: `RunProgress::MarkMemberFallen` marca al integrante y, cuando ya no quedan supervivientes, la compania queda `fallen`.
+7. Si un integrante comienza otra expedicion mientras una anterior figura activa, la anterior pasa a `abandoned`.
+
+Estados de una run:
+
+- `active` — expedicion vigente y reanudable.
+- `fallen` — la compania termino por muerte.
+- `completed` — reservado para completar todo el recorrido Gauntlet.
+- `abandoned` — sustituida por una nueva expedicion.
+
+### Que se guarda y que no
+
+Se guarda el **progreso roguelike significativo**: compania, integrantes, tamano de grupo, nivel, dungeon, checkpoint, mejor marca y posicion de reanudacion.
+
+No se promete persistir el estado byte a byte de una instancia de AzerothCore. Mobs comunes, puertas o scripts internos deben restaurarse a partir de checkpoints cuando cada dungeon implemente su restauracion. Esta separacion evita acoplar el historial/ranking a los IDs efimeros de instancia.
+
+Esta misma tabla de runs es la fuente prevista para el futuro **tablero de companias**. El ranking debe leer historial persistente; no debe reconstruirse desde memoria del worldserver.
 
 ## Catalogo de objetos
 
