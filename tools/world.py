@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import hashlib
 from pathlib import Path
 import sys
 
@@ -130,22 +131,29 @@ def install_one(core: Path, update: WorldUpdate) -> tuple[Path, bool]:
     return target, True
 
 
-def invalidate_changed_update_markers(
+def invalidate_stale_update_markers(
     core: Path,
     results: list[tuple[Path, bool]],
     conf: Path | None = None,
 ) -> list[str]:
-    changed_names = [
-        update.name
-        for update, (_target, was_changed) in zip(WORLD_UPDATES, results)
-        if was_changed
-    ]
-    if not changed_names:
-        return []
-
     conf = conf.expanduser().resolve() if conf else (core / DEFAULT_CONF_RELATIVE).resolve()
     db = read_database_info(conf, "WorldDatabaseInfo")
-    names = ", ".join("'" + name.replace("'", "''") + "'" for name in changed_names)
+
+    stale_names: list[str] = []
+    for update, (target, _was_changed) in zip(WORLD_UPDATES, results):
+        current_hash = hashlib.sha1(target.read_bytes()).hexdigest().upper()
+        applied_hash = query_scalar(
+            db,
+            "SELECT COALESCE(MAX(`hash`), '') FROM `updates` "
+            f"WHERE `name` = '{update.name.replace("'", "''")}'",
+        ).upper()
+        if applied_hash and applied_hash != current_hash:
+            stale_names.append(update.name)
+
+    if not stale_names:
+        return []
+
+    names = ", ".join("'" + name.replace("'", "''") + "'" for name in stale_names)
     _run_mysql(db, f"DELETE FROM `updates` WHERE `name` IN ({names});\n".encode())
 
     remaining = int(query_scalar(
@@ -154,9 +162,9 @@ def invalidate_changed_update_markers(
     ))
     if remaining:
         raise WorldUpdateError(
-            f"Failed to invalidate {remaining} changed Adventurer world update marker(s)"
+            f"Failed to invalidate {remaining} stale Adventurer world update marker(s)"
         )
-    return changed_names
+    return stale_names
 
 
 def install(
@@ -166,7 +174,7 @@ def install(
     core = validate_core(core)
     removed = remove_legacy_pending(core)
     results = [install_one(core, update) for update in WORLD_UPDATES]
-    invalidated = invalidate_changed_update_markers(core, results, conf)
+    invalidated = invalidate_stale_update_markers(core, results, conf)
     return removed, results, invalidated
 
 
@@ -268,7 +276,7 @@ def main() -> int:
             for target, was_changed in results:
                 print(f"  {'installed/updated' if was_changed else 'already current'}: {target}")
             if invalidated:
-                print("  invalidated applied markers: " + ", ".join(invalidated))
+                print("  invalidated stale applied markers: " + ", ".join(invalidated))
             print("  AzerothCore will apply changed pending updates on the next worldserver startup.")
         elif args.command == "verify":
             targets = verify(args.core_dir)
