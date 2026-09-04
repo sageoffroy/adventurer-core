@@ -1,4 +1,5 @@
 #include "Chat.h"
+#include "DungeonCatalog.h"
 #include "Player.h"
 #include "PlayerSettings.h"
 #include "ScriptMgr.h"
@@ -10,12 +11,9 @@ constexpr char const* GauntletSettingsSource = "adventurer_gauntlet";
 constexpr uint32 GauntletSettingPledged = 0;
 constexpr uint32 GauntletSettingFallen = 1;
 constexpr uint32 PledgeAuraSpellId = 910500;
-constexpr uint32 RagefireMapId = 389;
-constexpr uint32 DeadminesMapId = 36;
-
 bool IsGauntletMap(uint32 mapId)
 {
-    return mapId == RagefireMapId || mapId == DeadminesMapId;
+    return AdventurerGauntlet::DungeonCatalog::IsSupportedDungeonMap(mapId);
 }
 
 bool HasGauntletSetting(Player* player, uint32 index)
