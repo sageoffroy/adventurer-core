@@ -15,55 +15,40 @@ class WorldUpdateTests(unittest.TestCase):
     def make_core(self, root: Path) -> Path:
         (root / "data" / "sql" / "updates" / "pending_db_world").mkdir(parents=True)
         (root / "src" / "server" / "game").mkdir(parents=True)
+        generated = root / world.GAUNTLET_GENERATED_ITEMS_RELATIVE
+        generated.parent.mkdir(parents=True)
+        generated.write_text("-- generated Gauntlet items\n", encoding="utf-8")
         return root
 
-    def test_installs_chassis_rebalance_and_totem_fallbacks_idempotently(self):
+    def test_installs_authoritative_world_updates_idempotently(self):
         with tempfile.TemporaryDirectory() as td:
             core = self.make_core(Path(td) / "core")
-            results = world.install(core)
+            removed, results = world.install(core)
 
-            self.assertEqual(len(results), 3)
+            self.assertEqual(removed, [])
+            self.assertEqual(len(results), 6)
             self.assertTrue(all(changed for _target, changed in results))
 
-            original = core / world.WORLD_UPDATES[0].relative
-            rebalance = core / world.WORLD_UPDATES[1].relative
-            totems = core / world.WORLD_UPDATES[2].relative
-            self.assertTrue(original.is_file())
-            self.assertTrue(rebalance.is_file())
-            self.assertTrue(totems.is_file())
-            self.assertEqual(world.WORLD_UPDATES[0].source.name, "003_adventurer_chassis.sql")
-            self.assertEqual(world.WORLD_UPDATES[1].source.name, "005_adventurer_chassis_80.sql")
-            self.assertEqual(world.WORLD_UPDATES[2].source.name, "006_adventurer_totem_models.sql")
-            self.assertTrue(all("guardian" not in update.source.name.lower() for update in world.WORLD_UPDATES))
+            installed = [core / update.relative for update in world.WORLD_UPDATES]
+            self.assertTrue(all(path.is_file() for path in installed))
+            self.assertIn(b"Generated Gauntlet item definitions", installed[0].read_bytes())
+            self.assertEqual(world.WORLD_UPDATES[1].source.name, "001_adventurer.sql")
+            self.assertEqual(world.WORLD_UPDATES[2].source.name, "002_adventurer_goldshire.sql")
+            self.assertEqual(world.WORLD_UPDATES[3].source.name, "001_gauntlet_core.sql")
+            self.assertEqual(world.WORLD_UPDATES[4].source.name, "002_gauntlet_world.sql")
+            self.assertEqual(world.WORLD_UPDATES[5].source.name, "003_gauntlet_loot.sql")
 
-            original_sql = original.read_text(encoding="utf-8")
-            rebalance_sql = rebalance.read_text(encoding="utf-8")
-            totem_sql = totems.read_text(encoding="utf-8")
-            self.assertIn("@ADVENTURER_SCALE := 0.95", original_sql)
-            self.assertIn("@ADVENTURER_SCALE := 0.80", rebalance_sql)
-            self.assertIn("MAX(`BaseHP`)", rebalance_sql)
-            self.assertIn("MAX(`BaseMana`)", rebalance_sql)
-            self.assertIn("gtoctclasscombatratingscalar_dbc", rebalance_sql)
-            self.assertIn("gtregenmpperspt_dbc", rebalance_sql)
-
-            self.assertIn("INSERT IGNORE INTO `player_totem_model`", totem_sql)
-            self.assertIn("SELECT `TotemID`, 7, `ModelID`", totem_sql)
-            self.assertIn("WHERE `RaceID` = 3", totem_sql)
-            for race_id in (1, 4, 5, 7, 10):
-                self.assertIn(f"SELECT `TotemID`, {race_id}, `ModelID`", totem_sql)
-
-            results_again = world.install(core)
-            self.assertEqual(len(results_again), 3)
+            removed_again, results_again = world.install(core)
+            self.assertEqual(removed_again, [])
+            self.assertEqual(len(results_again), 6)
             self.assertTrue(all(not changed for _target, changed in results_again))
 
-            self.assertEqual(world.verify(core), [original, rebalance, totems])
+            self.assertEqual(world.verify(core), installed)
 
             removed = world.remove(core)
-            self.assertEqual(len(removed), 3)
+            self.assertEqual(len(removed), 6)
             self.assertTrue(all(changed for _target, changed in removed))
-            self.assertFalse(original.exists())
-            self.assertFalse(rebalance.exists())
-            self.assertFalse(totems.exists())
+            self.assertTrue(all(not path.exists() for path in installed))
 
     def test_fixed_talent_updates_are_cleanup_only(self):
         self.assertEqual(
@@ -81,14 +66,16 @@ class WorldUpdateTests(unittest.TestCase):
         self.assertNotIn("004_guardian_script_bindings.sql", active_sources)
         self.assertTrue(all("guardian" not in name.lower() for name in active_sources))
 
-    def test_refuses_to_overwrite_or_remove_different_pending_update(self):
+    def test_refreshes_owned_update_but_refuses_to_remove_different_pending_update(self):
         with tempfile.TemporaryDirectory() as td:
             core = self.make_core(Path(td) / "core")
             target = core / world.WORLD_UPDATES[0].relative
             target.write_text("different\n", encoding="utf-8")
 
-            with self.assertRaises(world.WorldUpdateError):
-                world.install(core)
+            _removed, installed = world.install(core)
+            self.assertTrue(installed[0][1])
+
+            target.write_text("different again\n", encoding="utf-8")
             with self.assertRaises(world.WorldUpdateError):
                 world.remove(core)
 
@@ -103,7 +90,6 @@ class WorldUpdateTests(unittest.TestCase):
         self.assertIn('tools/world.py" verify', verify_text)
         self.assertIn('tools/world.py" cleanup-db', rollback_text)
         self.assertIn('tools/world.py" remove', rollback_text)
-        self.assertIn("fresh apply never depends on remembering that extra step", apply_text)
 
 
 if __name__ == "__main__":

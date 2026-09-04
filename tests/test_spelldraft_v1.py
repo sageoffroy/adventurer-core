@@ -99,7 +99,7 @@ class SpellDraftV1Tests(unittest.TestCase):
             "ActiveSourceLevelLookahead = 3",
             "ActiveDraftFirstLevel = 5",
             "ActiveDraftEveryLevels = 5",
-            "TalentDraftFirstLevel = 10",
+            "TalentDraftFirstLevel = 5",
             "TalentDraftEveryLevels = 1",
         ):
             self.assertIn(token, self.config)
