@@ -4,6 +4,8 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 core_dir=""
 server_data_dir=""
+client_dir=""
+locale=""
 args=("$@")
 for ((i=0; i<${#args[@]}; i++)); do
     case "${args[$i]}" in
@@ -22,6 +24,22 @@ for ((i=0; i<${#args[@]}; i++)); do
             ;;
         --server-data-dir=*)
             server_data_dir="${args[$i]#*=}"
+            ;;
+        --client-dir)
+            if (( i + 1 < ${#args[@]} )); then
+                client_dir="${args[$((i + 1))]}"
+            fi
+            ;;
+        --client-dir=*)
+            client_dir="${args[$i]#*=}"
+            ;;
+        --locale)
+            if (( i + 1 < ${#args[@]} )); then
+                locale="${args[$((i + 1))]}"
+            fi
+            ;;
+        --locale=*)
+            locale="${args[$i]#*=}"
             ;;
     esac
 done
@@ -62,6 +80,18 @@ fi
 # Every DBC transform and external icon is applied before the final server DBCs
 # and client Z patches are installed.
 python3 "$ROOT/tools/build_client_bundle.py" "$@"
+
+# WotLK caches item query data (including RequiredLevel) in itemcache.wdb.
+# Fixed Adventurer item changes must be visible immediately after update.sh,
+# so discard only the client item cache after rebuilding/installing item data.
+if [[ -n "$client_dir" && -d "$client_dir/Cache/WDB" ]]; then
+    find "$client_dir/Cache/WDB" -type f -iname 'itemcache.wdb' -delete
+    if [[ -n "$locale" ]]; then
+        printf '%s\n' "Cleared WoW item cache for updated Adventurer items ($locale)."
+    else
+        printf '%s\n' "Cleared WoW item cache for updated Adventurer items."
+    fi
+fi
 
 if (( has_playerbots == 1 )); then
     python3 "$ROOT/tools/playerbots_source_patch.py" install --core-dir "$core_dir"
