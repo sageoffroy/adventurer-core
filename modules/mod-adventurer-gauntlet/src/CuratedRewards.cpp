@@ -438,6 +438,14 @@ void ProcessCreatureAfterDeath(Creature* creature)
     ProcessedCreatures.insert(key);
 
     uint8 rewardProfile = GetRewardProfile(creature->GetEntry());
+
+    // Boss loot is a Gauntlet rule, not something that must be registered
+    // creature-by-creature. Explicit DB profiles still win (for example a
+    // campaign/final boss), but every unconfigured dungeon boss falls back to
+    // the checkpoint boss profile and therefore has its stock loot replaced.
+    if (rewardProfile == REWARD_PROFILE_NONE && creature->IsDungeonBoss())
+        rewardProfile = REWARD_PROFILE_CHECKPOINT;
+
     std::cout << "[GauntletLoot] DEATH entry=" << creature->GetEntry()
               << " guid=" << creature->GetGUID().GetCounter()
               << " instance=" << creature->GetInstanceId()
