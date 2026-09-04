@@ -43,13 +43,11 @@ The runtime is authoritative: the client displays offers but does not decide eli
 
 ## Meta mechanics
 
-The current data-driven SpellDraft runtime includes persistent meta actions:
+The current game uses a single SpellDraft meta action:
 
-- Reroll: redraw the unresolved offer using configured charges/rules.
-- Bless: favor a displayed card by increasing its effective future draw weight while eligible.
-- Destroy: permanently exclude a candidate card for that character, subject to current-offer safety rules.
+- Reroll: redraw the unresolved offer. Each character starts with **3 total rerolls** and gains no additional charges automatically.
 
-Balance/settings for these mechanics live in `config/spelldraft/spelldraft.conf`.
+Bless and Destroy remain legacy runtime code for compatibility but are disabled by configuration and hidden from the client UI. Persisted legacy Bless/Destroy state is cleared when a character is loaded. Balance/settings live in `config/spelldraft/spelldraft.conf`.
 
 ## Persistence
 

@@ -1061,6 +1061,28 @@ void AddCharge(uint16& charges, uint16 amount, uint16 maximum)
     charges = static_cast<uint16>(std::min<uint32>(next, 65535));
 }
 
+void NormalizeDraftMetaState(DraftState& state)
+{
+    DraftRuntimeConfig const& config = GetDraftConfig();
+
+    if (config.rerollMaxCharges > 0)
+        state.rerollCharges = std::min<uint16>(state.rerollCharges, config.rerollMaxCharges);
+
+    if (config.blessStartingCharges == 0 && config.blessGainEveryLevels == 0 &&
+        config.blessGainAmount == 0 && config.blessMaxActive == 0)
+    {
+        state.blessCharges = 0;
+        state.blessedCardId = 0;
+    }
+
+    if (config.destroyStartingCharges == 0 && config.destroyGainEveryLevels == 0 &&
+        config.destroyGainAmount == 0)
+    {
+        state.destroyCharges = 0;
+        state.destroyedCards.clear();
+    }
+}
+
 void ApplyLevelRewards(DraftState& state, uint32 level)
 {
     DraftRuntimeConfig const& config = GetDraftConfig();
@@ -1124,11 +1146,10 @@ DraftState& GetDraftState(Player* player)
 
     DraftState state;
     if (!LoadPersistedDraftState(player, state))
-    {
         state = BuildFreshDraftState(player->GetLevel());
-        PersistDraftState(player, state);
-    }
 
+    NormalizeDraftMetaState(state);
+    PersistDraftState(player, state);
     return draftStates.emplace(key, state).first->second;
 }
 
@@ -1585,6 +1606,14 @@ void HandleDraftBless(Player* player, uint32 cardId)
 void HandleDraftDestroy(Player* player, uint32 cardId)
 {
     DraftState& state = GetDraftState(player);
+    DraftRuntimeConfig const& config = GetDraftConfig();
+    if (config.destroyStartingCharges == 0 && config.destroyGainEveryLevels == 0 &&
+        config.destroyGainAmount == 0)
+    {
+        SendDraftError(player, "DESTROY_DISABLED", &state);
+        return;
+    }
+
     if (state.destroyCharges == 0)
     {
         SendDraftError(player, "NO_DESTROYS", &state);

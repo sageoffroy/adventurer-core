@@ -188,12 +188,14 @@ local function CreateActionButton(name, x)
     return button
 end
 
-local rerollButton = CreateActionButton("AdventurerDraftRerollButton", -126)
+local rerollButton = CreateActionButton("AdventurerDraftRerollButton", 0)
 local blessButton = CreateActionButton("AdventurerDraftBlessButton", 0)
-local destroyButton = CreateActionButton("AdventurerDraftDestroyButton", 126)
+local destroyButton = CreateActionButton("AdventurerDraftDestroyButton", 0)
 rerollButton:SetText(text.reroll)
 blessButton:SetText(text.bless)
 destroyButton:SetText(text.destroy)
+blessButton:Hide()
+destroyButton:Hide()
 
 local debugButton = CreateFrame("Button", "AdventurerDraftPoolDebugButton", DraftFrame, "UIPanelButtonTemplate")
 debugButton:SetWidth(90)
@@ -498,20 +500,11 @@ local function ResetMode()
 end
 
 local function RefreshMetaUI()
-    local blessMultiplier = (state.blessMultiplierPercent or 0) / 100
-    local status = string.format(text.rerolls, state.rerolls)
-        .. "   •   "
-        .. string.format(text.blessings, state.blesses)
-        .. "   •   "
-        .. string.format(text.destroys, state.destroys)
-    if state.blessedCardId and state.blessedCardId > 0 and blessMultiplier > 0 then
-        status = status .. "   •   " .. string.format(text.blessed, blessMultiplier)
-    end
-    DraftFrame.metaStatus:SetText(status)
+    DraftFrame.metaStatus:SetText(string.format(text.rerolls, state.rerolls))
 
     if state.rerolls > 0 and DraftFrame:IsShown() then rerollButton:Enable() else rerollButton:Disable() end
-    if state.blesses > 0 and state.blessMultiplierPercent > 0 and DraftFrame:IsShown() then blessButton:Enable() else blessButton:Disable() end
-    if state.destroys > 0 and DraftFrame:IsShown() then destroyButton:Enable() else destroyButton:Disable() end
+    blessButton:Disable()
+    destroyButton:Disable()
 
     for _, button in ipairs(cardButtons) do
         local cardId = button.cardId
