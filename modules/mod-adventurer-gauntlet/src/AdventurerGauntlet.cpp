@@ -439,6 +439,8 @@ void ReturnFallenAdventurer(Player* player)
 
     PendingRunNames.erase(runItr);
     PendingRunLevels.erase(guid);
+    PendingRunCampaigns.erase(guid);
+    PendingRunCampaignStages.erase(guid);
     RunReturnPoints.erase(returnItr);
     if (runEnded)
     {
@@ -969,7 +971,6 @@ public:
         switch (action)
         {
             case ACTION_LEARN_MORE:
-                AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Si. Quiero afrontar el desafio.", GOSSIP_SENDER_MAIN, ACTION_START);
                 SendGossipMenuFor(player, KhadgarConfirmText, creature->GetGUID());
                 return true;
             case ACTION_START:
