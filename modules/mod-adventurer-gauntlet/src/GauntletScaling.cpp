@@ -9,7 +9,6 @@
 #include <array>
 #include <cstdint>
 #include <unordered_map>
-#include <unordered_set>
 
 namespace
 {
@@ -26,7 +25,13 @@ constexpr std::array<uint32, 5> RareHealthPct  = { 50, 160, 225, 290, 355 };
 constexpr std::array<uint32, 5> BossHealthPct  = { 50, 175, 250, 325, 400 };
 constexpr std::array<uint32, 5> DamagePct      = { 75, 115, 130, 145, 160 };
 
-std::unordered_set<uint64> ScaledCreatures;
+struct CreatureScaleState
+{
+    uint32 BaseMaxHealth = 0;
+    uint8 PartySize = 0;
+};
+
+std::unordered_map<uint64, CreatureScaleState> CreatureScaleStates;
 std::unordered_map<uint32, uint32> LoneWolfRefreshTimers;
 
 bool IsGauntletMap(uint32 mapId)
@@ -67,19 +72,17 @@ uint8 GetRunPartySize(Map* map)
     if (!map || !IsGauntletMap(map->GetId()))
         return 0;
 
+    uint8 presentPlayers = 0;
     for (auto const& ref : map->GetPlayers())
     {
         Player* player = ref.GetSource();
         if (!IsPledged(player))
             continue;
 
-        if (Group* group = player->GetGroup())
-            return std::clamp<uint8>(static_cast<uint8>(group->GetMembersCount()), 1, 5);
-
-        return 1;
+        presentPlayers = std::min<uint8>(5, uint8(presentPlayers + 1));
     }
 
-    return 0;
+    return presentPlayers;
 }
 
 uint32 GetHealthPercent(Creature const* creature, uint8 partySize)
@@ -100,26 +103,51 @@ uint64 GetCreatureScaleKey(Creature const* creature)
     return (uint64(creature->GetInstanceId()) << 32) | uint64(creature->GetGUID().GetCounter());
 }
 
-void ApplyHealthScaling(Creature* creature)
+void ApplyHealthScaling(Creature* creature, uint8 partySize)
 {
-    if (!creature || !IsGauntletMap(creature->GetMapId()) || creature->IsPet() || creature->IsTrigger())
-        return;
-
-    uint8 partySize = GetRunPartySize(creature->GetMap());
-    if (!partySize)
+    if (!creature || !partySize || !IsGauntletMap(creature->GetMapId()) || creature->IsPet() || creature->IsTrigger())
         return;
 
     uint64 key = GetCreatureScaleKey(creature);
-    if (!ScaledCreatures.insert(key).second)
+    CreatureScaleState& state = CreatureScaleStates[key];
+
+    if (!state.BaseMaxHealth)
+        state.BaseMaxHealth = creature->GetMaxHealth();
+
+    if (state.PartySize == partySize)
         return;
 
     uint32 healthPct = GetHealthPercent(creature, partySize);
-    uint32 oldMaxHealth = creature->GetMaxHealth();
-    uint32 newMaxHealth = std::max<uint32>(1, uint32((uint64(oldMaxHealth) * healthPct) / 100));
+    uint32 newMaxHealth = std::max<uint32>(1, uint32((uint64(state.BaseMaxHealth) * healthPct) / 100));
     float currentPct = creature->GetHealthPct();
 
     creature->SetMaxHealth(newMaxHealth);
     creature->SetHealth(std::max<uint32>(1, uint32((double(newMaxHealth) * currentPct) / 100.0)));
+    state.PartySize = partySize;
+}
+
+void ApplyHealthScaling(Creature* creature)
+{
+    if (!creature)
+        return;
+
+    ApplyHealthScaling(creature, GetRunPartySize(creature->GetMap()));
+}
+
+void RefreshOutOfCombatScaling(Map* map)
+{
+    uint8 partySize = GetRunPartySize(map);
+    if (!partySize)
+        return;
+
+    for (auto const& [spawnId, creature] : map->GetCreatureBySpawnIdStore())
+    {
+        (void)spawnId;
+        if (!creature || !creature->IsAlive() || creature->IsInCombat())
+            continue;
+
+        ApplyHealthScaling(creature, partySize);
+    }
 }
 
 uint32 ScaleOutgoingDamage(Unit* attacker, uint32 damage)
@@ -139,6 +167,9 @@ uint32 ScaleOutgoingDamage(Unit* attacker, uint32 damage)
         return damage;
 
     uint8 partySize = GetRunPartySize(creature->GetMap());
+    if (auto itr = CreatureScaleStates.find(GetCreatureScaleKey(creature)); itr != CreatureScaleStates.end() && itr->second.PartySize)
+        partySize = itr->second.PartySize;
+
     if (!partySize)
         return damage;
 
@@ -166,7 +197,7 @@ public:
     void OnUnitDeath(Unit* unit, Unit* /*killer*/) override
     {
         if (Creature* creature = unit ? unit->ToCreature() : nullptr)
-            ScaledCreatures.erase(GetCreatureScaleKey(creature));
+            CreatureScaleStates.erase(GetCreatureScaleKey(creature));
     }
 };
 
@@ -205,6 +236,9 @@ public:
 
         timer = LoneWolfRefreshMs;
         RefreshLoneWolf(player);
+
+        if (IsGauntletMap(player->GetMapId()))
+            RefreshOutOfCombatScaling(player->GetMap());
     }
 
     void OnPlayerLogout(Player* player) override

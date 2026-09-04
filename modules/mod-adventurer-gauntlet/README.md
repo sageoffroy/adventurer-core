@@ -51,6 +51,16 @@ Khadgar es parte de la experiencia, pero no define el alcance completo del modul
 
 Actualizaciones de base de datos propiedad de Gauntlet. No moverlas al SQL base de SpellDraft salvo que realmente dejen de ser especificas del modulo.
 
+### Escalado dinamico por jugadores presentes
+
+La dificultad de la instancia usa la cantidad de Aventureros del Gauntlet **fisicamente presentes en la dungeon**, no el numero total de integrantes del grupo fuera del mapa.
+
+Cuando cambia esa cantidad, `GauntletScaling.cpp` reajusta solamente criaturas vivas que esten **fuera de combate**. Una criatura que ya esta peleando conserva el tamano de grupo con el que comenzo ese combate, tanto para vida como para dano. Al morir se descarta su estado de escalado.
+
+Cada criatura conserva internamente su vida maxima base y el ultimo tamano de grupo aplicado. Los cambios 2→3, 3→4, etc. siempre se calculan desde esa base para evitar multiplicar escalados sucesivos entre si.
+
+Esto permite que un nuevo miembro llegue a la misma instancia usando el flujo normal de grupo de WoW: al aparecer fisicamente en la dungeon, los encuentros que todavia no comenzaron se adaptan al nuevo numero de jugadores sin alterar el combate que ya este en curso.
+
 ## Persistencia de companias y reanudacion
 
 La run es una entidad persistente de **compania**, no una coleccion de variables temporales del worldserver.
