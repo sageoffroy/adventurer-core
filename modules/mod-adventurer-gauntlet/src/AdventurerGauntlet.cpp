@@ -1,4 +1,5 @@
 #include "Chat.h"
+#include "DatabaseEnv.h"
 #include "Config.h"
 #include "Creature.h"
 #include "CreatureScript.h"
@@ -64,6 +65,177 @@ constexpr float DeadminesX = -16.4f;
 constexpr float DeadminesY = -383.07f;
 constexpr float DeadminesZ = 61.78f;
 constexpr float DeadminesO = 1.86f;
+
+void ClosePreviousActiveRuns(std::vector<Player*> const& members)
+{
+    for (Player* member : members)
+    {
+        if (!member)
+            continue;
+
+        CharacterDatabase.DirectExecute(
+            "UPDATE `adventurer_gauntlet_runs` r "
+            "JOIN `adventurer_gauntlet_run_members` m ON m.`run_id` = r.`run_id` "
+            "SET r.`status` = 'abandoned', r.`updated_at` = CURRENT_TIMESTAMP "
+            "WHERE m.`character_guid` = {} AND r.`status` = 'active'",
+            member->GetGUID().GetCounter());
+    }
+}
+
+void PersistNewRun(std::vector<Player*> const& members, std::string companyName, uint8 runLevel)
+{
+    if (members.empty() || !members.front())
+        return;
+
+    ClosePreviousActiveRuns(members);
+
+    Player* leader = members.front();
+    if (Group* group = leader->GetGroup())
+        if (Player* groupLeader = ObjectAccessor::FindPlayer(group->GetLeaderGUID()))
+            leader = groupLeader;
+
+    CharacterDatabase.EscapeString(companyName);
+    uint32 leaderGuid = leader->GetGUID().GetCounter();
+
+    CharacterDatabase.DirectExecute(
+        "INSERT INTO `adventurer_gauntlet_runs` "
+        "(`company_name`, `leader_guid`, `party_size`, `run_level`, `current_dungeon`, `current_map`, `current_checkpoint`, `best_dungeon_reached`, `status`) "
+        "VALUES ('{}', {}, {}, {}, 1, {}, 0, 1, 'active')",
+        companyName,
+        leaderGuid,
+        uint32(members.size()),
+        uint32(runLevel),
+        RagefireMapId);
+
+    for (Player* member : members)
+    {
+        if (!member)
+            continue;
+
+        std::string memberName = member->GetName();
+        CharacterDatabase.EscapeString(memberName);
+        CharacterDatabase.DirectExecute(
+            "INSERT INTO `adventurer_gauntlet_run_members` "
+            "(`run_id`, `character_guid`, `character_name`, `return_map`, `return_x`, `return_y`, `return_z`, `return_o`, "
+            " `last_map`, `last_x`, `last_y`, `last_z`, `last_o`) "
+            "SELECT `run_id`, {}, '{}', {}, {}, {}, {}, {}, {}, {}, {}, {}, {} "
+            "FROM `adventurer_gauntlet_runs` "
+            "WHERE `leader_guid` = {} AND `status` = 'active' "
+            "ORDER BY `run_id` DESC LIMIT 1",
+            member->GetGUID().GetCounter(),
+            memberName,
+            member->GetMapId(),
+            member->GetPositionX(),
+            member->GetPositionY(),
+            member->GetPositionZ(),
+            member->GetOrientation(),
+            member->GetMapId(),
+            member->GetPositionX(),
+            member->GetPositionY(),
+            member->GetPositionZ(),
+            member->GetOrientation(),
+            leaderGuid);
+    }
+}
+
+void PersistCurrentDungeon(Player* player, uint8 dungeonIndex, uint32 mapId)
+{
+    if (!player)
+        return;
+
+    CharacterDatabase.DirectExecute(
+        "UPDATE `adventurer_gauntlet_runs` r "
+        "JOIN `adventurer_gauntlet_run_members` m ON m.`run_id` = r.`run_id` "
+        "SET r.`current_dungeon` = {}, r.`current_map` = {}, r.`current_checkpoint` = 0, "
+        "    r.`best_dungeon_reached` = GREATEST(r.`best_dungeon_reached`, {}), "
+        "    r.`updated_at` = CURRENT_TIMESTAMP "
+        "WHERE m.`character_guid` = {} AND r.`status` = 'active'",
+        uint32(dungeonIndex),
+        mapId,
+        uint32(dungeonIndex),
+        player->GetGUID().GetCounter());
+}
+
+void PersistCheckpoint(Player* player, uint32 checkpoint)
+{
+    if (!player)
+        return;
+
+    CharacterDatabase.DirectExecute(
+        "UPDATE `adventurer_gauntlet_runs` r "
+        "JOIN `adventurer_gauntlet_run_members` m ON m.`run_id` = r.`run_id` "
+        "SET r.`current_checkpoint` = {}, r.`updated_at` = CURRENT_TIMESTAMP "
+        "WHERE m.`character_guid` = {} AND r.`status` = 'active'",
+        checkpoint,
+        player->GetGUID().GetCounter());
+}
+
+void PersistMemberFallen(Player* player, bool runEnded)
+{
+    if (!player)
+        return;
+
+    CharacterDatabase.DirectExecute(
+        "UPDATE `adventurer_gauntlet_run_members` m "
+        "JOIN `adventurer_gauntlet_runs` r ON r.`run_id` = m.`run_id` "
+        "SET m.`is_fallen` = 1, m.`updated_at` = CURRENT_TIMESTAMP "
+        "WHERE m.`character_guid` = {} AND r.`status` = 'active'",
+        player->GetGUID().GetCounter());
+
+    if (runEnded)
+        CharacterDatabase.DirectExecute(
+            "UPDATE `adventurer_gauntlet_runs` r "
+            "JOIN `adventurer_gauntlet_run_members` m ON m.`run_id` = r.`run_id` "
+            "SET r.`status` = 'fallen', r.`updated_at` = CURRENT_TIMESTAMP "
+            "WHERE m.`character_guid` = {} AND r.`status` = 'active'",
+            player->GetGUID().GetCounter());
+}
+
+void LoadPersistentRun(Player* player)
+{
+    if (!player)
+        return;
+
+    QueryResult result = CharacterDatabase.Query(
+        "SELECT r.`company_name`, r.`run_level`, "
+        "       m.`return_map`, m.`return_x`, m.`return_y`, m.`return_z`, m.`return_o` "
+        "FROM `adventurer_gauntlet_runs` r "
+        "JOIN `adventurer_gauntlet_run_members` m ON m.`run_id` = r.`run_id` "
+        "WHERE m.`character_guid` = {} AND r.`status` = 'active' "
+        "ORDER BY r.`run_id` DESC LIMIT 1",
+        player->GetGUID().GetCounter());
+
+    if (!result)
+        return;
+
+    Field* fields = result->Fetch();
+    uint32 guid = player->GetGUID().GetCounter();
+    PendingRunNames[guid] = fields[0].Get<std::string>();
+    PendingRunLevels[guid] = fields[1].Get<uint8>();
+    RunReturnPoints[guid] = {
+        fields[2].Get<uint32>(),
+        fields[3].Get<float>(),
+        fields[4].Get<float>(),
+        fields[5].Get<float>(),
+        fields[6].Get<float>()
+    };
+}
+
+uint32 LoadPersistentCheckpoint(Player* player)
+{
+    if (!player)
+        return 0;
+
+    QueryResult result = CharacterDatabase.Query(
+        "SELECT r.`current_checkpoint` "
+        "FROM `adventurer_gauntlet_runs` r "
+        "JOIN `adventurer_gauntlet_run_members` m ON m.`run_id` = r.`run_id` "
+        "WHERE m.`character_guid` = {} AND r.`status` = 'active' "
+        "ORDER BY r.`run_id` DESC LIMIT 1",
+        player->GetGUID().GetCounter());
+
+    return result ? result->Fetch()[0].Get<uint32>() : 0;
+}
 
 constexpr std::array<char const*, 12> CompanyTitles = {
     "Retirados", "Cuervos", "Exiliados", "Errantes", "Juramentados", "Centinelas",
@@ -385,6 +557,8 @@ void ReturnFallenAdventurer(Player* player)
     RunReturnPoint returnPoint = returnItr->second;
     bool runEnded = !InstanceStillHasLivingAdventurers(player->GetMap(), player);
 
+    PersistMemberFallen(player, runEnded);
+
     PendingRunNames.erase(runItr);
     PendingRunLevels.erase(guid);
     RunReturnPoints.erase(returnItr);
@@ -426,12 +600,21 @@ void RegisterRagefireBossDeathAndTryFinish(Creature* defeatedBoss)
     uint8& progress = RagefireBossProgress[instanceId];
     progress |= bit;
 
+    for (auto const& ref : defeatedBoss->GetMap()->GetPlayers())
+        if (Player* player = ref.GetSource())
+            if (GetPendingRunName(player))
+                PersistCheckpoint(player, progress);
+
     if ((progress & RagefireAllBossesMask) != RagefireAllBossesMask || (progress & RagefireCompletedMask))
         return;
 
     progress |= RagefireCompletedMask;
 
     Map* map = defeatedBoss->GetMap();
+    for (auto const& ref : map->GetPlayers())
+        if (Player* player = ref.GetSource())
+            if (GetPendingRunName(player))
+                PersistCheckpoint(player, progress);
     std::vector<Player*> survivors = GetLivingRunMembers(map);
     if (survivors.empty())
         return;
@@ -518,6 +701,8 @@ public:
 
         ActiveRunInstanceLevels[instanceId] = runLevel;
         ActiveRunNativeMinLevels[instanceId] = nativeMinLevel;
+        if (map->GetId() == RagefireMapId)
+            RagefireBossProgress[instanceId] = uint8(LoadPersistentCheckpoint(player));
 
         for (auto const& [spawnId, creature] : map->GetCreatureBySpawnIdStore())
         {
@@ -577,6 +762,12 @@ class AdventurerGauntletPlayerScript : public PlayerScript
 {
 public:
     AdventurerGauntletPlayerScript() : PlayerScript("AdventurerGauntletPlayerScript") { }
+
+    void OnPlayerLogin(Player* player) override
+    {
+        if (GauntletEnabled)
+            LoadPersistentRun(player);
+    }
 
     void OnPlayerJustDied(Player* player) override
     {
@@ -728,6 +919,7 @@ public:
                 std::string companyName = GenerateCompanyName();
                 ResetPartyInstances(player);
                 RegisterPendingRun(members, companyName, runLevel);
+                PersistNewRun(members, companyName, runLevel);
                 AnnounceRunStart(members, companyName, runLevel);
 
                 static_cast<npc_adventurer_gauntlet_khadgarAI*>(creature->AI())->BeginTravel(
@@ -764,8 +956,11 @@ public:
                 }
 
                 for (Player* survivor : survivors)
+                {
+                    PersistCurrentDungeon(survivor, 2, DeadminesMapId);
                     ChatHandler(survivor->GetSession()).SendSysMessage(
                         "Khadgar comienza a preparar el siguiente portal.");
+                }
 
                 static_cast<npc_adventurer_gauntlet_khadgarAI*>(creature->AI())->BeginTravel(
                     survivors,
