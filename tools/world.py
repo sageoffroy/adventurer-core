@@ -130,10 +130,44 @@ def install_one(core: Path, update: WorldUpdate) -> tuple[Path, bool]:
     return target, True
 
 
-def install(core: Path) -> tuple[list[Path], list[tuple[Path, bool]]]:
+def invalidate_changed_update_markers(
+    core: Path,
+    results: list[tuple[Path, bool]],
+    conf: Path | None = None,
+) -> list[str]:
+    changed_names = [
+        update.name
+        for update, (_target, was_changed) in zip(WORLD_UPDATES, results)
+        if was_changed
+    ]
+    if not changed_names:
+        return []
+
+    conf = conf.expanduser().resolve() if conf else (core / DEFAULT_CONF_RELATIVE).resolve()
+    db = read_database_info(conf, "WorldDatabaseInfo")
+    names = ", ".join("'" + name.replace("'", "''") + "'" for name in changed_names)
+    _run_mysql(db, f"DELETE FROM `updates` WHERE `name` IN ({names});\n".encode())
+
+    remaining = int(query_scalar(
+        db,
+        f"SELECT COUNT(*) FROM `updates` WHERE `name` IN ({names})",
+    ))
+    if remaining:
+        raise WorldUpdateError(
+            f"Failed to invalidate {remaining} changed Adventurer world update marker(s)"
+        )
+    return changed_names
+
+
+def install(
+    core: Path,
+    conf: Path | None = None,
+) -> tuple[list[Path], list[tuple[Path, bool]], list[str]]:
     core = validate_core(core)
     removed = remove_legacy_pending(core)
-    return removed, [install_one(core, update) for update in WORLD_UPDATES]
+    results = [install_one(core, update) for update in WORLD_UPDATES]
+    invalidated = invalidate_changed_update_markers(core, results, conf)
+    return removed, results, invalidated
 
 
 def verify_one(core: Path, update: WorldUpdate) -> Path:
@@ -214,6 +248,8 @@ def parser() -> argparse.ArgumentParser:
     for name in ("install", "verify", "remove"):
         command = sub.add_parser(name)
         command.add_argument("--core-dir", required=True, type=Path)
+        if name == "install":
+            command.add_argument("--worldserver-conf", type=Path)
     cleanup = sub.add_parser("cleanup-db")
     cleanup.add_argument("--core-dir", required=True, type=Path)
     cleanup.add_argument("--worldserver-conf", type=Path)
@@ -224,14 +260,16 @@ def main() -> int:
     args = parser().parse_args()
     try:
         if args.command == "install":
-            removed, results = install(args.core_dir)
+            removed, results, invalidated = install(args.core_dir, args.worldserver_conf)
             if removed:
                 print(f"Removed {len(removed)} obsolete Adventurer pending world updates.")
             changed = sum(1 for _target, was_changed in results if was_changed)
             print(f"Adventurer world updates installed: {changed} changed, {len(results) - changed} already current.")
             for target, was_changed in results:
                 print(f"  {'installed/updated' if was_changed else 'already current'}: {target}")
-            print("  AzerothCore will apply pending updates on the next worldserver startup.")
+            if invalidated:
+                print("  invalidated applied markers: " + ", ".join(invalidated))
+            print("  AzerothCore will apply changed pending updates on the next worldserver startup.")
         elif args.command == "verify":
             targets = verify(args.core_dir)
             print(f"Adventurer world updates verify cleanly: {len(targets)}.")
