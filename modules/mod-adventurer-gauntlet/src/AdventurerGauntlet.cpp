@@ -2,6 +2,7 @@
 #include "Config.h"
 #include "Creature.h"
 #include "CreatureScript.h"
+#include "DungeonCatalog.h"
 #include "Group.h"
 #include "Map.h"
 #include "ObjectAccessor.h"
@@ -90,25 +91,15 @@ constexpr std::array<char const*, 12> CompanyPlaces = {
 
 bool IsGauntletDungeon(uint32 mapId)
 {
-    return mapId == RagefireMapId || mapId == DeadminesMapId ||
-        mapId == HellfireRampartsMapId || mapId == AzjolNerubMapId;
+    return AdventurerGauntlet::DungeonCatalog::IsSupportedDungeonMap(mapId);
 }
 
 char const* GetGauntletDungeonName(uint32 mapId)
 {
-    switch (mapId)
-    {
-        case RagefireMapId:
-            return "Sima Ignea";
-        case DeadminesMapId:
-            return "Minas de la Muerte";
-        case HellfireRampartsMapId:
-            return "Murallas del Fuego Infernal";
-        case AzjolNerubMapId:
-            return "Azjol-Nerub";
-        default:
-            return "mazmorra";
-    }
+    if (auto const* dungeon = AdventurerGauntlet::DungeonCatalog::GetDungeon(mapId))
+        return dungeon->Name;
+
+    return "mazmorra";
 }
 
 uint8 GetRagefireBossBit(uint32 entry)
@@ -643,8 +634,9 @@ enum KhadgarGauntletActions
     ACTION_START = GOSSIP_ACTION_INFO_DEF + 2,
     ACTION_STATUS = GOSSIP_ACTION_INFO_DEF + 3,
     ACTION_CONTINUE = GOSSIP_ACTION_INFO_DEF + 4,
-    ACTION_TEST_RAMPARTS = GOSSIP_ACTION_INFO_DEF + 5,
-    ACTION_TEST_AZJOL = GOSSIP_ACTION_INFO_DEF + 6,
+    ACTION_RANDOM_CLASSIC = GOSSIP_ACTION_INFO_DEF + 5,
+    ACTION_RANDOM_OUTLAND = GOSSIP_ACTION_INFO_DEF + 6,
+    ACTION_RANDOM_NORTHREND = GOSSIP_ACTION_INFO_DEF + 7,
 };
 
 enum KhadgarTravelDestination
@@ -664,6 +656,58 @@ public:
     struct npc_adventurer_gauntlet_khadgarAI : public ScriptedAI
     {
         npc_adventurer_gauntlet_khadgarAI(Creature* creature) : ScriptedAI(creature) { }
+
+        void BeginTravel(std::vector<Player*> const& members, AdventurerGauntlet::DungeonCatalog::DungeonDefinition const& dungeon)
+        {
+            if (_travelInProgress || members.empty())
+                return;
+
+            _travelInProgress = true;
+            _destination = KHADGAR_TRAVEL_NONE;
+            _randomDestination = dungeon;
+            _hasRandomDestination = true;
+            _travellers.clear();
+            _travellers.reserve(members.size());
+            for (Player* member : members)
+                if (member)
+                    _travellers.push_back(member->GetGUID());
+
+            me->ReplaceAllNpcFlags(UNIT_NPC_FLAG_NONE);
+            DoCastSelf(KhadgarCastVisual, false);
+
+            _scheduler.Schedule(2500ms, [this](TaskContext /*context*/)
+            {
+                std::vector<Player*> travellers;
+                travellers.reserve(_travellers.size());
+                for (ObjectGuid const& guid : _travellers)
+                    if (Player* player = ObjectAccessor::FindPlayer(guid))
+                        travellers.push_back(player);
+
+                for (Player* player : travellers)
+                    ChatHandler(player->GetSession()).PSendSysMessage(
+                        "Khadgar abre el camino hacia |cffffd100{}|r.",
+                        _randomDestination.Name);
+
+                bool success = TeleportParty(
+                    travellers,
+                    _randomDestination.MapId,
+                    _randomDestination.X,
+                    _randomDestination.Y,
+                    _randomDestination.Z,
+                    _randomDestination.O);
+
+                if (!success)
+                    for (Player* player : travellers)
+                        ChatHandler(player->GetSession()).SendSysMessage(
+                            "El portal de Khadgar no pudo transportar a toda la expedicion.");
+
+                me->CastSpell(me, KhadgarTeleportVisual, true);
+                _travellers.clear();
+                _travelInProgress = false;
+                _hasRandomDestination = false;
+                me->ReplaceAllNpcFlags(UNIT_NPC_FLAG_GOSSIP);
+            });
+        }
 
         void BeginTravel(std::vector<Player*> const& members, uint8 destination)
         {
@@ -745,6 +789,8 @@ public:
         TaskScheduler _scheduler;
         std::vector<ObjectGuid> _travellers;
         uint8 _destination = KHADGAR_TRAVEL_NONE;
+        AdventurerGauntlet::DungeonCatalog::DungeonDefinition _randomDestination{};
+        bool _hasRandomDestination = false;
         bool _travelInProgress = false;
     };
 
@@ -771,8 +817,9 @@ public:
         }
 
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Quiero saber mas.", GOSSIP_SENDER_MAIN, ACTION_LEARN_MORE);
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "[Prueba] Murallas del Fuego Infernal.", GOSSIP_SENDER_MAIN, ACTION_TEST_RAMPARTS);
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "[Prueba] Azjol-Nerub.", GOSSIP_SENDER_MAIN, ACTION_TEST_AZJOL);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Mazmorra clasica aleatoria.", GOSSIP_SENDER_MAIN, ACTION_RANDOM_CLASSIC);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Mazmorra de Terrallende aleatoria.", GOSSIP_SENDER_MAIN, ACTION_RANDOM_OUTLAND);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Mazmorra de Rasganorte aleatoria.", GOSSIP_SENDER_MAIN, ACTION_RANDOM_NORTHREND);
         SendGossipMenuFor(player, KhadgarIntroText, creature->GetGUID());
         return true;
     }
@@ -812,8 +859,9 @@ public:
                 CloseGossipMenuFor(player);
                 return true;
             }
-            case ACTION_TEST_RAMPARTS:
-            case ACTION_TEST_AZJOL:
+            case ACTION_RANDOM_CLASSIC:
+            case ACTION_RANDOM_OUTLAND:
+            case ACTION_RANDOM_NORTHREND:
             {
                 std::vector<Player*> members;
                 std::string error;
@@ -824,26 +872,32 @@ public:
                     return true;
                 }
 
-                uint32 testMapId = action == ACTION_TEST_RAMPARTS ? HellfireRampartsMapId : AzjolNerubMapId;
-                uint8 destination = action == ACTION_TEST_RAMPARTS ? KHADGAR_TRAVEL_RAMPARTS : KHADGAR_TRAVEL_AZJOL;
+                AdventurerGauntlet::DungeonCatalog::ExpansionPool pool =
+                    action == ACTION_RANDOM_CLASSIC
+                        ? AdventurerGauntlet::DungeonCatalog::ExpansionPool::Classic
+                        : action == ACTION_RANDOM_OUTLAND
+                            ? AdventurerGauntlet::DungeonCatalog::ExpansionPool::Outland
+                            : AdventurerGauntlet::DungeonCatalog::ExpansionPool::Northrend;
+
+                auto const& dungeon = AdventurerGauntlet::DungeonCatalog::GetRandomDungeon(pool);
                 uint8 runLevel = GetHighestPartyLevel(members);
                 std::string companyName = GenerateCompanyName();
 
                 ResetPartyInstances(player);
                 RegisterPendingRun(members, companyName, runLevel);
-                AdventurerGauntlet::RunProgress::StartRun(members, companyName, runLevel, testMapId);
+                AdventurerGauntlet::RunProgress::StartRun(members, companyName, runLevel, dungeon.MapId);
 
                 for (Player* member : members)
                 {
                     ChatHandler(member->GetSession()).PSendSysMessage(
-                        "|cffffd100Prueba Gauntlet.|r {} entra con nivel base {}.",
-                        GetGauntletDungeonName(testMapId),
+                        "|cffffd100Prueba aleatoria Gauntlet.|r Khadgar ha elegido {}. Nivel base: {}.",
+                        dungeon.Name,
                         runLevel);
                 }
 
                 static_cast<npc_adventurer_gauntlet_khadgarAI*>(creature->AI())->BeginTravel(
                     members,
-                    destination);
+                    dungeon);
 
                 CloseGossipMenuFor(player);
                 return true;

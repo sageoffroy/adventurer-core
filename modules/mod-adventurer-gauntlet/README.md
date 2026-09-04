@@ -51,16 +51,25 @@ Khadgar es parte de la experiencia, pero no define el alcance completo del modul
 
 Actualizaciones de base de datos propiedad de Gauntlet. No moverlas al SQL base de SpellDraft salvo que realmente dejen de ser especificas del modulo.
 
-### Mapas de prueba de escalado
+### Selector aleatorio temporal por expansion
 
-Mientras se valida el desacople entre nivel nativo y nivel Gauntlet, Khadgar ofrece dos destinos de laboratorio separados del recorrido normal:
+Mientras se define el futuro mapa de rutas, Khadgar ofrece tres accesos de prueba:
 
-- **Murallas del Fuego Infernal** (Outland, map 543).
-- **Azjol-Nerub** (Wrath of the Lich King, map 601).
+- **Mazmorra clasica aleatoria**.
+- **Mazmorra de Terrallende aleatoria**.
+- **Mazmorra de Rasganorte aleatoria**.
 
-Las opciones aparecen marcadas con `[Prueba]`. Usan el flujo real de Gauntlet: validacion del grupo, compania persistente, binding/reconexion, nivel de run y escalado por jugadores presentes. No forman parte todavia de la secuencia Sima Ignea -> Minas de la Muerte.
+Cada opcion elige al azar una mazmorra del pool correspondiente y usa el flujo real de Gauntlet: validacion de grupo, compania persistente, binding/reconexion, nivel de run y escalado por jugadores presentes.
 
-Sus coordenadas de entrada son las entradas stock de AzerothCore (`areatrigger_teleport`). El objetivo es probar personajes de nivel muy bajo, por ejemplo nivel 3, contra contenido originalmente disenado para expansiones posteriores antes de incorporarlo al catalogo aleatorio definitivo.
+Los pools temporales viven encapsulados en `DungeonCatalog.h/.cpp`. Ese catalogo es tambien la fuente de nombre, map ID y coordenadas de entrada para los mapas soportados. El objetivo es comparar rapidamente como responde el escalado a contenido Classic, TBC y WotLK antes de construir el mapa definitivo de rutas.
+
+Pools actuales:
+
+- Classic: Sima Ignea, Minas de la Muerte, Las Mazmorras de Ventormenta, Castillo de Colmillo Oscuro y Cementerio del Monasterio Escarlata.
+- Terrallende: Murallas del Fuego Infernal, Horno de Sangre, Recinto de los Esclavos y Tumbas de Mana.
+- Rasganorte: Azjol-Nerub, Fortaleza de Utgarde, El Nexo y Gundrak.
+
+Estas opciones son temporales y no representan todavia la progresion geografica final.
 
 ### Escalado dinamico por jugadores presentes
 

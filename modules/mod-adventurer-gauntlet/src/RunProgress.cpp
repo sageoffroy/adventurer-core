@@ -1,6 +1,7 @@
 #include "RunProgress.h"
 
 #include "DatabaseEnv.h"
+#include "DungeonCatalog.h"
 #include "Group.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
@@ -28,8 +29,7 @@ void AbandonPreviousActiveRuns(std::vector<Player*> const& members)
 
 bool IsSupportedDungeonMap(uint32 mapId)
 {
-    return mapId == RagefireMapId || mapId == DeadminesMapId ||
-        mapId == HellfireRampartsMapId || mapId == AzjolNerubMapId;
+    return AdventurerGauntlet::DungeonCatalog::IsSupportedDungeonMap(mapId);
 }
 
 void StartRun(std::vector<Player*> const& members, std::string const& companyName, uint8 runLevel, uint32 initialMapId)

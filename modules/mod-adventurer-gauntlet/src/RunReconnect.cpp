@@ -1,3 +1,4 @@
+#include "DungeonCatalog.h"
 #include "Player.h"
 #include "PlayerSettings.h"
 #include "RunProgress.h"
@@ -28,17 +29,13 @@ bool IsPledged(Player* player)
 
 RunResumePoint DefaultEntryFor(uint32 mapId)
 {
-    switch (mapId)
-    {
-        case AdventurerGauntlet::RunProgress::DeadminesMapId:
-            return {mapId, -16.4f, -383.07f, 61.78f, 1.86f};
-        case AdventurerGauntlet::RunProgress::HellfireRampartsMapId:
-            return {mapId, -1355.24f, 1641.12f, 68.2491f, 0.6687f};
-        case AdventurerGauntlet::RunProgress::AzjolNerubMapId:
-            return {mapId, 413.314f, 795.968f, 831.351f, 5.5f};
-        default:
-            return {AdventurerGauntlet::RunProgress::RagefireMapId, 3.81f, -14.82f, -17.84f, 4.39f};
-    }
+    if (auto const* dungeon = AdventurerGauntlet::DungeonCatalog::GetDungeon(mapId))
+        return {dungeon->MapId, dungeon->X, dungeon->Y, dungeon->Z, dungeon->O};
+
+    if (auto const* ragefire = AdventurerGauntlet::DungeonCatalog::GetDungeon(AdventurerGauntlet::RunProgress::RagefireMapId))
+        return {ragefire->MapId, ragefire->X, ragefire->Y, ragefire->Z, ragefire->O};
+
+    return {};
 }
 }
 
