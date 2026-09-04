@@ -28,10 +28,11 @@ void AbandonPreviousActiveRuns(std::vector<Player*> const& members)
 
 bool IsSupportedDungeonMap(uint32 mapId)
 {
-    return mapId == RagefireMapId || mapId == DeadminesMapId;
+    return mapId == RagefireMapId || mapId == DeadminesMapId ||
+        mapId == HellfireRampartsMapId || mapId == AzjolNerubMapId;
 }
 
-void StartRun(std::vector<Player*> const& members, std::string const& companyName, uint8 runLevel)
+void StartRun(std::vector<Player*> const& members, std::string const& companyName, uint8 runLevel, uint32 initialMapId)
 {
     if (members.empty() || !members.front())
         return;
@@ -56,7 +57,7 @@ void StartRun(std::vector<Player*> const& members, std::string const& companyNam
         leaderGuid,
         uint32(members.size()),
         uint32(runLevel),
-        RagefireMapId);
+        initialMapId);
 
     for (Player* member : members)
     {

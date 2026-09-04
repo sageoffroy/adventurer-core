@@ -66,6 +66,18 @@ constexpr float DeadminesY = -383.07f;
 constexpr float DeadminesZ = 61.78f;
 constexpr float DeadminesO = 1.86f;
 
+constexpr uint32 HellfireRampartsMapId = 543;
+constexpr float HellfireRampartsX = -1355.24f;
+constexpr float HellfireRampartsY = 1641.12f;
+constexpr float HellfireRampartsZ = 68.2491f;
+constexpr float HellfireRampartsO = 0.6687f;
+
+constexpr uint32 AzjolNerubMapId = 601;
+constexpr float AzjolNerubX = 413.314f;
+constexpr float AzjolNerubY = 795.968f;
+constexpr float AzjolNerubZ = 831.351f;
+constexpr float AzjolNerubO = 5.5f;
+
 constexpr std::array<char const*, 12> CompanyTitles = {
     "Retirados", "Cuervos", "Exiliados", "Errantes", "Juramentados", "Centinelas",
     "Desventurados", "Veteranos", "Herederos", "Escudos", "Perdidos", "Caminantes"
@@ -78,7 +90,8 @@ constexpr std::array<char const*, 12> CompanyPlaces = {
 
 bool IsGauntletDungeon(uint32 mapId)
 {
-    return mapId == RagefireMapId || mapId == DeadminesMapId;
+    return mapId == RagefireMapId || mapId == DeadminesMapId ||
+        mapId == HellfireRampartsMapId || mapId == AzjolNerubMapId;
 }
 
 char const* GetGauntletDungeonName(uint32 mapId)
@@ -89,6 +102,10 @@ char const* GetGauntletDungeonName(uint32 mapId)
             return "Sima Ignea";
         case DeadminesMapId:
             return "Minas de la Muerte";
+        case HellfireRampartsMapId:
+            return "Murallas del Fuego Infernal";
+        case AzjolNerubMapId:
+            return "Azjol-Nerub";
         default:
             return "mazmorra";
     }
@@ -626,6 +643,8 @@ enum KhadgarGauntletActions
     ACTION_START = GOSSIP_ACTION_INFO_DEF + 2,
     ACTION_STATUS = GOSSIP_ACTION_INFO_DEF + 3,
     ACTION_CONTINUE = GOSSIP_ACTION_INFO_DEF + 4,
+    ACTION_TEST_RAMPARTS = GOSSIP_ACTION_INFO_DEF + 5,
+    ACTION_TEST_AZJOL = GOSSIP_ACTION_INFO_DEF + 6,
 };
 
 enum KhadgarTravelDestination
@@ -633,6 +652,8 @@ enum KhadgarTravelDestination
     KHADGAR_TRAVEL_NONE = 0,
     KHADGAR_TRAVEL_RAGEFIRE = 1,
     KHADGAR_TRAVEL_DEADMINES = 2,
+    KHADGAR_TRAVEL_RAMPARTS = 3,
+    KHADGAR_TRAVEL_AZJOL = 4,
 };
 
 class npc_adventurer_gauntlet_khadgar : public CreatureScript
@@ -678,6 +699,22 @@ public:
                             "Khadgar abre el camino hacia |cffffd100Minas de la Muerte|r.");
 
                     success = TeleportParty(travellers, DeadminesMapId, DeadminesX, DeadminesY, DeadminesZ, DeadminesO);
+                }
+                else if (_destination == KHADGAR_TRAVEL_RAMPARTS)
+                {
+                    for (Player* player : travellers)
+                        ChatHandler(player->GetSession()).SendSysMessage(
+                            "Khadgar abre un portal de prueba hacia |cffffd100Murallas del Fuego Infernal|r.");
+
+                    success = TeleportParty(travellers, HellfireRampartsMapId, HellfireRampartsX, HellfireRampartsY, HellfireRampartsZ, HellfireRampartsO);
+                }
+                else if (_destination == KHADGAR_TRAVEL_AZJOL)
+                {
+                    for (Player* player : travellers)
+                        ChatHandler(player->GetSession()).SendSysMessage(
+                            "Khadgar abre un portal de prueba hacia |cffffd100Azjol-Nerub|r.");
+
+                    success = TeleportParty(travellers, AzjolNerubMapId, AzjolNerubX, AzjolNerubY, AzjolNerubZ, AzjolNerubO);
                 }
 
                 if (!success)
@@ -734,6 +771,8 @@ public:
         }
 
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Quiero saber mas.", GOSSIP_SENDER_MAIN, ACTION_LEARN_MORE);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "[Prueba] Murallas del Fuego Infernal.", GOSSIP_SENDER_MAIN, ACTION_TEST_RAMPARTS);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "[Prueba] Azjol-Nerub.", GOSSIP_SENDER_MAIN, ACTION_TEST_AZJOL);
         SendGossipMenuFor(player, KhadgarIntroText, creature->GetGUID());
         return true;
     }
@@ -769,6 +808,42 @@ public:
                 static_cast<npc_adventurer_gauntlet_khadgarAI*>(creature->AI())->BeginTravel(
                     members,
                     KHADGAR_TRAVEL_RAGEFIRE);
+
+                CloseGossipMenuFor(player);
+                return true;
+            }
+            case ACTION_TEST_RAMPARTS:
+            case ACTION_TEST_AZJOL:
+            {
+                std::vector<Player*> members;
+                std::string error;
+                if (!ValidateParty(player, members, error))
+                {
+                    ChatHandler(player->GetSession()).SendSysMessage(error.c_str());
+                    CloseGossipMenuFor(player);
+                    return true;
+                }
+
+                uint32 testMapId = action == ACTION_TEST_RAMPARTS ? HellfireRampartsMapId : AzjolNerubMapId;
+                uint8 destination = action == ACTION_TEST_RAMPARTS ? KHADGAR_TRAVEL_RAMPARTS : KHADGAR_TRAVEL_AZJOL;
+                uint8 runLevel = GetHighestPartyLevel(members);
+                std::string companyName = GenerateCompanyName();
+
+                ResetPartyInstances(player);
+                RegisterPendingRun(members, companyName, runLevel);
+                AdventurerGauntlet::RunProgress::StartRun(members, companyName, runLevel, testMapId);
+
+                for (Player* member : members)
+                {
+                    ChatHandler(member->GetSession()).PSendSysMessage(
+                        "|cffffd100Prueba Gauntlet.|r {} entra con nivel base {}.",
+                        GetGauntletDungeonName(testMapId),
+                        runLevel);
+                }
+
+                static_cast<npc_adventurer_gauntlet_khadgarAI*>(creature->AI())->BeginTravel(
+                    members,
+                    destination);
 
                 CloseGossipMenuFor(player);
                 return true;

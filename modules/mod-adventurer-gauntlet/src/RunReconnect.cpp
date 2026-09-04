@@ -28,10 +28,17 @@ bool IsPledged(Player* player)
 
 RunResumePoint DefaultEntryFor(uint32 mapId)
 {
-    if (mapId == AdventurerGauntlet::RunProgress::DeadminesMapId)
-        return {mapId, -16.4f, -383.07f, 61.78f, 1.86f};
-
-    return {AdventurerGauntlet::RunProgress::RagefireMapId, 3.81f, -14.82f, -17.84f, 4.39f};
+    switch (mapId)
+    {
+        case AdventurerGauntlet::RunProgress::DeadminesMapId:
+            return {mapId, -16.4f, -383.07f, 61.78f, 1.86f};
+        case AdventurerGauntlet::RunProgress::HellfireRampartsMapId:
+            return {mapId, -1355.24f, 1641.12f, 68.2491f, 0.6687f};
+        case AdventurerGauntlet::RunProgress::AzjolNerubMapId:
+            return {mapId, 413.314f, 795.968f, 831.351f, 5.5f};
+        default:
+            return {AdventurerGauntlet::RunProgress::RagefireMapId, 3.81f, -14.82f, -17.84f, 4.39f};
+    }
 }
 }
 

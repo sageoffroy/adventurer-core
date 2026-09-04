@@ -11,6 +11,8 @@ namespace AdventurerGauntlet::RunProgress
 {
 constexpr uint32 RagefireMapId = 389;
 constexpr uint32 DeadminesMapId = 36;
+constexpr uint32 HellfireRampartsMapId = 543;
+constexpr uint32 AzjolNerubMapId = 601;
 
 struct Position
 {
@@ -39,7 +41,7 @@ struct ResumePoint
 
 bool IsSupportedDungeonMap(uint32 mapId);
 
-void StartRun(std::vector<Player*> const& members, std::string const& companyName, uint8 runLevel);
+void StartRun(std::vector<Player*> const& members, std::string const& companyName, uint8 runLevel, uint32 initialMapId = RagefireMapId);
 void AdvanceDungeon(Player* player, uint8 dungeonIndex, uint32 mapId);
 void SaveCheckpoint(Player* player, uint32 checkpoint);
 void MarkMemberFallen(Player* player, bool runEnded);

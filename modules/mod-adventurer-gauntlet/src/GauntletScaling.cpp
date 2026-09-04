@@ -16,6 +16,8 @@ constexpr char const* GauntletSettingsSource = "adventurer_gauntlet";
 constexpr uint32 GauntletSettingPledged = 0;
 constexpr uint32 RagefireMapId = 389;
 constexpr uint32 DeadminesMapId = 36;
+constexpr uint32 HellfireRampartsMapId = 543;
+constexpr uint32 AzjolNerubMapId = 601;
 constexpr uint32 LoneWolfSpellId = 910501;
 constexpr uint32 LoneWolfDamagePct = 120;
 constexpr uint32 LoneWolfRefreshMs = 1000;
@@ -37,7 +39,8 @@ std::unordered_map<uint32, uint32> LoneWolfRefreshTimers;
 
 bool IsGauntletMap(uint32 mapId)
 {
-    return mapId == RagefireMapId || mapId == DeadminesMapId;
+    return mapId == RagefireMapId || mapId == DeadminesMapId ||
+        mapId == HellfireRampartsMapId || mapId == AzjolNerubMapId;
 }
 
 bool IsPledged(Player* player)

@@ -51,6 +51,17 @@ Khadgar es parte de la experiencia, pero no define el alcance completo del modul
 
 Actualizaciones de base de datos propiedad de Gauntlet. No moverlas al SQL base de SpellDraft salvo que realmente dejen de ser especificas del modulo.
 
+### Mapas de prueba de escalado
+
+Mientras se valida el desacople entre nivel nativo y nivel Gauntlet, Khadgar ofrece dos destinos de laboratorio separados del recorrido normal:
+
+- **Murallas del Fuego Infernal** (Outland, map 543).
+- **Azjol-Nerub** (Wrath of the Lich King, map 601).
+
+Las opciones aparecen marcadas con `[Prueba]`. Usan el flujo real de Gauntlet: validacion del grupo, compania persistente, binding/reconexion, nivel de run y escalado por jugadores presentes. No forman parte todavia de la secuencia Sima Ignea -> Minas de la Muerte.
+
+Sus coordenadas de entrada son las entradas stock de AzerothCore (`areatrigger_teleport`). El objetivo es probar personajes de nivel muy bajo, por ejemplo nivel 3, contra contenido originalmente disenado para expansiones posteriores antes de incorporarlo al catalogo aleatorio definitivo.
+
 ### Escalado dinamico por jugadores presentes
 
 La dificultad de la instancia usa la cantidad de Aventureros del Gauntlet **fisicamente presentes en la dungeon**, no el numero total de integrantes del grupo fuera del mapa.
