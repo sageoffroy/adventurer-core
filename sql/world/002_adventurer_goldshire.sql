@@ -42,7 +42,7 @@ UNION ALL
 SELECT `race`, @ADVENTURER_CLASS, @START_FOOD, 1, 'Adventurer - Level 3 travel ration'
 FROM `playercreateinfo` WHERE `class` = @ADVENTURER_CLASS
 UNION ALL
-SELECT `race`, @ADVENTURER_CLASS, 19222, 1, 'Adventurer - Cheap Beer'
+SELECT `race`, @ADVENTURER_CLASS, 33028, 1, 'Adventurer - Light Brew'
 FROM `playercreateinfo` WHERE `class` = @ADVENTURER_CLASS;
 
 -- ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ VALUES
 DELETE FROM `npc_vendor`
 WHERE `entry` = @REMEN_MARCOT;
 
--- Unlimited ammunition, food, water and low-level stat scrolls.
+-- Unlimited ammunition, food, water, potions, weapon consumables and low-level stat scrolls.
 INSERT INTO `npc_vendor`
 (`entry`, `slot`, `item`, `maxcount`, `incrtime`, `ExtendedCost`, `VerifiedBuild`)
 VALUES
@@ -156,7 +156,13 @@ VALUES
 (@REMEN_MARCOT, 0, 955,  0, 0, 0, 0),
 (@REMEN_MARCOT, 0, 1180, 0, 0, 0, 0),
 (@REMEN_MARCOT, 0, 1181, 0, 0, 0, 0),
-(@REMEN_MARCOT, 0, 3012, 0, 0, 0, 0);
+(@REMEN_MARCOT, 0, 3012, 0, 0, 0, 0),
+(@REMEN_MARCOT, 0, 118,   0, 0, 0, 0),
+(@REMEN_MARCOT, 0, 2455,  0, 0, 0, 0),
+(@REMEN_MARCOT, 0, 27635, 0, 0, 0, 0),
+(@REMEN_MARCOT, 0, 20744, 0, 0, 0, 0),
+(@REMEN_MARCOT, 0, 3240,  0, 0, 0, 0),
+(@REMEN_MARCOT, 0, 2862,  0, 0, 0, 0);
 
 -- Scarce custom armor/accessories.
 INSERT INTO `npc_vendor`
@@ -184,7 +190,6 @@ VALUES
 (@REMEN_MARCOT, 0, 910235, 2, @RESTOCK_THREE_DAYS, 0, 0),
 (@REMEN_MARCOT, 0, 910226, 1, @RESTOCK_THREE_DAYS, 0, 0),
 (@REMEN_MARCOT, 0, 910236, 2, @RESTOCK_THREE_DAYS, 0, 0),
-(@REMEN_MARCOT, 0, 910227, 1, @RESTOCK_THREE_DAYS, 0, 0),
 (@REMEN_MARCOT, 0, 910228, 3, @RESTOCK_THREE_DAYS, 0, 0),
 (@REMEN_MARCOT, 0, 910229, 1, @RESTOCK_THREE_DAYS, 0, 0),
 (@REMEN_MARCOT, 0, 910230, 1, @RESTOCK_THREE_DAYS, 0, 0),
