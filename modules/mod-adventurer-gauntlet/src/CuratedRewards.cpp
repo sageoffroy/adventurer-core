@@ -1,5 +1,6 @@
 #include "Creature.h"
 #include "DatabaseEnv.h"
+#include "DungeonCatalog.h"
 #include "ItemTemplate.h"
 #include "LootMgr.h"
 #include "Map.h"
@@ -16,7 +17,6 @@
 
 namespace
 {
-constexpr uint32 RagefireMapId = 389;
 constexpr uint32 UniversalMask = 0xFFFFFFFFu;
 constexpr uint32 AdventurerItemRangeFirst = 910000;
 constexpr uint32 AdventurerItemRangeLast = 910999;
@@ -428,7 +428,8 @@ bool AddCommonMobTestDrop(Creature* creature)
 
 void ProcessCreatureAfterDeath(Creature* creature)
 {
-    if (!creature || creature->IsAlive() || creature->GetMapId() != RagefireMapId)
+    if (!creature || creature->IsAlive() ||
+        !AdventurerGauntlet::DungeonCatalog::IsSupportedDungeonMap(creature->GetMapId()))
         return;
 
     uint64 key = GetCreatureKey(creature);
@@ -477,7 +478,8 @@ public:
 
     void OnCreatureRemoveWorld(Creature* creature) override
     {
-        if (!creature || creature->GetMapId() != RagefireMapId)
+        if (!creature ||
+            !AdventurerGauntlet::DungeonCatalog::IsSupportedDungeonMap(creature->GetMapId()))
             return;
         uint64 key = GetCreatureKey(creature);
         if (key)
