@@ -78,6 +78,44 @@ DungeonDefinition const& GetRandomDungeon(ExpansionPool pool)
     return ClassicDungeons.front();
 }
 
+void GetDungeons(ExpansionPool pool, std::vector<DungeonDefinition const*>& out)
+{
+    out.clear();
+
+    auto append = [&out](auto const& source)
+    {
+        for (DungeonDefinition const& dungeon : source)
+            out.push_back(&dungeon);
+    };
+
+    switch (pool)
+    {
+        case ExpansionPool::Classic:
+            append(ClassicDungeons);
+            break;
+        case ExpansionPool::Outland:
+            append(OutlandDungeons);
+            break;
+        case ExpansionPool::Northrend:
+            append(NorthrendDungeons);
+            break;
+    }
+}
+
+DungeonDefinition const* GetSpecificDungeonByMenuIndex(uint32 index)
+{
+    std::vector<DungeonDefinition const*> all;
+    all.reserve(ClassicDungeons.size() + OutlandDungeons.size() + NorthrendDungeons.size());
+    for (DungeonDefinition const& dungeon : ClassicDungeons)
+        all.push_back(&dungeon);
+    for (DungeonDefinition const& dungeon : OutlandDungeons)
+        all.push_back(&dungeon);
+    for (DungeonDefinition const& dungeon : NorthrendDungeons)
+        all.push_back(&dungeon);
+
+    return index < all.size() ? all[index] : nullptr;
+}
+
 bool IsSupportedDungeonMap(uint32 mapId)
 {
     return GetDungeon(mapId) != nullptr;

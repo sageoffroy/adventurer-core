@@ -51,6 +51,12 @@ Khadgar es parte de la experiencia, pero no define el alcance completo del modul
 
 Actualizaciones de base de datos propiedad de Gauntlet. No moverlas al SQL base de SpellDraft salvo que realmente dejen de ser especificas del modulo.
 
+### Selector de mazmorra especifica
+
+Para depuracion, Khadgar ofrece **Elegir mazmorra especifica**. El submenu separa Classic, Terrallende y Rasganorte y permite entrar directamente a cualquiera de las mazmorras habilitadas en los pools temporales.
+
+La entrada especifica usa exactamente el mismo flujo Gauntlet que la seleccion aleatoria: validacion de grupo, compania persistente, nivel de run, binding/reconexion y escalado. No es un teleport GM aislado; sirve para reproducir bugs de una dungeon concreta tantas veces como sea necesario.
+
 ### Primera campana: La sombra sobre Ventormenta
 
 Ademas de los tres selectores aleatorios de prueba, Khadgar ofrece una cuarta opcion fija: **La sombra sobre Ventormenta**.

@@ -2,6 +2,8 @@
 
 #include "Define.h"
 
+#include <vector>
+
 namespace AdventurerGauntlet::DungeonCatalog
 {
 enum class ExpansionPool : uint8
@@ -24,5 +26,7 @@ struct DungeonDefinition
 
 DungeonDefinition const* GetDungeon(uint32 mapId);
 DungeonDefinition const& GetRandomDungeon(ExpansionPool pool);
+void GetDungeons(ExpansionPool pool, std::vector<DungeonDefinition const*>& out);
+DungeonDefinition const* GetSpecificDungeonByMenuIndex(uint32 index);
 bool IsSupportedDungeonMap(uint32 mapId);
 }

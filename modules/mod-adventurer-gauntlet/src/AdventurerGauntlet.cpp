@@ -761,6 +761,11 @@ enum KhadgarGauntletActions
     ACTION_RANDOM_NORTHREND = GOSSIP_ACTION_INFO_DEF + 7,
     ACTION_STORMWIND_SHADOW = GOSSIP_ACTION_INFO_DEF + 8,
     ACTION_CAMPAIGN_CONTINUE = GOSSIP_ACTION_INFO_DEF + 9,
+    ACTION_SPECIFIC_MENU = GOSSIP_ACTION_INFO_DEF + 10,
+    ACTION_SPECIFIC_CLASSIC = GOSSIP_ACTION_INFO_DEF + 11,
+    ACTION_SPECIFIC_OUTLAND = GOSSIP_ACTION_INFO_DEF + 12,
+    ACTION_SPECIFIC_NORTHREND = GOSSIP_ACTION_INFO_DEF + 13,
+    ACTION_SPECIFIC_BASE = GOSSIP_ACTION_INFO_DEF + 100,
 };
 
 enum KhadgarTravelDestination
@@ -959,6 +964,7 @@ public:
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Mazmorra clasica aleatoria.", GOSSIP_SENDER_MAIN, ACTION_RANDOM_CLASSIC);
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Mazmorra de Terrallende aleatoria.", GOSSIP_SENDER_MAIN, ACTION_RANDOM_OUTLAND);
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Mazmorra de Rasganorte aleatoria.", GOSSIP_SENDER_MAIN, ACTION_RANDOM_NORTHREND);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Elegir mazmorra especifica.", GOSSIP_SENDER_MAIN, ACTION_SPECIFIC_MENU);
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "La sombra sobre Ventormenta.", GOSSIP_SENDER_MAIN, ACTION_STORMWIND_SHADOW);
         SendGossipMenuFor(player, KhadgarIntroText, creature->GetGUID());
         return true;
@@ -967,6 +973,46 @@ public:
     bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
     {
         ClearGossipMenuFor(player);
+
+        if (action >= ACTION_SPECIFIC_BASE)
+        {
+            uint32 index = action - ACTION_SPECIFIC_BASE;
+            auto const* dungeon = AdventurerGauntlet::DungeonCatalog::GetSpecificDungeonByMenuIndex(index);
+            if (!dungeon)
+            {
+                CloseGossipMenuFor(player);
+                return true;
+            }
+
+            std::vector<Player*> members;
+            std::string error;
+            if (!ValidateParty(player, members, error))
+            {
+                ChatHandler(player->GetSession()).SendSysMessage(error.c_str());
+                CloseGossipMenuFor(player);
+                return true;
+            }
+
+            uint8 runLevel = GetHighestPartyLevel(members);
+            std::string companyName = GenerateCompanyName();
+
+            ResetPartyInstances(player);
+            RegisterPendingRun(members, companyName, runLevel);
+            AdventurerGauntlet::RunProgress::StartRun(members, companyName, runLevel, dungeon->MapId);
+
+            for (Player* member : members)
+                ChatHandler(member->GetSession()).PSendSysMessage(
+                    "|cffffd100Prueba especifica Gauntlet.|r Khadgar abre {}. Nivel base: {}.",
+                    dungeon->Name,
+                    runLevel);
+
+            static_cast<npc_adventurer_gauntlet_khadgarAI*>(creature->AI())->BeginTravel(
+                members,
+                *dungeon);
+
+            CloseGossipMenuFor(player);
+            return true;
+        }
 
         switch (action)
         {
@@ -996,6 +1042,44 @@ public:
                     KHADGAR_TRAVEL_RAGEFIRE);
 
                 CloseGossipMenuFor(player);
+                return true;
+            }
+            case ACTION_SPECIFIC_MENU:
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Classic.", GOSSIP_SENDER_MAIN, ACTION_SPECIFIC_CLASSIC);
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Terrallende.", GOSSIP_SENDER_MAIN, ACTION_SPECIFIC_OUTLAND);
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Rasganorte.", GOSSIP_SENDER_MAIN, ACTION_SPECIFIC_NORTHREND);
+                SendGossipMenuFor(player, DEFAULT_GOSSIP_MESSAGE, creature->GetGUID());
+                return true;
+            case ACTION_SPECIFIC_CLASSIC:
+            case ACTION_SPECIFIC_OUTLAND:
+            case ACTION_SPECIFIC_NORTHREND:
+            {
+                AdventurerGauntlet::DungeonCatalog::ExpansionPool pool =
+                    action == ACTION_SPECIFIC_CLASSIC
+                        ? AdventurerGauntlet::DungeonCatalog::ExpansionPool::Classic
+                        : action == ACTION_SPECIFIC_OUTLAND
+                            ? AdventurerGauntlet::DungeonCatalog::ExpansionPool::Outland
+                            : AdventurerGauntlet::DungeonCatalog::ExpansionPool::Northrend;
+
+                std::vector<AdventurerGauntlet::DungeonCatalog::DungeonDefinition const*> dungeons;
+                AdventurerGauntlet::DungeonCatalog::GetDungeons(pool, dungeons);
+
+                uint32 offset =
+                    pool == AdventurerGauntlet::DungeonCatalog::ExpansionPool::Classic
+                        ? 0
+                        : pool == AdventurerGauntlet::DungeonCatalog::ExpansionPool::Outland
+                            ? 5
+                            : 9;
+
+                for (uint32 i = 0; i < dungeons.size(); ++i)
+                    AddGossipItemFor(
+                        player,
+                        GOSSIP_ICON_CHAT,
+                        dungeons[i]->Name,
+                        GOSSIP_SENDER_MAIN,
+                        ACTION_SPECIFIC_BASE + offset + i);
+
+                SendGossipMenuFor(player, DEFAULT_GOSSIP_MESSAGE, creature->GetGUID());
                 return true;
             }
             case ACTION_STORMWIND_SHADOW:
