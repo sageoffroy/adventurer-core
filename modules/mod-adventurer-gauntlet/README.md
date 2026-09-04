@@ -104,7 +104,7 @@ nivel Gauntlet del mob = nivel de la run + max(0, nivel nativo del mob - NativeB
 
 Esto evita que NPC auxiliares, criaturas de otras zonas del mismo map o mapas compartidos distorsionen toda la instancia. Es especialmente importante para **Monasterio Escarlata**, donde Cementerio, Biblioteca, Armeria y Catedral comparten el map 189. Por ahora el catalogo habilita solo Cementerio y usa su base propia; cuando se incorporen las otras alas deberan modelarse como stages/dungeons independientes aunque compartan `map_id`.
 
-Las bases actuales son parametros de balance del Gauntlet y se ajustaran con pruebas en juego; no se recalculan dinamicamente desde los spawns del mapa.
+Las bases actuales son parametros de balance del Gauntlet y se ajustaran con pruebas en juego; no se recalculan dinamicamente desde los spawns del mapa. En Cementerio del Monasterio Escarlata la base se fija en 30 para reducir en dos niveles el resultado respecto de la primera prueba con base 28.
 
 ### Escalado dinamico por jugadores presentes
 

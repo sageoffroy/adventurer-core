@@ -73,10 +73,10 @@ public:
             }
             : DefaultEntryFor(persisted.CurrentMap);
 
-        if (player->GetMapId() == point.MapId &&
-            AdventurerGauntlet::RunProgress::IsSupportedDungeonMap(player->GetMapId()))
-            return;
-
+        // Always re-apply the persisted Gauntlet position, even when the
+        // character logs in on the same map. Shared-map dungeons (for example
+        // Scarlet Monastery) can place the character at a stock entrance or
+        // portal while still reporting the same map id.
         PendingRunResumes[player->GetGUID().GetCounter()] = point;
     }
 
@@ -95,9 +95,7 @@ public:
         if (!IsPledged(player) || !AdventurerGauntlet::RunProgress::IsSupportedDungeonMap(point.MapId))
             return;
 
-        if (player->GetMapId() == point.MapId)
-            return;
-
+        player->BindToInstance();
         player->TeleportTo(
             point.MapId,
             point.X,

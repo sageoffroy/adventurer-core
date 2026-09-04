@@ -13,7 +13,7 @@ constexpr std::array<DungeonDefinition, 5> ClassicDungeons = {{
     { 36, "Minas de la Muerte", -16.4f, -383.07f, 61.78f, 1.86f, ExpansionPool::Classic, 17 },
     { 34, "Las Mazmorras de Ventormenta", 54.23f, 0.28f, -18.34f, 6.26f, ExpansionPool::Classic, 22 },
     { 33, "Castillo de Colmillo Oscuro", -229.135f, 2109.18f, 76.8898f, 1.267f, ExpansionPool::Classic, 18 },
-    { 189, "Monasterio Escarlata - Cementerio", 1688.99f, 1053.48f, 18.6775f, 0.00117f, ExpansionPool::Classic, 28 },
+    { 189, "Monasterio Escarlata - Cementerio", 1688.99f, 1053.48f, 18.6775f, 0.00117f, ExpansionPool::Classic, 30 },
 }};
 
 constexpr std::array<DungeonDefinition, 4> OutlandDungeons = {{
