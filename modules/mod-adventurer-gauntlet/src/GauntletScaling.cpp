@@ -32,6 +32,7 @@ struct CreatureScaleState
 };
 
 std::unordered_map<uint64, CreatureScaleState> CreatureScaleStates;
+std::unordered_map<uint32, uint8> InstancePeakPartySizes;
 std::unordered_map<uint32, uint32> LoneWolfRefreshTimers;
 
 bool IsGauntletMap(uint32 mapId)
@@ -82,7 +83,12 @@ uint8 GetRunPartySize(Map* map)
         presentPlayers = std::min<uint8>(5, uint8(presentPlayers + 1));
     }
 
-    return presentPlayers;
+    if (!map->GetInstanceId())
+        return presentPlayers;
+
+    uint8& peakPartySize = InstancePeakPartySizes[map->GetInstanceId()];
+    peakPartySize = std::max<uint8>(peakPartySize, presentPlayers);
+    return peakPartySize;
 }
 
 uint32 GetHealthPercent(Creature const* creature, uint8 partySize)
@@ -178,6 +184,29 @@ uint32 ScaleOutgoingDamage(Unit* attacker, uint32 damage)
 }
 }
 
+class AdventurerGauntletScalingMapScript : public AllMapScript
+{
+public:
+    AdventurerGauntletScalingMapScript() : AllMapScript("AdventurerGauntletScalingMapScript") { }
+
+    void OnDestroyInstance(MapInstanced* /*mapInstanced*/, Map* map) override
+    {
+        if (!map || !IsGauntletMap(map->GetId()))
+            return;
+
+        uint32 instanceId = map->GetInstanceId();
+        InstancePeakPartySizes.erase(instanceId);
+
+        for (auto itr = CreatureScaleStates.begin(); itr != CreatureScaleStates.end();)
+        {
+            if (uint32(itr->first >> 32) == instanceId)
+                itr = CreatureScaleStates.erase(itr);
+            else
+                ++itr;
+        }
+    }
+};
+
 class AdventurerGauntletScalingUnitScript : public UnitScript
 {
 public:
@@ -250,6 +279,7 @@ public:
 
 void AddAdventurerGauntletScalingScripts()
 {
+    new AdventurerGauntletScalingMapScript();
     new AdventurerGauntletScalingUnitScript();
     new AdventurerGauntletLoneWolfPlayerScript();
 }

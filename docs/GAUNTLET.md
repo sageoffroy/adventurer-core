@@ -77,6 +77,18 @@ A logout records the last position only when the character is inside a supported
 
 The intended save model is checkpoint-based, not a byte-for-byte snapshot of an AzerothCore instance. Individual dungeon implementations are responsible for reconstructing boss/door/world state from the saved checkpoint. This keeps progression stable across instance destruction and worldserver restarts.
 
+### Dynamic party scaling
+
+Instance difficulty is monotonic for the lifetime of an instance. Gauntlet tracks the highest number of pledged Adventurers physically present in that dungeon instance.
+
+- More players entering can raise the effective party size.
+- Living creatures outside combat are rescaled upward to the new size.
+- Creatures already in combat keep the size they started that combat with.
+- A death, logout, or departure never lowers the instance difficulty.
+- Peak size and per-creature scaling state are discarded only when the instance is destroyed.
+
+This intentionally means that if a 3-player company loses one member, the survivors must finish a dungeon still tuned for 3.
+
 ### Historical board
 
 Run rows are intentionally retained after the run ends. The planned company board/ranking should query this history directly. In particular, `party_size` is the number of adventurers that **started** the run and remains immutable for ranking purposes even if members later disconnect or die.

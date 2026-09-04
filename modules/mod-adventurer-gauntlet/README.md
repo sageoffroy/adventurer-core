@@ -55,7 +55,9 @@ Actualizaciones de base de datos propiedad de Gauntlet. No moverlas al SQL base 
 
 La dificultad de la instancia usa la cantidad de Aventureros del Gauntlet **fisicamente presentes en la dungeon**, no el numero total de integrantes del grupo fuera del mapa.
 
-Cuando cambia esa cantidad, `GauntletScaling.cpp` reajusta solamente criaturas vivas que esten **fuera de combate**. Una criatura que ya esta peleando conserva el tamano de grupo con el que comenzo ese combate, tanto para vida como para dano. Al morir se descarta su estado de escalado.
+Cuando aumenta esa cantidad, `GauntletScaling.cpp` reajusta solamente criaturas vivas que esten **fuera de combate**. Una criatura que ya esta peleando conserva el tamano de grupo con el que comenzo ese combate, tanto para vida como para dano. Al morir se descarta su estado de escalado.
+
+La dificultad de una instancia **nunca baja** durante esa instancia. Se conserva el mayor numero de Aventureros que llego a estar presente. Si una compania entra con 3 y uno muere, se desconecta o abandona la dungeon, los encuentros pendientes siguen escalados para 3. Si despues entra un cuarto, la dificultad puede subir a 4, pero nunca volver a 3 mientras esa instancia exista.
 
 Cada criatura conserva internamente su vida maxima base y el ultimo tamano de grupo aplicado. Los cambios 2→3, 3→4, etc. siempre se calculan desde esa base para evitar multiplicar escalados sucesivos entre si.
 
