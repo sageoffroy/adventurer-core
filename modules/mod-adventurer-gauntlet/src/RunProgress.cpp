@@ -32,7 +32,7 @@ bool IsSupportedDungeonMap(uint32 mapId)
     return AdventurerGauntlet::DungeonCatalog::IsSupportedDungeonMap(mapId);
 }
 
-void StartRun(std::vector<Player*> const& members, std::string const& companyName, uint8 runLevel, uint32 initialMapId)
+void StartRun(std::vector<Player*> const& members, std::string const& companyName, uint8 runLevel, uint32 initialMapId, std::string const& campaignKey)
 {
     if (members.empty() || !members.front())
         return;
@@ -46,17 +46,20 @@ void StartRun(std::vector<Player*> const& members, std::string const& companyNam
 
     std::string escapedCompanyName = companyName;
     CharacterDatabase.EscapeString(escapedCompanyName);
+    std::string escapedCampaignKey = campaignKey;
+    CharacterDatabase.EscapeString(escapedCampaignKey);
     uint32 leaderGuid = leader->GetGUID().GetCounter();
 
     CharacterDatabase.DirectExecute(
         "INSERT INTO `adventurer_gauntlet_runs` "
-        "(`company_name`, `leader_guid`, `party_size`, `run_level`, `current_dungeon`, `current_map`, "
+        "(`company_name`, `leader_guid`, `party_size`, `run_level`, `campaign_key`, `current_dungeon`, `current_map`, "
         " `current_checkpoint`, `best_dungeon_reached`, `status`) "
-        "VALUES ('{}', {}, {}, {}, 1, {}, 0, 1, 'active')",
+        "VALUES ('{}', {}, {}, {}, '{}', 1, {}, 0, 1, 'active')",
         escapedCompanyName,
         leaderGuid,
         uint32(members.size()),
         uint32(runLevel),
+        escapedCampaignKey,
         initialMapId);
 
     for (Player* member : members)
@@ -144,13 +147,26 @@ void MarkMemberFallen(Player* player, bool runEnded)
             player->GetGUID().GetCounter());
 }
 
+void CompleteRun(Player* player)
+{
+    if (!player)
+        return;
+
+    CharacterDatabase.DirectExecute(
+        "UPDATE `adventurer_gauntlet_runs` r "
+        "JOIN `adventurer_gauntlet_run_members` m ON m.`run_id` = r.`run_id` "
+        "SET r.`status` = 'completed', r.`updated_at` = CURRENT_TIMESTAMP "
+        "WHERE m.`character_guid` = {} AND r.`status` = 'active'",
+        player->GetGUID().GetCounter());
+}
+
 bool LoadActiveRun(Player* player, ActiveRun& run)
 {
     if (!player)
         return false;
 
     QueryResult result = CharacterDatabase.Query(
-        "SELECT r.`company_name`, r.`run_level`, r.`current_dungeon`, r.`current_checkpoint`, "
+        "SELECT r.`company_name`, r.`campaign_key`, r.`run_level`, r.`current_dungeon`, r.`current_map`, r.`current_checkpoint`, "
         "       m.`return_map`, m.`return_x`, m.`return_y`, m.`return_z`, m.`return_o` "
         "FROM `adventurer_gauntlet_runs` r "
         "JOIN `adventurer_gauntlet_run_members` m ON m.`run_id` = r.`run_id` "
@@ -163,15 +179,17 @@ bool LoadActiveRun(Player* player, ActiveRun& run)
 
     Field* fields = result->Fetch();
     run.CompanyName = fields[0].Get<std::string>();
-    run.RunLevel = fields[1].Get<uint8>();
-    run.CurrentDungeon = fields[2].Get<uint8>();
-    run.CurrentCheckpoint = fields[3].Get<uint32>();
+    run.CampaignKey = fields[1].Get<std::string>();
+    run.RunLevel = fields[2].Get<uint8>();
+    run.CurrentDungeon = fields[3].Get<uint8>();
+    run.CurrentMap = fields[4].Get<uint32>();
+    run.CurrentCheckpoint = fields[5].Get<uint32>();
     run.ReturnPoint = {
-        fields[4].Get<uint32>(),
-        fields[5].Get<float>(),
-        fields[6].Get<float>(),
+        fields[6].Get<uint32>(),
         fields[7].Get<float>(),
-        fields[8].Get<float>()
+        fields[8].Get<float>(),
+        fields[9].Get<float>(),
+        fields[10].Get<float>()
     };
     return true;
 }

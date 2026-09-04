@@ -1,3 +1,4 @@
+#include "CampaignCatalog.h"
 #include "Chat.h"
 #include "Config.h"
 #include "Creature.h"
@@ -39,6 +40,8 @@ struct RunReturnPoint
 std::unordered_map<uint32, std::string> PendingRunNames;
 std::unordered_map<uint32, RunReturnPoint> RunReturnPoints;
 std::unordered_map<uint32, uint8> PendingRunLevels;
+std::unordered_map<uint32, std::string> PendingRunCampaigns;
+std::unordered_map<uint32, uint8> PendingRunCampaignStages;
 std::unordered_map<uint32, uint8> ActiveRunInstanceLevels;
 std::unordered_map<uint32, uint8> ActiveRunNativeMinLevels;
 std::unordered_map<uint32, uint8> RagefireBossProgress;
@@ -215,13 +218,23 @@ bool ValidateParty(Player* player, std::vector<Player*>& members, std::string& e
     return true;
 }
 
-void RegisterPendingRun(std::vector<Player*> const& members, std::string const& companyName, uint8 runLevel)
+void RegisterPendingRun(std::vector<Player*> const& members, std::string const& companyName, uint8 runLevel, std::string const& campaignKey = "", uint8 campaignStage = 0)
 {
     for (Player* member : members)
     {
         uint32 guid = member->GetGUID().GetCounter();
         PendingRunNames[guid] = companyName;
         PendingRunLevels[guid] = runLevel;
+        if (!campaignKey.empty())
+        {
+            PendingRunCampaigns[guid] = campaignKey;
+            PendingRunCampaignStages[guid] = campaignStage;
+        }
+        else
+        {
+            PendingRunCampaigns.erase(guid);
+            PendingRunCampaignStages.erase(guid);
+        }
         RunReturnPoints[guid] = {
             member->GetMapId(),
             member->GetPositionX(),
@@ -256,6 +269,34 @@ bool GetPendingRunLevel(Player* player, uint8& level)
 
     level = itr->second;
     return true;
+}
+
+AdventurerGauntlet::CampaignCatalog::CampaignDefinition const* GetPendingCampaign(Player* player)
+{
+    if (!player)
+        return nullptr;
+
+    auto itr = PendingRunCampaigns.find(player->GetGUID().GetCounter());
+    if (itr == PendingRunCampaigns.end())
+        return nullptr;
+
+    return AdventurerGauntlet::CampaignCatalog::GetCampaign(itr->second);
+}
+
+uint8 GetPendingCampaignStage(Player* player)
+{
+    if (!player)
+        return 0;
+
+    auto itr = PendingRunCampaignStages.find(player->GetGUID().GetCounter());
+    return itr == PendingRunCampaignStages.end() ? 0 : itr->second;
+}
+
+void SetPendingCampaignStage(std::vector<Player*> const& members, uint8 stage)
+{
+    for (Player* member : members)
+        if (member)
+            PendingRunCampaignStages[member->GetGUID().GetCounter()] = stage;
 }
 
 bool GetActiveRunLevel(Creature const* creature, uint8& level)
@@ -424,6 +465,78 @@ void ReturnFallenAdventurer(Player* player)
         "Khadgar te ha devuelto. Durante el desarrollo puedes volver a intentar el desafio.");
 }
 
+void RegisterCampaignBossDeathAndTryAdvance(Creature* defeatedBoss)
+{
+    if (!defeatedBoss)
+        return;
+
+    Player* campaignPlayer = nullptr;
+    AdventurerGauntlet::CampaignCatalog::CampaignDefinition const* campaign = nullptr;
+    for (auto const& ref : defeatedBoss->GetMap()->GetPlayers())
+    {
+        Player* player = ref.GetSource();
+        if (!player || !GetPendingRunName(player))
+            continue;
+
+        campaign = GetPendingCampaign(player);
+        if (campaign)
+        {
+            campaignPlayer = player;
+            break;
+        }
+    }
+
+    if (!campaignPlayer || !campaign)
+        return;
+
+    uint8 stageIndex = GetPendingCampaignStage(campaignPlayer);
+    auto const* stage = AdventurerGauntlet::CampaignCatalog::GetStage(*campaign, stageIndex);
+    if (!stage || stage->MapId != defeatedBoss->GetMapId() || stage->FinalBossEntry != defeatedBoss->GetEntry())
+        return;
+
+    std::vector<Player*> survivors = GetLivingRunMembers(defeatedBoss->GetMap());
+    if (survivors.empty())
+        return;
+
+    for (Player* survivor : survivors)
+        AdventurerGauntlet::RunProgress::SaveCheckpoint(survivor, 0x80);
+
+    Creature* khadgar = defeatedBoss->SummonCreature(
+        KhadgarEntry,
+        defeatedBoss->GetPositionX() + 2.5f,
+        defeatedBoss->GetPositionY() + 1.5f,
+        defeatedBoss->GetPositionZ(),
+        defeatedBoss->GetOrientation());
+
+    for (Player* survivor : survivors)
+    {
+        ChatHandler(survivor->GetSession()).PSendSysMessage(
+            "|cff00ff00{} - etapa {} completada.|r",
+            campaign->Name,
+            uint32(stageIndex));
+        ChatHandler(survivor->GetSession()).SendSysMessage(stage->TransitionText);
+    }
+
+    if (stageIndex == campaign->Stages.size())
+    {
+        for (Player* survivor : survivors)
+            AdventurerGauntlet::RunProgress::CompleteRun(survivor);
+
+        for (Player* survivor : survivors)
+            ChatHandler(survivor->GetSession()).SendSysMessage(
+                khadgar
+                    ? "Khadgar contempla el cuerpo de Onyxia. La expedicion ha terminado."
+                    : "La expedicion ha terminado: Onyxia ha caido.");
+        return;
+    }
+
+    for (Player* survivor : survivors)
+        ChatHandler(survivor->GetSession()).SendSysMessage(
+            khadgar
+                ? "Khadgar ha llegado. Habla con el cuando estes listo para seguir la pista."
+                : "Khadgar intento materializarse, pero el portal no respondio.");
+}
+
 void RegisterRagefireBossDeathAndTryFinish(Creature* defeatedBoss)
 {
     if (!defeatedBoss || defeatedBoss->GetMapId() != RagefireMapId)
@@ -590,6 +703,8 @@ public:
             creature->RemoveDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
         }
 
+        RegisterCampaignBossDeathAndTryAdvance(creature);
+
         if (creature->GetMapId() == RagefireMapId)
             RegisterRagefireBossDeathAndTryFinish(creature);
     }
@@ -612,6 +727,11 @@ public:
         uint32 guid = player->GetGUID().GetCounter();
         PendingRunNames[guid] = run.CompanyName;
         PendingRunLevels[guid] = run.RunLevel;
+        if (!run.CampaignKey.empty())
+        {
+            PendingRunCampaigns[guid] = run.CampaignKey;
+            PendingRunCampaignStages[guid] = run.CurrentDungeon;
+        }
         RunReturnPoints[guid] = {
             run.ReturnPoint.MapId,
             run.ReturnPoint.X,
@@ -637,6 +757,8 @@ enum KhadgarGauntletActions
     ACTION_RANDOM_CLASSIC = GOSSIP_ACTION_INFO_DEF + 5,
     ACTION_RANDOM_OUTLAND = GOSSIP_ACTION_INFO_DEF + 6,
     ACTION_RANDOM_NORTHREND = GOSSIP_ACTION_INFO_DEF + 7,
+    ACTION_STORMWIND_SHADOW = GOSSIP_ACTION_INFO_DEF + 8,
+    ACTION_CAMPAIGN_CONTINUE = GOSSIP_ACTION_INFO_DEF + 9,
 };
 
 enum KhadgarTravelDestination
@@ -808,18 +930,34 @@ public:
             return true;
         }
 
-        if (creature->GetMapId() == RagefireMapId && GetPendingRunName(player))
+        if (auto const* campaign = GetPendingCampaign(player))
         {
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Estamos listos. Abre el camino a la siguiente mazmorra.", GOSSIP_SENDER_MAIN, ACTION_CONTINUE);
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Recuerdame el nombre de nuestra compania.", GOSSIP_SENDER_MAIN, ACTION_STATUS);
-            SendGossipMenuFor(player, DEFAULT_GOSSIP_MESSAGE, creature->GetGUID());
-            return true;
+            uint8 stageIndex = GetPendingCampaignStage(player);
+            if (auto const* stage = AdventurerGauntlet::CampaignCatalog::GetStage(*campaign, stageIndex))
+            {
+                if (stage->MapId == creature->GetMapId() && stageIndex < campaign->Stages.size())
+                {
+                    if (auto const* nextStage = AdventurerGauntlet::CampaignCatalog::GetStage(*campaign, stageIndex + 1))
+                        if (auto const* nextDungeon = AdventurerGauntlet::DungeonCatalog::GetDungeon(nextStage->MapId))
+                            AddGossipItemFor(
+                                player,
+                                GOSSIP_ICON_CHAT,
+                                std::string("Continuar hacia ") + nextDungeon->Name + ".",
+                                GOSSIP_SENDER_MAIN,
+                                ACTION_CAMPAIGN_CONTINUE);
+
+                    AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Recuerdame el nombre de nuestra compania.", GOSSIP_SENDER_MAIN, ACTION_STATUS);
+                    SendGossipMenuFor(player, DEFAULT_GOSSIP_MESSAGE, creature->GetGUID());
+                    return true;
+                }
+            }
         }
 
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Quiero saber mas.", GOSSIP_SENDER_MAIN, ACTION_LEARN_MORE);
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Mazmorra clasica aleatoria.", GOSSIP_SENDER_MAIN, ACTION_RANDOM_CLASSIC);
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Mazmorra de Terrallende aleatoria.", GOSSIP_SENDER_MAIN, ACTION_RANDOM_OUTLAND);
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Mazmorra de Rasganorte aleatoria.", GOSSIP_SENDER_MAIN, ACTION_RANDOM_NORTHREND);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "La sombra sobre Ventormenta.", GOSSIP_SENDER_MAIN, ACTION_STORMWIND_SHADOW);
         SendGossipMenuFor(player, KhadgarIntroText, creature->GetGUID());
         return true;
     }
@@ -855,6 +993,56 @@ public:
                 static_cast<npc_adventurer_gauntlet_khadgarAI*>(creature->AI())->BeginTravel(
                     members,
                     KHADGAR_TRAVEL_RAGEFIRE);
+
+                CloseGossipMenuFor(player);
+                return true;
+            }
+            case ACTION_STORMWIND_SHADOW:
+            {
+                std::vector<Player*> members;
+                std::string error;
+                if (!ValidateParty(player, members, error))
+                {
+                    ChatHandler(player->GetSession()).SendSysMessage(error.c_str());
+                    CloseGossipMenuFor(player);
+                    return true;
+                }
+
+                auto const* campaign = AdventurerGauntlet::CampaignCatalog::GetCampaign(
+                    AdventurerGauntlet::CampaignCatalog::StormwindShadowKey);
+                auto const* firstStage = campaign ? AdventurerGauntlet::CampaignCatalog::GetStage(*campaign, 1) : nullptr;
+                auto const* firstDungeon = firstStage ? AdventurerGauntlet::DungeonCatalog::GetDungeon(firstStage->MapId) : nullptr;
+                if (!campaign || !firstStage || !firstDungeon)
+                {
+                    ChatHandler(player->GetSession()).SendSysMessage("La campaña no esta disponible.");
+                    CloseGossipMenuFor(player);
+                    return true;
+                }
+
+                uint8 runLevel = GetHighestPartyLevel(members);
+                std::string companyName = GenerateCompanyName();
+
+                ResetPartyInstances(player);
+                RegisterPendingRun(members, companyName, runLevel, campaign->Key, 1);
+                AdventurerGauntlet::RunProgress::StartRun(
+                    members,
+                    companyName,
+                    runLevel,
+                    firstStage->MapId,
+                    campaign->Key);
+
+                for (Player* member : members)
+                {
+                    ChatHandler(member->GetSession()).PSendSysMessage(
+                        "|cffffd100{}|r comienza. Khadgar ha localizado a Edwin VanCleef en las Minas de la Muerte.",
+                        campaign->Name);
+                    ChatHandler(member->GetSession()).SendSysMessage(
+                        "Derrota a VanCleef. Khadgar intentara arrancar una ultima pista de sus pensamientos antes de que su alma abandone el cuerpo.");
+                }
+
+                static_cast<npc_adventurer_gauntlet_khadgarAI*>(creature->AI())->BeginTravel(
+                    members,
+                    *firstDungeon);
 
                 CloseGossipMenuFor(player);
                 return true;
@@ -902,9 +1090,16 @@ public:
                 CloseGossipMenuFor(player);
                 return true;
             }
-            case ACTION_CONTINUE:
+            case ACTION_CAMPAIGN_CONTINUE:
             {
-                if (creature->GetMapId() != RagefireMapId || !GetPendingRunName(player))
+                auto const* campaign = GetPendingCampaign(player);
+                uint8 stageIndex = GetPendingCampaignStage(player);
+                auto const* currentStage = campaign ? AdventurerGauntlet::CampaignCatalog::GetStage(*campaign, stageIndex) : nullptr;
+                auto const* nextStage = campaign ? AdventurerGauntlet::CampaignCatalog::GetStage(*campaign, stageIndex + 1) : nullptr;
+                auto const* nextDungeon = nextStage ? AdventurerGauntlet::DungeonCatalog::GetDungeon(nextStage->MapId) : nullptr;
+
+                if (!campaign || !currentStage || !nextStage || !nextDungeon ||
+                    currentStage->MapId != creature->GetMapId())
                 {
                     CloseGossipMenuFor(player);
                     return true;
@@ -929,15 +1124,18 @@ public:
                 }
 
                 for (Player* survivor : survivors)
-                {
-                    AdventurerGauntlet::RunProgress::AdvanceDungeon(survivor, 2, DeadminesMapId);
-                    ChatHandler(survivor->GetSession()).SendSysMessage(
-                        "Khadgar comienza a preparar el siguiente portal.");
-                }
+                    AdventurerGauntlet::RunProgress::AdvanceDungeon(survivor, nextStage->Index, nextStage->MapId);
+
+                SetPendingCampaignStage(survivors, nextStage->Index);
+
+                for (Player* survivor : survivors)
+                    ChatHandler(survivor->GetSession()).PSendSysMessage(
+                        "Khadgar prepara el portal hacia |cffffd100{}|r.",
+                        nextDungeon->Name);
 
                 static_cast<npc_adventurer_gauntlet_khadgarAI*>(creature->AI())->BeginTravel(
                     survivors,
-                    KHADGAR_TRAVEL_DEADMINES);
+                    *nextDungeon);
 
                 CloseGossipMenuFor(player);
                 return true;

@@ -1,3 +1,4 @@
+AC_ADD_SCRIPT("${CMAKE_CURRENT_LIST_DIR}/src/CampaignCatalog.cpp")
 AC_ADD_SCRIPT("${CMAKE_CURRENT_LIST_DIR}/src/DungeonCatalog.cpp")
 AC_ADD_SCRIPT("${CMAKE_CURRENT_LIST_DIR}/src/AdventurerGauntlet.cpp")
 AC_ADD_SCRIPT("${CMAKE_CURRENT_LIST_DIR}/src/GauntletPermadeath.cpp")

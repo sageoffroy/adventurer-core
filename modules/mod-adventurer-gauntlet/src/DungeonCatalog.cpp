@@ -30,6 +30,11 @@ constexpr std::array<DungeonDefinition, 4> NorthrendDungeons = {{
     { 604, "Gundrak", 1891.84f, 832.169f, 176.669f, 2.109f, ExpansionPool::Northrend },
 }};
 
+constexpr std::array<DungeonDefinition, 2> CampaignOnlyDungeons = {{
+    { 230, "Profundidades de Roca Negra", 456.929f, 34.0923f, -68.0896f, 4.71239f, ExpansionPool::Classic },
+    { 249, "Guarida de Onyxia", 29.1607f, -71.3372f, -8.18032f, 4.58f, ExpansionPool::Classic },
+}};
+
 template <std::size_t N>
 DungeonDefinition const* FindIn(std::array<DungeonDefinition, N> const& pool, uint32 mapId)
 {
@@ -53,7 +58,9 @@ DungeonDefinition const* GetDungeon(uint32 mapId)
         return dungeon;
     if (DungeonDefinition const* dungeon = FindIn(OutlandDungeons, mapId))
         return dungeon;
-    return FindIn(NorthrendDungeons, mapId);
+    if (DungeonDefinition const* dungeon = FindIn(NorthrendDungeons, mapId))
+        return dungeon;
+    return FindIn(CampaignOnlyDungeons, mapId);
 }
 
 DungeonDefinition const& GetRandomDungeon(ExpansionPool pool)

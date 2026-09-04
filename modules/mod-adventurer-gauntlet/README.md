@@ -51,6 +51,23 @@ Khadgar es parte de la experiencia, pero no define el alcance completo del modul
 
 Actualizaciones de base de datos propiedad de Gauntlet. No moverlas al SQL base de SpellDraft salvo que realmente dejen de ser especificas del modulo.
 
+### Primera campana: La sombra sobre Ventormenta
+
+Ademas de los tres selectores aleatorios de prueba, Khadgar ofrece una cuarta opcion fija: **La sombra sobre Ventormenta**.
+
+Es la primera campana completa usada como patron para el futuro sistema de expediciones:
+
+1. **Minas de la Muerte** — Edwin VanCleef (entry 639).
+2. **Las Mazmorras de Ventormenta** — Bazil Thredd (entry 1716).
+3. **Profundidades de Roca Negra** — Emperador Dagran Thaurissan (entry 9019).
+4. **Guarida de Onyxia** — Onyxia (entry 10184).
+
+La campana se identifica persistentemente con `campaign_key=stormwind_shadow`. El stage actual sigue usando `current_dungeon`, por lo que reconectar o reiniciar el servidor conserva tanto la campana como la etapa.
+
+Al morir el jefe objetivo de cada etapa, Khadgar aparece junto al cuerpo, presenta de forma provisional la pista narrativa obtenida de los ultimos recuerdos del jefe y permite al lider continuar. Antes de abrir el siguiente portal, `RunProgress::AdvanceDungeon` persiste el nuevo stage/mapa. Al caer Onyxia, la run pasa a estado `completed`.
+
+La definicion narrativa y los bosses de la campana viven en `CampaignCatalog.h/.cpp`. Las coordenadas y datos de mapas siguen perteneciendo a `DungeonCatalog.h/.cpp`. Los textos actuales son funcionales/provisionales: la redaccion final de Khadgar se pulira despues sin cambiar el flujo tecnico.
+
 ### Selector aleatorio temporal por expansion
 
 Mientras se define el futuro mapa de rutas, Khadgar ofrece tres accesos de prueba:

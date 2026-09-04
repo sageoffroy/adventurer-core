@@ -26,8 +26,10 @@ struct Position
 struct ActiveRun
 {
     std::string CompanyName;
+    std::string CampaignKey;
     uint8 RunLevel = 1;
     uint8 CurrentDungeon = 1;
+    uint32 CurrentMap = 0;
     uint32 CurrentCheckpoint = 0;
     Position ReturnPoint;
 };
@@ -41,10 +43,11 @@ struct ResumePoint
 
 bool IsSupportedDungeonMap(uint32 mapId);
 
-void StartRun(std::vector<Player*> const& members, std::string const& companyName, uint8 runLevel, uint32 initialMapId = RagefireMapId);
+void StartRun(std::vector<Player*> const& members, std::string const& companyName, uint8 runLevel, uint32 initialMapId = RagefireMapId, std::string const& campaignKey = "");
 void AdvanceDungeon(Player* player, uint8 dungeonIndex, uint32 mapId);
 void SaveCheckpoint(Player* player, uint32 checkpoint);
 void MarkMemberFallen(Player* player, bool runEnded);
+void CompleteRun(Player* player);
 
 bool LoadActiveRun(Player* player, ActiveRun& run);
 uint32 LoadCheckpoint(Player* player);
