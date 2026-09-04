@@ -325,30 +325,6 @@ bool GetActiveRunNativeMinLevel(Creature const* creature, uint8& level)
     return true;
 }
 
-uint8 CalculateNativeMinimumLevel(Map* map)
-{
-    uint8 nativeMin = 0;
-    if (!map)
-        return nativeMin;
-
-    for (auto const& [spawnId, creature] : map->GetCreatureBySpawnIdStore())
-    {
-        (void)spawnId;
-        if (!creature || creature->IsPet() || creature->IsTrigger())
-            continue;
-
-        CreatureTemplate const* creatureTemplate = creature->GetCreatureTemplate();
-        if (!creatureTemplate || !creatureTemplate->minlevel || creatureTemplate->type == CREATURE_TYPE_CRITTER)
-            continue;
-
-        nativeMin = nativeMin == 0
-            ? creatureTemplate->minlevel
-            : std::min<uint8>(nativeMin, creatureTemplate->minlevel);
-    }
-
-    return nativeMin;
-}
-
 bool IsActiveRunCreature(Creature const* creature)
 {
     uint8 level = 0;
@@ -643,9 +619,11 @@ public:
 
         map->LoadAllGrids();
 
-        uint8 nativeMinLevel = CalculateNativeMinimumLevel(map);
-        if (!nativeMinLevel)
-            nativeMinLevel = 1;
+        auto const* dungeon = AdventurerGauntlet::DungeonCatalog::GetDungeon(map->GetId());
+        if (!dungeon || !dungeon->NativeBaseLevel)
+            return;
+
+        uint8 nativeMinLevel = dungeon->NativeBaseLevel;
 
         std::vector<Player*> partyMembers = GetPartyMembers(player);
         uint8 runLevel = GetHighestPartyLevel(partyMembers);
@@ -668,8 +646,9 @@ public:
         }
 
         ChatHandler(player->GetSession()).PSendSysMessage(
-            "{} adapta su curva nativa al nivel base |cffffd100{}|r de la expedicion.",
+            "{} adapta su curva nativa (base {}) al nivel |cffffd100{}|r de la expedicion.",
             GetGauntletDungeonName(map->GetId()),
+            uint32(nativeMinLevel),
             runLevel);
     }
 

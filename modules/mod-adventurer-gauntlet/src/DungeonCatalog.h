@@ -22,6 +22,7 @@ struct DungeonDefinition
     float Z;
     float O;
     ExpansionPool Pool;
+    uint8 NativeBaseLevel;
 };
 
 DungeonDefinition const* GetDungeon(uint32 mapId);

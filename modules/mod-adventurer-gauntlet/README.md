@@ -94,6 +94,18 @@ Pools actuales:
 
 Estas opciones son temporales y no representan todavia la progresion geografica final.
 
+### Normalizacion de nivel por mazmorra
+
+El nivel nativo ya no se deduce buscando la criatura de menor nivel de todo el mapa. Cada entrada de `DungeonCatalog` declara un `NativeBaseLevel` propio y el nivel Gauntlet conserva solamente la diferencia interna respecto de esa base:
+
+```text
+nivel Gauntlet del mob = nivel de la run + max(0, nivel nativo del mob - NativeBaseLevel)
+```
+
+Esto evita que NPC auxiliares, criaturas de otras zonas del mismo map o mapas compartidos distorsionen toda la instancia. Es especialmente importante para **Monasterio Escarlata**, donde Cementerio, Biblioteca, Armeria y Catedral comparten el map 189. Por ahora el catalogo habilita solo Cementerio y usa su base propia; cuando se incorporen las otras alas deberan modelarse como stages/dungeons independientes aunque compartan `map_id`.
+
+Las bases actuales son parametros de balance del Gauntlet y se ajustaran con pruebas en juego; no se recalculan dinamicamente desde los spawns del mapa.
+
 ### Escalado dinamico por jugadores presentes
 
 La dificultad de la instancia usa la cantidad de Aventureros del Gauntlet **fisicamente presentes en la dungeon**, no el numero total de integrantes del grupo fuera del mapa.
