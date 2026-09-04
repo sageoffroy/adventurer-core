@@ -194,155 +194,155 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 210;felsteed;active;20;rare;100;5784;;;;0;Corcel nefasto
 211;brutal_slam;active;1;common;100;920020;;;50,55;0;Embate brutal
 212;ruthless_cleave;active;1;common;100;920040;;;50,55;0;Tajo despiadado
-101;cruelty;talent;10;common;120;12320/12852/12853/12855/12856;;;;1;Crueldad
-102;deflection;talent;10;common;100;16462/16463/16464/16465/16466;;;;1;Desvío
-103;anticipation;talent;10;common;90;12297/12750/12751/12752/12753;;;;1;Anticipación
-104;improved_fireball;talent;10;uncommon;180;11069/12338/12339/12340/12341;2:1;;;1;Bola de Fuego mejorada
-105;improved_frostbolt;talent;10;uncommon;180;11070/12473/16763/16765/16766;3:1;;;1;Descarga de Escarcha mejorada
-106;tactical_mastery;talent;10;uncommon;250;12295/12676/12677;1:1;;;1;Maestría táctica
-107;improved_heroic_strike;talent;10;uncommon;180;12282/12663/12664;8:1;;;1;Golpe heroico mejorado
-213;iron_will;talent;10;common;100;12300/12959/12960;;;;1;Voluntad de hierro
-214;anger_management;talent;10;common;100;12296;;;;1;Control de ira
-215;deep_wounds;talent;10;common;100;12834/12849/12867;;;;1;Heridas profundas
-216;two_handed_weapon_specialization;talent;10;common;100;12163/12711/12712;;;;1;Especialización en armas de dos manos
-217;poleaxe_specialization;talent;10;common;100;12700/12781/12783/12784/12785;;;;1;Especialización en hachas y armas de asta
-218;mace_specialization;talent;10;common;100;12284/12701/12702/12703/12704;;;;1;Especialización en mazas
-219;sword_specialization;talent;10;common;100;12281/12812/12813/12814/12815;;;;1;Especialización en espadas
-220;weapon_mastery;talent;10;common;100;20504/20505;;;;1;Maestría en armas
-221;trauma;talent;10;common;100;46854/46855;;;;1;Trauma
-222;second_wind;talent;10;common;100;29834/29838;;;;1;Segundo aliento
-223;strength_of_arms;talent;10;common;100;46865/46866;;;;1;Fuerza de armas
-224;endless_rage;talent;10;common;100;29623;;;;1;Ira infinita
-225;wrecking_crew;talent;10;common;100;46867/56611/56612/56613/56614;;;;1;Equipo de demolición
-226;armored_to_the_teeth;talent;10;common;100;61216/61221/61222;;;;1;Armado hasta los dientes
-227;unbridled_wrath;talent;10;common;100;12322/12999/13000/13001/13002;;;;1;Ira desbocada
-228;blood_craze;talent;10;common;100;16487/16489/16492;;;;1;Manía sangrienta
-229;dual_wield_specialization;talent;10;common;100;13715/13848/13849/13851/13852;;;;1;Especialización en doble empuñadura
-230;warrior_enrage;talent;10;common;100;12317/13045/13046/13047/13048;;;;1;Enfurecer
-231;warrior_precision;talent;10;common;100;29590/29591/29592;;;;1;Precisión
-232;shaman_flurry;talent;10;common;100;16256/16281/16282/16283/16284;;;;1;Aluvión
-233;furious_attacks;talent;10;common;100;46910/46911;;;;1;Ataques furiosos
-234;rampage;talent;10;common;100;29801;;;;1;Desenfreno
-235;titans_grip;talent;10;common;100;46917;;;;1;Empuñadura de titán
-236;shield_specialization;talent;10;common;100;12298/12724/12725/12726/12727;;;;1;Especialización en escudos
-237;toughness;talent;10;common;100;12299/12761/12762/12763/12764;;;;1;Dureza
-238;one_handed_weapon_specialization;talent;10;common;100;20196/20197/20198;;;;1;Especialización en armas de una mano
-239;vitality;talent;10;common;100;29140/29143/29144;;;;1;Vitalidad
-240;damage_shield;talent;10;common;100;58872/58874;;;;1;Escudo de daño
-241;vigor;talent;10;common;100;14983;;;;1;Vigor
-242;fleet_footed;talent;10;common;100;31208/31209;;;;1;Pies de galgo
-243;deadened_nerves;talent;10;common;100;31380/31382/31383;;;;1;Nervios entumecidos
-244;focused_attacks;talent;10;common;100;51634/51635/51636;;;;1;Ataques centrados
-245;rogue_precision;talent;10;common;100;13705/13832/13843/13844/13845;;;;1;Precisión
-246;close_quarters_combat;talent;10;common;100;13706/13804/13805/13806/13807;;;;1;Combate cuerpo a cuerpo
-247;lightning_reflexes;talent;10;common;100;13787/13788/13789;;;;1;Reflejos de relámpago
-248;weapon_expertise_rogue;talent;10;common;100;30919/30920;;;;1;Experiencia con armas
-249;rogue_vitality;talent;10;common;100;31122/31123/61329;;;;1;Vitalidad
-250;nerves_of_steel;talent;10;common;100;31130/31131;;;;1;Nervios de acero
-251;combat_potency;talent;10;common;100;35541/35550/35551/35552/35553;;;;1;Potencia de combate
-252;unfair_advantage;talent;10;common;100;51672/51674;;;;1;Ventaja desleal
-253;prey_on_the_weak;talent;10;common;100;51685/51686/51687/51688/51689;;;;1;Abusar de los débiles
-254;master_of_deception;talent;10;common;100;13958/13970/13971;;;;1;Maestro del engaño
-255;setup;talent;10;common;100;13983/14070/14071;;;;1;Preparación
-256;heightened_senses;talent;10;common;100;30894/30895;;;;1;Sentidos agudizados
-257;rogue_deadliness;talent;10;common;100;30902/30903/30904/30905/30906;;;;1;Letalidad
-258;enveloping_shadows;talent;10;common;100;31211/31212/31213;;;;1;Sombras envolventes
-259;cheat_death;talent;10;common;100;31228/31229/31230;;;;1;Burlar a la muerte
-260;honor_among_thieves;talent;10;common;100;51698/51700/51701;;;;1;Honor entre ladrones
-261;heart_of_the_wild;talent;10;common;100;17003/17004/17005/17006/24894;;;;1;Corazón de lo Salvaje
-262;unyielding_faith;talent;10;common;100;9453/25836;;;;1;Fe implacable
-263;divine_strength;talent;10;common;100;20262/20263/20264/20265/20266;;;;1;Fuerza divina
-264;divinity;talent;10;common;100;63646/63647/63648/63649/63650;;;;1;Divinidad
-265;stoicism;talent;10;common;100;31844/31845;;;;1;Estoicismo
-266;spiritual_attunement;talent;10;common;100;31785/33776;;;;1;Armonización espiritual
-267;ardent_defender;talent;10;common;100;31850/31851/31852;;;;1;Defensor candente
-268;combat_expertise_paladin;talent;10;common;100;31858/31859/31860;;;;1;Experiencia en combate
-269;touched_by_the_light;talent;10;common;100;53590/53591/53592;;;;1;Tocado por la Luz
-270;conviction;talent;10;common;100;20049/20056/20057/20058/20059;;;;1;Convicción
-271;pursuit_of_justice;talent;10;common;100;26022/26023;;;;1;Búsqueda de justicia
-272;eye_for_an_eye;talent;10;common;100;9799/25988;;;;1;Ojo por ojo
-273;crusade;talent;10;common;100;31866/31867/31868;;;;1;Cruzada
-274;vengeance_paladin;talent;10;common;100;20050/20052/20053;;;;1;Venganza
-275;endurance_training;talent;10;common;100;19583/19584/19585/19586/19587;;;;1;Entrenamiento de resistencia
-276;serpents_swiftness;talent;10;common;100;34466/34467/34468/34469/34470;;;;1;Rapidez de serpiente
-277;lethal_shots;talent;10;common;100;19426/19427/19429/19430/19431;;;;1;Disparos letales
-278;focused_aim;talent;10;common;100;53620/53621/53622;;;;1;Puntería centrada
-279;careful_aim;talent;10;common;100;34482/34483/34484;;;;1;Puntería cuidadosa
-280;mortal_shots;talent;10;common;100;19485/19487/19488/19489/19490;;;;1;Disparos mortales
-281;combat_experience_hunter;talent;10;common;100;34475/34476;;;;1;Experiencia de combate
-282;ranged_weapon_specialization;talent;10;common;100;19507/19508/19509;;;;1;Especialización en armas a distancia
-283;master_marksman;talent;10;common;100;34485/34486/34487/34488/34489;;;;1;Maestro tirador
-284;wild_quiver;talent;10;common;100;53215/53216/53217;;;;1;Carcaj salvaje
-285;hawk_eye;talent;10;common;100;19498/19499/19500;;;;1;Ojo de halcón
-286;survival_instincts_hunter;talent;10;common;100;34494/34496;;;;1;Instintos de supervivencia
-287;survivalist;talent;10;common;100;19255/19256/19257/19258/19259;;;;1;Superviviente
-288;killer_instinct_hunter;talent;10;common;100;19370/19371/19373;;;;1;Instinto asesino
-289;lightning_reflexes_hunter;talent;10;common;100;19168/19180/19181/24296/24297;;;;1;Reflejos de relámpago
-290;surefooted;talent;10;common;100;19290/19294/24283;;;;1;Pies firmes
-291;expose_weakness;talent;10;common;100;34500/34502/34503;;;;1;Exponer debilidad
-292;master_tactician_hunter;talent;10;common;100;34506/34507/34508/34838/34839;;;;1;Maestro táctico
-293;hunter_vs_wild;talent;10;common;100;56339/56340/56341;;;;1;Cazador contra naturaleza
-294;unbreakable_will;talent;10;common;100;14522/14788/14789/14790/14791;;;;1;Voluntad inquebrantable
-295;meditation_priest;talent;10;common;100;14521/14776/14777;;;;1;Meditación
-296;focused_will;talent;10;common;100;45234/45243/45244;;;;1;Voluntad centrada
-297;spell_warding;talent;10;common;100;27900/27901/27902/27903/27904;;;;1;Protección contra hechizos
-298;blessed_recovery;talent;10;common;100;27811/27815/27816;;;;1;Recuperación bendita
-299;spirit_of_redemption;talent;10;common;100;20711;;;;1;Espíritu redentor
-300;spiritual_guidance;talent;10;common;100;14901/15028/15029/15030/15031;;;;1;Guía espiritual
-301;blessed_resilience;talent;10;common;100;33142/33145/33146;;;;1;Temple bendito
-302;spirit_tap;talent;10;common;100;15270/15335/15336;;;;1;Transfusión de espíritu
-303;divine_aegis;talent;10;common;100;47509/47511/47515;;;;1;Égida divina
-304;elemental_focus;talent;10;common;100;16164;;;;1;Enfoque elemental
-305;unrelenting_storm;talent;10;common;100;30664/30665/30666;;;;1;Tormenta incansable
-306;astral_shift;talent;10;common;100;51474/51478/51479;;;;1;Cambio astral
-307;spirit_weapons;talent;10;common;100;16268;;;;1;Armas espirituales
-308;weapon_mastery_shaman;talent;10;common;100;29082/29084/29086;;;;1;Maestría con armas
-309;unleashed_rage;talent;10;common;100;30802/30808/30809;;;;1;Ira desatada
-310;mental_dexterity;talent;10;common;100;51883/51884/51885;;;;1;Destreza mental
-311;ancestral_healing;talent;10;common;100;16176/16235/16240;;;;1;Sanación ancestral
-312;natures_guardian_shaman;talent;10;common;100;30881/30883/30884/30885/30886;;;;1;Guardián de la Naturaleza
-313;blessing_of_the_eternals;talent;10;common;100;51554/51555;;;;1;Bendición de los Eternos
-314;survival_of_the_fittest;talent;10;common;100;33853/33855/33856;;;;1;Supervivencia del más apto
-315;naturalist;talent;10;common;100;17069/17070/17071/17072/17073;;;;1;Naturalista
-316;lunar_guidance;talent;10;common;100;33589/33590/33591;;;;1;Guía lunar
-317;dreamstate;talent;10;common;100;33597/33599/33956;;;;1;Estado onírico
-318;natures_grace;talent;10;common;100;16880/61345/61346;;;;1;Gracia de la Naturaleza
-319;living_spirit;talent;10;common;100;34151/34152/34153;;;;1;Espíritu vivo
-320;natural_perfection;talent;10;common;100;33881/33882/33883;;;;1;Perfección natural
-321;mental_strength;talent;10;common;100;18551/18552/18553/18554/18555;;;;1;Fortaleza mental
-322;arcane_fortitude;talent;10;common;100;28574/54658;;;;1;Fortaleza Arcana
-323;magic_absorption;talent;10;common;100;29441/29444;;;;1;Absorción de magia
-324;mind_mastery;talent;10;common;100;31584/31585/31586/31587/31588;;;;1;Maestría mental
-325;netherwind_presence;talent;10;common;100;44400/44402/44403;;;;1;Presencia viento abisal
-326;spell_power;talent;10;common;100;35578/35581;;;;1;Poder con hechizos
-327;burning_determination;talent;10;common;100;54747/54749;;;;1;Determinación ardiente
-328;master_of_elements;talent;10;common;100;29074/29075/29076;;;;1;Maestro de los elementos
-329;playing_with_fire;talent;10;common;100;31638/31639/31640;;;;1;Jugando con fuego
-330;critical_mass;talent;10;common;100;11095/12872/12873;;;;1;Masa crítica
-331;blazing_speed;talent;10;common;100;31641/31642;;;;1;Velocidad llameante
-332;fire_power;talent;10;common;100;11124/12378/12398/12399/12400;;;;1;Poder de Fuego
-333;pyromaniac;talent;10;common;100;34293/34295/34296;;;;1;Pirómano
-334;molten_fury;talent;10;common;100;31679/31680;;;;1;Furia de arrabio
-335;ice_shards;talent;10;common;100;11207/12672/15047;;;;1;Fragmentos de hielo
-336;mage_precision;talent;10;common;100;29438/29439/29440;;;;1;Precisión
-337;piercing_ice;talent;10;common;100;11151/12952/12953;;;;1;Hielo penetrante
-338;frost_channeling;talent;10;common;100;11160/12518/12519;;;;1;Canalización de Escarcha
-339;shatter;talent;10;common;100;11170/12982/12983;;;;1;Trizar
-340;arctic_winds;talent;10;common;100;31674/31675/31676/31677/31678;;;;1;Vientos árticos
-341;fel_vitality;talent;10;common;100;18731/18743/18744;;;;1;Vitalidad vil
-342;demonic_tactics;talent;10;common;100;30242/30245/30246/30247/30248;;;;1;Tácticas demoníacas
-343;demonic_resilience;talent;10;common;100;30319/30320/30321;;;;1;Resiliencia demoníaca
-344;nether_protection;talent;10;common;100;30299/30301/30302;;;;1;Protección abisal
-345;demonic_embrace;talent;10;common;100;18697/18698/18699;;;;1;Abrazo demoníaco
-346;molten_skin;talent;10;common;100;63349/63350/63351;;;;1;Piel de arrabio
-347;divine_intellect;talent;10;common;100;20257/20258/20259/20260/20261;;;;1;Intelecto divino
-348;malice;talent;10;common;100;14138/14139/14140/14141/14142;;;;1;Malicia
-349;thick_hide_hunter;talent;10;common;100;19609/19610/19612;;;;1;Pellejo grueso
-350;ancestral_knowledge;talent;10;common;100;17485/17486/17487/17488/17489;;;;1;Conocimiento ancestral
-351;toughness_shaman;talent;10;common;100;16252/16306/16307/16308/16309;;;;1;Dureza
-352;elemental_warding;talent;10;common;100;28996/28997/28998;;;;1;Protección elemental
-353;thundering_strikes;talent;10;common;100;16255/16302/16303/16304/16305;;;;1;Golpes atronadores
-354;intensity_druid;talent;10;common;100;17106/17107/17108;;;;1;Intensidad
-355;arcane_meditation;talent;10;common;100;18462/18463/18464;;;;1;Meditación Arcana
-356;arcane_mind;talent;10;common;100;11232/12500/12501/12502/12503;;;;1;Mente Arcana
-357;student_of_the_mind;talent;10;common;100;44397/44398/44399;;;;1;Estudiante de la mente
+101;cruelty;talent;5;common;120;12320/12852/12853/12855/12856;;;;1;Crueldad
+102;deflection;talent;5;common;100;16462/16463/16464/16465/16466;;;;1;Desvío
+103;anticipation;talent;5;common;90;12297/12750/12751/12752/12753;;;;1;Anticipación
+104;improved_fireball;talent;5;uncommon;180;11069/12338/12339/12340/12341;2:1;;;1;Bola de Fuego mejorada
+105;improved_frostbolt;talent;5;uncommon;180;11070/12473/16763/16765/16766;3:1;;;1;Descarga de Escarcha mejorada
+106;tactical_mastery;talent;5;uncommon;250;12295/12676/12677;1:1;;;1;Maestría táctica
+107;improved_heroic_strike;talent;5;uncommon;180;12282/12663/12664;8:1;;;1;Golpe heroico mejorado
+213;iron_will;talent;5;common;100;12300/12959/12960;;;;1;Voluntad de hierro
+214;anger_management;talent;5;common;100;12296;;;;1;Control de ira
+215;deep_wounds;talent;5;common;100;12834/12849/12867;;;;1;Heridas profundas
+216;two_handed_weapon_specialization;talent;5;common;100;12163/12711/12712;;;;1;Especialización en armas de dos manos
+217;poleaxe_specialization;talent;5;common;100;12700/12781/12783/12784/12785;;;;1;Especialización en hachas y armas de asta
+218;mace_specialization;talent;5;common;100;12284/12701/12702/12703/12704;;;;1;Especialización en mazas
+219;sword_specialization;talent;5;common;100;12281/12812/12813/12814/12815;;;;1;Especialización en espadas
+220;weapon_mastery;talent;5;common;100;20504/20505;;;;1;Maestría en armas
+221;trauma;talent;5;common;100;46854/46855;;;;1;Trauma
+222;second_wind;talent;5;common;100;29834/29838;;;;1;Segundo aliento
+223;strength_of_arms;talent;5;common;100;46865/46866;;;;1;Fuerza de armas
+224;endless_rage;talent;5;common;100;29623;;;;1;Ira infinita
+225;wrecking_crew;talent;5;common;100;46867/56611/56612/56613/56614;;;;1;Equipo de demolición
+226;armored_to_the_teeth;talent;5;common;100;61216/61221/61222;;;;1;Armado hasta los dientes
+227;unbridled_wrath;talent;5;common;100;12322/12999/13000/13001/13002;;;;1;Ira desbocada
+228;blood_craze;talent;5;common;100;16487/16489/16492;;;;1;Manía sangrienta
+229;dual_wield_specialization;talent;5;common;100;13715/13848/13849/13851/13852;;;;1;Especialización en doble empuñadura
+230;warrior_enrage;talent;5;common;100;12317/13045/13046/13047/13048;;;;1;Enfurecer
+231;warrior_precision;talent;5;common;100;29590/29591/29592;;;;1;Precisión
+232;shaman_flurry;talent;5;common;100;16256/16281/16282/16283/16284;;;;1;Aluvión
+233;furious_attacks;talent;5;common;100;46910/46911;;;;1;Ataques furiosos
+234;rampage;talent;5;common;100;29801;;;;1;Desenfreno
+235;titans_grip;talent;5;common;100;46917;;;;1;Empuñadura de titán
+236;shield_specialization;talent;5;common;100;12298/12724/12725/12726/12727;;;;1;Especialización en escudos
+237;toughness;talent;5;common;100;12299/12761/12762/12763/12764;;;;1;Dureza
+238;one_handed_weapon_specialization;talent;5;common;100;20196/20197/20198;;;;1;Especialización en armas de una mano
+239;vitality;talent;5;common;100;29140/29143/29144;;;;1;Vitalidad
+240;damage_shield;talent;5;common;100;58872/58874;;;;1;Escudo de daño
+241;vigor;talent;5;common;100;14983;;;;1;Vigor
+242;fleet_footed;talent;5;common;100;31208/31209;;;;1;Pies de galgo
+243;deadened_nerves;talent;5;common;100;31380/31382/31383;;;;1;Nervios entumecidos
+244;focused_attacks;talent;5;common;100;51634/51635/51636;;;;1;Ataques centrados
+245;rogue_precision;talent;5;common;100;13705/13832/13843/13844/13845;;;;1;Precisión
+246;close_quarters_combat;talent;5;common;100;13706/13804/13805/13806/13807;;;;1;Combate cuerpo a cuerpo
+247;lightning_reflexes;talent;5;common;100;13787/13788/13789;;;;1;Reflejos de relámpago
+248;weapon_expertise_rogue;talent;5;common;100;30919/30920;;;;1;Experiencia con armas
+249;rogue_vitality;talent;5;common;100;31122/31123/61329;;;;1;Vitalidad
+250;nerves_of_steel;talent;5;common;100;31130/31131;;;;1;Nervios de acero
+251;combat_potency;talent;5;common;100;35541/35550/35551/35552/35553;;;;1;Potencia de combate
+252;unfair_advantage;talent;5;common;100;51672/51674;;;;1;Ventaja desleal
+253;prey_on_the_weak;talent;5;common;100;51685/51686/51687/51688/51689;;;;1;Abusar de los débiles
+254;master_of_deception;talent;5;common;100;13958/13970/13971;;;;1;Maestro del engaño
+255;setup;talent;5;common;100;13983/14070/14071;;;;1;Preparación
+256;heightened_senses;talent;5;common;100;30894/30895;;;;1;Sentidos agudizados
+257;rogue_deadliness;talent;5;common;100;30902/30903/30904/30905/30906;;;;1;Letalidad
+258;enveloping_shadows;talent;5;common;100;31211/31212/31213;;;;1;Sombras envolventes
+259;cheat_death;talent;5;common;100;31228/31229/31230;;;;1;Burlar a la muerte
+260;honor_among_thieves;talent;5;common;100;51698/51700/51701;;;;1;Honor entre ladrones
+261;heart_of_the_wild;talent;5;common;100;17003/17004/17005/17006/24894;;;;1;Corazón de lo Salvaje
+262;unyielding_faith;talent;5;common;100;9453/25836;;;;1;Fe implacable
+263;divine_strength;talent;5;common;100;20262/20263/20264/20265/20266;;;;1;Fuerza divina
+264;divinity;talent;5;common;100;63646/63647/63648/63649/63650;;;;1;Divinidad
+265;stoicism;talent;5;common;100;31844/31845;;;;1;Estoicismo
+266;spiritual_attunement;talent;5;common;100;31785/33776;;;;1;Armonización espiritual
+267;ardent_defender;talent;5;common;100;31850/31851/31852;;;;1;Defensor candente
+268;combat_expertise_paladin;talent;5;common;100;31858/31859/31860;;;;1;Experiencia en combate
+269;touched_by_the_light;talent;5;common;100;53590/53591/53592;;;;1;Tocado por la Luz
+270;conviction;talent;5;common;100;20049/20056/20057/20058/20059;;;;1;Convicción
+271;pursuit_of_justice;talent;5;common;100;26022/26023;;;;1;Búsqueda de justicia
+272;eye_for_an_eye;talent;5;common;100;9799/25988;;;;1;Ojo por ojo
+273;crusade;talent;5;common;100;31866/31867/31868;;;;1;Cruzada
+274;vengeance_paladin;talent;5;common;100;20050/20052/20053;;;;1;Venganza
+275;endurance_training;talent;5;common;100;19583/19584/19585/19586/19587;;;;1;Entrenamiento de resistencia
+276;serpents_swiftness;talent;5;common;100;34466/34467/34468/34469/34470;;;;1;Rapidez de serpiente
+277;lethal_shots;talent;5;common;100;19426/19427/19429/19430/19431;;;;1;Disparos letales
+278;focused_aim;talent;5;common;100;53620/53621/53622;;;;1;Puntería centrada
+279;careful_aim;talent;5;common;100;34482/34483/34484;;;;1;Puntería cuidadosa
+280;mortal_shots;talent;5;common;100;19485/19487/19488/19489/19490;;;;1;Disparos mortales
+281;combat_experience_hunter;talent;5;common;100;34475/34476;;;;1;Experiencia de combate
+282;ranged_weapon_specialization;talent;5;common;100;19507/19508/19509;;;;1;Especialización en armas a distancia
+283;master_marksman;talent;5;common;100;34485/34486/34487/34488/34489;;;;1;Maestro tirador
+284;wild_quiver;talent;5;common;100;53215/53216/53217;;;;1;Carcaj salvaje
+285;hawk_eye;talent;5;common;100;19498/19499/19500;;;;1;Ojo de halcón
+286;survival_instincts_hunter;talent;5;common;100;34494/34496;;;;1;Instintos de supervivencia
+287;survivalist;talent;5;common;100;19255/19256/19257/19258/19259;;;;1;Superviviente
+288;killer_instinct_hunter;talent;5;common;100;19370/19371/19373;;;;1;Instinto asesino
+289;lightning_reflexes_hunter;talent;5;common;100;19168/19180/19181/24296/24297;;;;1;Reflejos de relámpago
+290;surefooted;talent;5;common;100;19290/19294/24283;;;;1;Pies firmes
+291;expose_weakness;talent;5;common;100;34500/34502/34503;;;;1;Exponer debilidad
+292;master_tactician_hunter;talent;5;common;100;34506/34507/34508/34838/34839;;;;1;Maestro táctico
+293;hunter_vs_wild;talent;5;common;100;56339/56340/56341;;;;1;Cazador contra naturaleza
+294;unbreakable_will;talent;5;common;100;14522/14788/14789/14790/14791;;;;1;Voluntad inquebrantable
+295;meditation_priest;talent;5;common;100;14521/14776/14777;;;;1;Meditación
+296;focused_will;talent;5;common;100;45234/45243/45244;;;;1;Voluntad centrada
+297;spell_warding;talent;5;common;100;27900/27901/27902/27903/27904;;;;1;Protección contra hechizos
+298;blessed_recovery;talent;5;common;100;27811/27815/27816;;;;1;Recuperación bendita
+299;spirit_of_redemption;talent;5;common;100;20711;;;;1;Espíritu redentor
+300;spiritual_guidance;talent;5;common;100;14901/15028/15029/15030/15031;;;;1;Guía espiritual
+301;blessed_resilience;talent;5;common;100;33142/33145/33146;;;;1;Temple bendito
+302;spirit_tap;talent;5;common;100;15270/15335/15336;;;;1;Transfusión de espíritu
+303;divine_aegis;talent;5;common;100;47509/47511/47515;;;;1;Égida divina
+304;elemental_focus;talent;5;common;100;16164;;;;1;Enfoque elemental
+305;unrelenting_storm;talent;5;common;100;30664/30665/30666;;;;1;Tormenta incansable
+306;astral_shift;talent;5;common;100;51474/51478/51479;;;;1;Cambio astral
+307;spirit_weapons;talent;5;common;100;16268;;;;1;Armas espirituales
+308;weapon_mastery_shaman;talent;5;common;100;29082/29084/29086;;;;1;Maestría con armas
+309;unleashed_rage;talent;5;common;100;30802/30808/30809;;;;1;Ira desatada
+310;mental_dexterity;talent;5;common;100;51883/51884/51885;;;;1;Destreza mental
+311;ancestral_healing;talent;5;common;100;16176/16235/16240;;;;1;Sanación ancestral
+312;natures_guardian_shaman;talent;5;common;100;30881/30883/30884/30885/30886;;;;1;Guardián de la Naturaleza
+313;blessing_of_the_eternals;talent;5;common;100;51554/51555;;;;1;Bendición de los Eternos
+314;survival_of_the_fittest;talent;5;common;100;33853/33855/33856;;;;1;Supervivencia del más apto
+315;naturalist;talent;5;common;100;17069/17070/17071/17072/17073;;;;1;Naturalista
+316;lunar_guidance;talent;5;common;100;33589/33590/33591;;;;1;Guía lunar
+317;dreamstate;talent;5;common;100;33597/33599/33956;;;;1;Estado onírico
+318;natures_grace;talent;5;common;100;16880/61345/61346;;;;1;Gracia de la Naturaleza
+319;living_spirit;talent;5;common;100;34151/34152/34153;;;;1;Espíritu vivo
+320;natural_perfection;talent;5;common;100;33881/33882/33883;;;;1;Perfección natural
+321;mental_strength;talent;5;common;100;18551/18552/18553/18554/18555;;;;1;Fortaleza mental
+322;arcane_fortitude;talent;5;common;100;28574/54658;;;;1;Fortaleza Arcana
+323;magic_absorption;talent;5;common;100;29441/29444;;;;1;Absorción de magia
+324;mind_mastery;talent;5;common;100;31584/31585/31586/31587/31588;;;;1;Maestría mental
+325;netherwind_presence;talent;5;common;100;44400/44402/44403;;;;1;Presencia viento abisal
+326;spell_power;talent;5;common;100;35578/35581;;;;1;Poder con hechizos
+327;burning_determination;talent;5;common;100;54747/54749;;;;1;Determinación ardiente
+328;master_of_elements;talent;5;common;100;29074/29075/29076;;;;1;Maestro de los elementos
+329;playing_with_fire;talent;5;common;100;31638/31639/31640;;;;1;Jugando con fuego
+330;critical_mass;talent;5;common;100;11095/12872/12873;;;;1;Masa crítica
+331;blazing_speed;talent;5;common;100;31641/31642;;;;1;Velocidad llameante
+332;fire_power;talent;5;common;100;11124/12378/12398/12399/12400;;;;1;Poder de Fuego
+333;pyromaniac;talent;5;common;100;34293/34295/34296;;;;1;Pirómano
+334;molten_fury;talent;5;common;100;31679/31680;;;;1;Furia de arrabio
+335;ice_shards;talent;5;common;100;11207/12672/15047;;;;1;Fragmentos de hielo
+336;mage_precision;talent;5;common;100;29438/29439/29440;;;;1;Precisión
+337;piercing_ice;talent;5;common;100;11151/12952/12953;;;;1;Hielo penetrante
+338;frost_channeling;talent;5;common;100;11160/12518/12519;;;;1;Canalización de Escarcha
+339;shatter;talent;5;common;100;11170/12982/12983;;;;1;Trizar
+340;arctic_winds;talent;5;common;100;31674/31675/31676/31677/31678;;;;1;Vientos árticos
+341;fel_vitality;talent;5;common;100;18731/18743/18744;;;;1;Vitalidad vil
+342;demonic_tactics;talent;5;common;100;30242/30245/30246/30247/30248;;;;1;Tácticas demoníacas
+343;demonic_resilience;talent;5;common;100;30319/30320/30321;;;;1;Resiliencia demoníaca
+344;nether_protection;talent;5;common;100;30299/30301/30302;;;;1;Protección abisal
+345;demonic_embrace;talent;5;common;100;18697/18698/18699;;;;1;Abrazo demoníaco
+346;molten_skin;talent;5;common;100;63349/63350/63351;;;;1;Piel de arrabio
+347;divine_intellect;talent;5;common;100;20257/20258/20259/20260/20261;;;;1;Intelecto divino
+348;malice;talent;5;common;100;14138/14139/14140/14141/14142;;;;1;Malicia
+349;thick_hide_hunter;talent;5;common;100;19609/19610/19612;;;;1;Pellejo grueso
+350;ancestral_knowledge;talent;5;common;100;17485/17486/17487/17488/17489;;;;1;Conocimiento ancestral
+351;toughness_shaman;talent;5;common;100;16252/16306/16307/16308/16309;;;;1;Dureza
+352;elemental_warding;talent;5;common;100;28996/28997/28998;;;;1;Protección elemental
+353;thundering_strikes;talent;5;common;100;16255/16302/16303/16304/16305;;;;1;Golpes atronadores
+354;intensity_druid;talent;5;common;100;17106/17107/17108;;;;1;Intensidad
+355;arcane_meditation;talent;5;common;100;18462/18463/18464;;;;1;Meditación Arcana
+356;arcane_mind;talent;5;common;100;11232/12500/12501/12502/12503;;;;1;Mente Arcana
+357;student_of_the_mind;talent;5;common;100;44397/44398/44399;;;;1;Estudiante de la mente

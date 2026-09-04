@@ -304,7 +304,7 @@ def build_runtime_cards(base_text: str, metadata_text: str, talent_ranks: dict[i
             "id": str(card_id),
             "key": f"talent_{first_spell}",
             "type": "talent",
-            "source_level": "10",
+            "source_level": "5",
             "rarity": "common",
             "weight": "100",
             "rank_grants": "/".join(str(spell_id) for spell_id in ranks),
