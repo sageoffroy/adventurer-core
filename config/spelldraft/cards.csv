@@ -335,3 +335,14 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 344;nether_protection;talent;10;common;100;30299/30301/30302;;;;1;Protección abisal
 345;demonic_embrace;talent;10;common;100;18697/18698/18699;;;;1;Abrazo demoníaco
 346;molten_skin;talent;10;common;100;63349/63350/63351;;;;1;Piel de arrabio
+347;divine_intellect;talent;10;common;100;20257/20258/20259/20260/20261;;;;1;Intelecto divino
+348;malice;talent;10;common;100;14138/14139/14140/14141/14142;;;;1;Malicia
+349;thick_hide_hunter;talent;10;common;100;19609/19610/19612;;;;1;Pellejo grueso
+350;ancestral_knowledge;talent;10;common;100;17485/17486/17487/17488/17489;;;;1;Conocimiento ancestral
+351;toughness_shaman;talent;10;common;100;16252/16306/16307/16308/16309;;;;1;Dureza
+352;elemental_warding;talent;10;common;100;28996/28997/28998;;;;1;Protección elemental
+353;thundering_strikes;talent;10;common;100;16255/16302/16303/16304/16305;;;;1;Golpes atronadores
+354;intensity_druid;talent;10;common;100;17106/17107/17108;;;;1;Intensidad
+355;arcane_meditation;talent;10;common;100;18462/18463/18464;;;;1;Meditación Arcana
+356;arcane_mind;talent;10;common;100;11232/12500/12501/12502/12503;;;;1;Mente Arcana
+357;student_of_the_mind;talent;10;common;100;44397/44398/44399;;;;1;Estudiante de la mente
