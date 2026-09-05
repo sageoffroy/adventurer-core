@@ -21,6 +21,6 @@ entry;source_entry;name;Quality;ItemLevel;RequiredLevel;bonding;BuyPrice;SellPri
 910234;22215;Destripadora;2;11;3;2;1625;325;-1;-1;5;10;1500;3;2;0;0;;;0;0;30;;;;;;;;;;;;;;;
 910235;4763;Arco del Fugitivo;2;9;3;2;675;135;-1;-1;11;21;2700;3;1;0;0;;;0;0;30;8106;;;;;;;;;;;;;;
 910236;7108;Rodela del Matón;2;11;3;2;1045;209;-1;-1;;;;;;;;207;4;;;45;18480;;;;;;;;;;;;;;
-910237;43850;Scroll de Suerte;1;1;1;0;0;0;-1;-1;;;;;;;;;;;;;;;;0;0;0;0;20;Concede 1 Relanzamiento para SpellDraft.;AdventurerDraftCurrencyScroll;0;0;0;0;0
+910237;37118;Scroll de Suerte;1;1;1;0;0;0;-1;-1;;;;;;;;;;;;;;;;0;0;0;0;20;Concede 1 Relanzamiento para SpellDraft.;AdventurerDraftCurrencyScroll;0;0;0;0;0
 910238;37118;Scroll de Bendición;1;1;1;0;0;0;-1;-1;;;;;;;;;;;;;;;;0;0;0;0;20;Concede 1 Bendición para SpellDraft.;AdventurerDraftCurrencyScroll;0;0;0;0;0
 910239;44315;Scroll del Olvido;1;1;1;0;0;0;-1;-1;;;;;;;;;;;;;;;;0;0;0;0;20;Concede 1 Destrucción para SpellDraft.;AdventurerDraftCurrencyScroll;0;0;0;0;0
