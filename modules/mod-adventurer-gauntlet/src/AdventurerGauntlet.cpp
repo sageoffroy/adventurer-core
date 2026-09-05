@@ -20,6 +20,7 @@
 #include <array>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace
@@ -45,6 +46,7 @@ std::unordered_map<uint32, uint8> PendingRunCampaignStages;
 std::unordered_map<uint32, uint8> ActiveRunInstanceLevels;
 std::unordered_map<uint32, uint8> ActiveRunNativeMinLevels;
 std::unordered_map<uint32, uint8> RagefireBossProgress;
+std::unordered_set<uint32> AllowedGauntletTeleports;
 
 constexpr uint32 KhadgarEntry = 910000;
 constexpr uint32 KhadgarIntroText = 910000;
@@ -405,7 +407,12 @@ bool TeleportParty(std::vector<Player*> const& members, uint32 mapId, float x, f
 
         member->CastSpell(member, KhadgarTeleportVisual, true);
 
-        if (!member->TeleportTo(mapId, x, y, z, o, TELE_TO_GM_MODE))
+        uint32 guid = member->GetGUID().GetCounter();
+        AllowedGauntletTeleports.insert(guid);
+        bool teleported = member->TeleportTo(mapId, x, y, z, o, TELE_TO_GM_MODE);
+        AllowedGauntletTeleports.erase(guid);
+
+        if (!teleported)
         {
             success = false;
             ChatHandler(member->GetSession()).PSendSysMessage(
@@ -775,6 +782,30 @@ public:
             run.ReturnPoint.Z,
             run.ReturnPoint.O
         };
+    }
+
+    bool OnPlayerBeforeTeleport(Player* player, uint32 mapId, float /*x*/, float /*y*/, float /*z*/,
+        float /*orientation*/, uint32 /*options*/, Unit* /*target*/) override
+    {
+        if (!GauntletEnabled || !player || !IsGauntletDungeon(player->GetMapId()))
+            return true;
+
+        uint32 guid = player->GetGUID().GetCounter();
+        if (AllowedGauntletTeleports.find(guid) != AllowedGauntletTeleports.end())
+            return true;
+
+        // Same-map teleports are used by reconnect/resume mechanics and do not
+        // represent leaving the expedition.
+        if (mapId == player->GetMapId())
+            return true;
+
+        AdventurerGauntlet::RunProgress::ActiveRun run;
+        if (!AdventurerGauntlet::RunProgress::LoadActiveRun(player, run))
+            return true;
+
+        ChatHandler(player->GetSession()).SendSysMessage(
+            "Khadgar ha sellado esta salida. La expedicion debe continuar.");
+        return false;
     }
 
     void OnPlayerJustDied(Player* player) override
