@@ -217,9 +217,12 @@ public:
             ApplyHealthScaling(creature);
     }
 
-    void OnDamage(Unit* attacker, Unit* /*victim*/, uint32& damage) override
+    uint32 DealDamage(Unit* attacker, Unit* /*victim*/, uint32 damage, DamageEffectType /*damageType*/) override
     {
-        damage = ScaleOutgoingDamage(attacker, damage);
+        // DealDamage is the common core path for melee, ranged spell damage
+        // and periodic damage. Using it avoids leaving special creature
+        // attacks (for example Throw Axe) or DoTs outside Gauntlet scaling.
+        return ScaleOutgoingDamage(attacker, damage);
     }
 
     void OnUnitDeath(Unit* unit, Unit* /*killer*/) override
