@@ -28,6 +28,7 @@ entry;kind;class_key;required_level;card_id;spell_id;name;description
 910308;active_card;warrior;1;8;0;Manual sobre Golpe heroico;Enseña Golpe heroico. Esta habilidad también puede obtenerse mediante SpellDraft.
 910309;active_card;druid;4;9;0;Libro sobre Rejuvenecimiento;Enseña Rejuvenecimiento. Esta habilidad también puede obtenerse mediante SpellDraft.
 910310;active_card;rogue;1;10;0;Manual sobre Sigilo;Enseña Sigilo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910311;active_card;warrior;4;11;0;Manual de Cargar;Enseña Cargar. Esta habilidad también puede obtenerse mediante SpellDraft.
 910312;active_card;mage;1;12;0;Escrito sobre Intelecto Arcano;Enseña Intelecto Arcano. Esta habilidad también puede obtenerse mediante SpellDraft.
 910313;active_card;shaman;1;13;0;Tablilla sobre Ola de sanación;Enseña Ola de sanación. Esta habilidad también puede obtenerse mediante SpellDraft.
 910314;active_card;rogue;1;14;0;Manual del Golpe siniestro;Enseña Golpe siniestro. Esta habilidad también puede obtenerse mediante SpellDraft.
