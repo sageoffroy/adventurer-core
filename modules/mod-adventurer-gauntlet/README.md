@@ -264,3 +264,24 @@ La documentacion general de esta relacion vive en `docs/GAUNTLET.md`.
 When a player without an active Gauntlet run talks to Khadgar while grouped with an online party member who is already inside that party's active Gauntlet instance, Khadgar replaces the normal start/testing menu with a single option to join that company.
 
 Joining does not require party leadership. The new member is persisted into the existing run, keeps the run's stable base level/campaign stage/checkpoint, and enters at the current dungeon entrance. The existing party and instance are not reset. Late joins retain the current +/-5 level compatibility rule and the run remains capped at five living members.
+
+
+### Knowledge loot
+
+Knowledge is an independent auxiliary Gauntlet roll, separate from equipment,
+potions, ammunition, bags and SpellDraft currency scrolls.
+
+- Chance: **2.00% per eligible creature**.
+- A successful roll adds exactly one knowledge item.
+- Eligible catalog: custom entries `910240..910599` that exist in
+  `item_template`.
+- Level window: `RequiredLevel <= rewardLevel + 3`. This allows a book to drop
+  slightly before it can be read, while its item-level requirement still blocks
+  early use.
+- Selection among eligible knowledge items is uniform.
+- The implementation is isolated in `KnowledgeRewards.cpp/.h`; curated boss
+  and trash loot only call `KnowledgeRewards::TryAddDrop`.
+
+The knowledge catalog itself is owned by SpellDraft at
+`config/spelldraft/knowledge_books.csv`. Normal ability books supplement the
+active-card draft; active-talent tomes are their exclusive acquisition path.
