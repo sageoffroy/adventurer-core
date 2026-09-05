@@ -27,7 +27,7 @@ constexpr uint32 ItemSubclassPotion = 1;
 constexpr uint32 ItemSubclassArrow = 2;
 constexpr uint32 ItemSubclassScroll = 4;
 constexpr uint32 AmmoDropChance = 1;
-constexpr uint32 ConsumableDropChance = 5;
+constexpr uint32 PotionDropChance = 1;
 
 enum RewardPool : uint8
 {
@@ -49,7 +49,6 @@ struct RewardPools
     std::array<std::vector<uint32>, 4> Items;
     std::vector<uint32> Arrows;
     std::vector<uint32> Potions;
-    std::vector<uint32> Scrolls;
 };
 
 std::unordered_set<uint64> ProcessedCreatures;
@@ -141,8 +140,6 @@ RewardPools BuildControlledPools()
         {
             if (item.SubClass == ItemSubclassPotion)
                 pools.Potions.push_back(entry);
-            else if (item.SubClass == ItemSubclassScroll)
-                pools.Scrolls.push_back(entry);
         }
     }
     return pools;
@@ -250,7 +247,6 @@ void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
               << " ammoChance=" << AmmoDropChance
               << " arrowPool=" << pools.Arrows.size()
               << " potionPool=" << pools.Potions.size()
-              << " scrollPool=" << pools.Scrolls.size()
               << std::endl;
 
     if (ammoRoll <= AmmoDropChance)
@@ -263,25 +259,19 @@ void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
         AddLootItem(loot, arrowEntry, 40, 100);
     }
 
-    uint32 consumableRoll = urand(1, 100);
-    std::cout << "[GauntletLoot] AUX consumableRoll=" << consumableRoll
-              << " consumableChance=" << ConsumableDropChance << std::endl;
+    uint32 potionRoll = urand(1, 100);
+    std::cout << "[GauntletLoot] AUX potionRoll=" << potionRoll
+              << " potionChance=" << PotionDropChance << std::endl;
 
-    if (consumableRoll <= ConsumableDropChance)
+    if (potionRoll <= PotionDropChance)
     {
-        bool choosePotion = urand(0, 1) == 0;
-        std::vector<uint32> const& primary = choosePotion ? pools.Potions : pools.Scrolls;
-        std::vector<uint32> const& fallback = choosePotion ? pools.Scrolls : pools.Potions;
-        uint32 itemEntry = SelectUsableAuxiliaryFromPool(primary, rewardLevel);
-        if (!itemEntry)
-            itemEntry = SelectUsableAuxiliaryFromPool(fallback, rewardLevel);
+        uint32 itemEntry = SelectUsableAuxiliaryFromPool(pools.Potions, rewardLevel);
 
-        std::cout << "[GauntletLoot] >>> CONSUMABLE SUCCESS roll=" << consumableRoll
-                  << " type=" << (choosePotion ? "potion" : "scroll")
+        std::cout << "[GauntletLoot] >>> POTION SUCCESS roll=" << potionRoll
                   << " selected=" << itemEntry << std::endl;
         if (itemEntry)
-            LogSelectedItem("CONSUMABLE_SELECTED", itemEntry);
-        AddLootItem(loot, itemEntry, 1, 2);
+            LogSelectedItem("POTION_SELECTED", itemEntry);
+        AddLootItem(loot, itemEntry, 1, 1);
     }
 }
 
