@@ -285,3 +285,37 @@ potions, ammunition, bags and SpellDraft currency scrolls.
 The knowledge catalog itself is owned by SpellDraft at
 `config/spelldraft/knowledge_books.csv`. Normal ability books supplement the
 active-card draft; active-talent tomes are their exclusive acquisition path.
+
+
+### Rare elite rewards
+
+Rare and rare-elite creatures inside an active Gauntlet run never keep their
+stock loot. They use the controlled reward pools and sit between checkpoint and
+final bosses:
+
+- primary reward: 93% rare / 7% epic;
+- independent extra rare roll: 20% per survivor;
+- normal auxiliary rolls still apply.
+
+Checkpoint bosses remain 97% rare / 3% epic + 15% extra rare per survivor.
+Final bosses remain 87% rare / 13% epic + 25% extra rare per survivor.
+
+### Sealed dungeon exits
+
+While a character has an active persisted Gauntlet run and is inside a supported
+dungeon, teleports that would leave the current map are rejected with:
+
+`Khadgar ha sellado esta salida. La expedicion debe continuar.`
+
+Same-map teleports remain available for reconnect/resume. Khadgar-owned travel
+uses an explicit short-lived bypass so campaign transitions and normal Gauntlet
+portals are not blocked. Fallen/completed runs are no longer active and can
+return normally.
+
+### Outgoing damage scaling
+
+Gauntlet damage scaling is applied through the core `UnitScript::DealDamage`
+hook, the common final damage path. This covers melee, physical spell attacks,
+ranged special attacks and periodic damage consistently. Examples that
+previously bypassed the older `OnDamage` hook include Throw Axe and periodic
+Shadow Word: Pain damage.
