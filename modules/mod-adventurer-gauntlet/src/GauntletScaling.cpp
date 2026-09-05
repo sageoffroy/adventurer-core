@@ -155,6 +155,29 @@ void RefreshOutOfCombatScaling(Map* map)
     }
 }
 
+uint32 ScaleCreatureSpellForLevel(Unit* attacker, uint32 damage)
+{
+    Creature* creature = attacker ? attacker->ToCreature() : nullptr;
+    if (!creature || !damage || !IsGauntletMap(creature->GetMapId()) ||
+        creature->IsPet() || creature->IsTrigger())
+        return damage;
+
+    CreatureTemplate const* creatureTemplate = creature->GetCreatureTemplate();
+    if (!creatureTemplate || !creatureTemplate->minlevel)
+        return damage;
+
+    // Creature melee damage is naturally rebuilt when SelectLevel() moves the
+    // mob to the run level. Native spell base points are not. Normalize those
+    // fixed spell values by the same level relationship so low-level runs do
+    // not receive a level-17/30 dungeon spell at full stock strength.
+    uint32 nativeLevel = creatureTemplate->minlevel;
+    uint32 scaledLevel = creature->GetLevel();
+    if (!scaledLevel || scaledLevel >= nativeLevel)
+        return damage;
+
+    return std::max<uint32>(1, uint32((uint64(damage) * scaledLevel) / nativeLevel));
+}
+
 uint32 ScaleOutgoingDamage(Unit* attacker, uint32 damage)
 {
     if (!attacker)
@@ -217,11 +240,23 @@ public:
             ApplyHealthScaling(creature);
     }
 
+    void ModifySpellDamageTaken(Unit* /*target*/, Unit* attacker, int32& damage, SpellInfo const* /*spellInfo*/) override
+    {
+        if (damage <= 0)
+            return;
+        damage = static_cast<int32>(ScaleCreatureSpellForLevel(attacker, static_cast<uint32>(damage)));
+    }
+
+    void ModifyPeriodicDamageAurasTick(Unit* /*target*/, Unit* attacker, uint32& damage, SpellInfo const* /*spellInfo*/) override
+    {
+        damage = ScaleCreatureSpellForLevel(attacker, damage);
+    }
+
     uint32 DealDamage(Unit* attacker, Unit* /*victim*/, uint32 damage, DamageEffectType /*damageType*/) override
     {
-        // DealDamage is the common core path for melee, ranged spell damage
-        // and periodic damage. Using it avoids leaving special creature
-        // attacks (for example Throw Axe) or DoTs outside Gauntlet scaling.
+        // Final party-size multiplier. Spell level normalization is performed
+        // earlier in the dedicated spell/periodic hooks; melee reaches only
+        // this common final stage.
         return ScaleOutgoingDamage(attacker, damage);
     }
 
