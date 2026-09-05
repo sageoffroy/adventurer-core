@@ -28,6 +28,7 @@ constexpr uint32 ItemSubclassArrow = 2;
 constexpr uint32 ItemSubclassScroll = 4;
 constexpr uint32 AmmoDropChance = 1;
 constexpr uint32 PotionDropChance = 1;
+constexpr uint32 StockScrollDropChance = 1;
 
 enum RewardPool : uint8
 {
@@ -49,6 +50,7 @@ struct RewardPools
     std::array<std::vector<uint32>, 4> Items;
     std::vector<uint32> Arrows;
     std::vector<uint32> Potions;
+    std::vector<uint32> Scrolls;
 };
 
 std::unordered_set<uint64> ProcessedCreatures;
@@ -140,6 +142,8 @@ RewardPools BuildControlledPools()
         {
             if (item.SubClass == ItemSubclassPotion)
                 pools.Potions.push_back(entry);
+            else if (item.SubClass == ItemSubclassScroll)
+                pools.Scrolls.push_back(entry);
         }
     }
     return pools;
@@ -247,6 +251,7 @@ void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
               << " ammoChance=" << AmmoDropChance
               << " arrowPool=" << pools.Arrows.size()
               << " potionPool=" << pools.Potions.size()
+              << " scrollPool=" << pools.Scrolls.size()
               << std::endl;
 
     if (ammoRoll <= AmmoDropChance)
@@ -271,6 +276,21 @@ void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
                   << " selected=" << itemEntry << std::endl;
         if (itemEntry)
             LogSelectedItem("POTION_SELECTED", itemEntry);
+        AddLootItem(loot, itemEntry, 1, 1);
+    }
+
+    uint32 scrollRoll = urand(1, 100);
+    std::cout << "[GauntletLoot] AUX stockScrollRoll=" << scrollRoll
+              << " stockScrollChance=" << StockScrollDropChance << std::endl;
+
+    if (scrollRoll <= StockScrollDropChance)
+    {
+        uint32 itemEntry = SelectUsableAuxiliaryFromPool(pools.Scrolls, rewardLevel);
+
+        std::cout << "[GauntletLoot] >>> STOCK SCROLL SUCCESS roll=" << scrollRoll
+                  << " selected=" << itemEntry << std::endl;
+        if (itemEntry)
+            LogSelectedItem("STOCK_SCROLL_SELECTED", itemEntry);
         AddLootItem(loot, itemEntry, 1, 1);
     }
 }
