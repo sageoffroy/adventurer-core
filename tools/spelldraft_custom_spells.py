@@ -39,6 +39,9 @@ CUSTOM_RANK_CHAINS = {
     RUTHLESS_CLEAVE_RANKS[0]: RUTHLESS_CLEAVE_RANKS,
 }
 CUSTOM_SPELL_IDS = frozenset(spell for chain in CUSTOM_RANK_CHAINS.values() for spell in chain)
+ITEM_USE_SPELL_ID = 920900
+ITEM_USE_SOURCE_ID = 130  # Slow Fall: instant, harmless shell before effects are cleared.
+OWNED_SPELL_IDS = CUSTOM_SPELL_IDS | {ITEM_USE_SPELL_ID}
 
 CLEAVE_SOURCE_ID = 845
 SHIELD_SLAM_SOURCE_ID = 23922
@@ -129,6 +132,30 @@ def _prepare_common(row: bytearray, spell_id: int, cost: int) -> None:
     set_u32(row, 1, 0)
     _set_energy_cost(row, cost)
     _clear_spell_family(row)
+
+
+def _build_item_use_spell(dbc: DBC, source: bytearray) -> bytearray:
+    """Client/server spell shell used by scripted consumable items.
+
+    The item script performs the actual effect. This row only makes the WotLK
+    client expose the custom item as usable without inheriting a stock spell.
+    """
+    row = bytearray(source)
+    set_u32(row, 0, ITEM_USE_SPELL_ID)
+    set_u32(row, 1, 0)
+    for field in (42, 43, 44, 45, 204):
+        set_u32(row, field, 0)
+    _clear_spell_family(row)
+    for index in range(3):
+        _clear_effect(row, index)
+    _set_text(
+        dbc,
+        row,
+        "Leer conocimiento",
+        0,
+        "Lee este objeto para activar su conocimiento.",
+    )
+    return row
 
 
 def _build_sinister(
@@ -230,10 +257,10 @@ def patch(path: Path, icon_ids: dict[str, int]) -> bool:
         raise DBCError(f"{path}: unexpected Spell.dbc layout {dbc.fields}/{dbc.record_size}")
 
     before = dbc.to_bytes()
-    base_rows = [row for row in dbc.records if u32(row, 0) not in CUSTOM_SPELL_IDS]
+    base_rows = [row for row in dbc.records if u32(row, 0) not in OWNED_SPELL_IDS]
     lookup = {u32(row, 0): row for row in base_rows}
 
-    missing_sources = [spell for spell in (*SINISTER_SOURCE_RANKS, CLEAVE_SOURCE_ID, SHIELD_SLAM_SOURCE_ID) if spell not in lookup]
+    missing_sources = [spell for spell in (*SINISTER_SOURCE_RANKS, CLEAVE_SOURCE_ID, SHIELD_SLAM_SOURCE_ID, ITEM_USE_SOURCE_ID) if spell not in lookup]
     if missing_sources:
         raise DBCError(f"{path}: missing stock spell source rows: {missing_sources}")
 
@@ -252,7 +279,7 @@ def patch(path: Path, icon_ids: dict[str, int]) -> bool:
 
     cleave_source = lookup[CLEAVE_SOURCE_ID]
     shield_source = lookup[SHIELD_SLAM_SOURCE_ID]
-    custom_rows: list[bytearray] = []
+    custom_rows: list[bytearray] = [_build_item_use_spell(dbc, lookup[ITEM_USE_SOURCE_ID])]
 
     for index, source_id in enumerate(SINISTER_SOURCE_RANKS):
         rank = index + 1
@@ -287,7 +314,7 @@ def patch(path: Path, icon_ids: dict[str, int]) -> bool:
 
     verify = DBC.read(path)
     present = {u32(row, 0) for row in verify.records}
-    missing = sorted(CUSTOM_SPELL_IDS - present)
+    missing = sorted(OWNED_SPELL_IDS - present)
     if missing:
         raise DBCError(f"{path}: custom SpellDraft spell rows missing after patch: {missing}")
     return after != before
