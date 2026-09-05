@@ -123,6 +123,7 @@ runtime_dir="$spelldraft_data_dir/spelldraft"
 rm -f \
   "$runtime_dir/cards.csv" \
   "$runtime_dir/catalog_metadata.csv" \
+  "$runtime_dir/knowledge_books.csv" \
   "$runtime_dir/subclasses.json" \
   "$runtime_dir/card_subclasses.csv"
 
@@ -134,6 +135,7 @@ if [[ "$spelldraft_data_dir" != "$server_data_dir" ]]; then
     rm -f \
       "$stale_runtime_dir/cards.csv" \
       "$stale_runtime_dir/catalog_metadata.csv" \
+      "$stale_runtime_dir/knowledge_books.csv" \
       "$stale_runtime_dir/subclasses.json" \
       "$stale_runtime_dir/card_subclasses.csv"
 fi
