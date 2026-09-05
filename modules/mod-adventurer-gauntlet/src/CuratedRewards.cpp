@@ -500,11 +500,12 @@ bool AddCommonMobTestDrop(Creature* creature)
               << " equipRoll=" << roll << std::endl;
 
     RewardPool pool;
-    if (roll <= 400)
+    // Common equipment: 5% green / 1% blue / 0.25% epic.
+    if (roll <= 500)
         pool = REWARD_GREEN;
-    else if (roll <= 450)
+    else if (roll <= 600)
         pool = REWARD_BLUE;
-    else if (roll <= 455)
+    else if (roll <= 625)
         pool = REWARD_EPIC;
     else
         pool = REWARD_LEGENDARY;
