@@ -807,7 +807,7 @@ std::vector<DraftCard> BuildFallbackDraftCards()
 {
     return
     {
-        { 1, "battle_stance", DraftCardType::Active, 1, DraftRarity::Common, 100, {{2457}}, {}, {}, {11, 106}, false, "Battle Stance" },
+        { 1, "battle_stance", DraftCardType::Active, 1, DraftRarity::Common, 100, {{2457, 100}}, {}, {}, {106}, false, "Battle Stance + Charge" },
         { 2, "fireball", DraftCardType::Active, 1, DraftRarity::Common, 100, {{133}}, {}, {}, {104}, false, "Fireball" },
         { 3, "frostbolt", DraftCardType::Active, 4, DraftRarity::Common, 100, {{116}}, {}, {}, {105}, false, "Frostbolt" },
         { 4, "shadow_bolt", DraftCardType::Active, 1, DraftRarity::Common, 100, {{686}}, {}, {}, {}, false, "Shadow Bolt" },
@@ -817,7 +817,6 @@ std::vector<DraftCard> BuildFallbackDraftCards()
         { 8, "heroic_strike", DraftCardType::Active, 1, DraftRarity::Common, 110, {{78}}, {}, {}, {107}, false, "Heroic Strike" },
         { 9, "rejuvenation", DraftCardType::Active, 4, DraftRarity::Common, 100, {{774}}, {}, {}, {}, false, "Rejuvenation" },
         { 10, "stealth_kit", DraftCardType::Active, 1, DraftRarity::Uncommon, 120, {{1784, 921}}, {}, {}, {}, false, "Stealth + Pick Pocket" },
-        { 11, "charge", DraftCardType::Active, 4, DraftRarity::Common, 500, {{100}}, {{1, 1}}, {}, {}, false, "Charge" },
         { 12, "arcane_intellect", DraftCardType::Active, 1, DraftRarity::Common, 90, {{1459}}, {}, {}, {}, false, "Arcane Intellect" },
         { 13, "healing_wave", DraftCardType::Active, 1, DraftRarity::Common, 100, {{331}}, {}, {}, {}, false, "Healing Wave" },
         { 14, "sinister_strike", DraftCardType::Active, 1, DraftRarity::Common, 100, {{1752}}, {}, {}, {}, false, "Sinister Strike" },
