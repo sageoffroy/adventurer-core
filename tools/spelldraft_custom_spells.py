@@ -155,6 +155,7 @@ def _build_item_use_spell(dbc: DBC, source: bytearray) -> bytearray:
         0,
         "Lee este objeto para activar su conocimiento.",
     )
+    _set_localized(dbc, row, 153, "")
     return row
 
 
