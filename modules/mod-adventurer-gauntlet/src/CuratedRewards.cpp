@@ -22,13 +22,16 @@ constexpr uint32 AdventurerItemRangeFirst = 910000;
 constexpr uint32 AdventurerItemRangeLast = 910999;
 constexpr uint32 StockItemEntryLimit = AdventurerItemRangeFirst;
 constexpr uint32 ItemClassConsumable = 0;
+constexpr uint32 ItemClassContainer = 1;
 constexpr uint32 ItemClassProjectile = 6;
+constexpr uint32 ItemSubclassBag = 0;
 constexpr uint32 ItemSubclassPotion = 1;
 constexpr uint32 ItemSubclassArrow = 2;
 constexpr uint32 ItemSubclassScroll = 4;
 constexpr uint32 AmmoDropChance = 1;
 constexpr uint32 PotionDropChance = 1;
 constexpr uint32 StockScrollDropChance = 1;
+constexpr uint32 BagDropChance = 1;
 
 enum RewardPool : uint8
 {
@@ -51,6 +54,7 @@ struct RewardPools
     std::vector<uint32> Arrows;
     std::vector<uint32> Potions;
     std::vector<uint32> Scrolls;
+    std::vector<uint32> Bags;
 };
 
 std::unordered_set<uint64> ProcessedCreatures;
@@ -114,6 +118,24 @@ bool PassesStockAuxiliaryRules(uint32 entry, ItemTemplate const& item)
     return true;
 }
 
+bool PassesStockBagRules(uint32 entry, ItemTemplate const& item)
+{
+    if (entry >= StockItemEntryLimit)
+        return false;
+    if (item.Class != ItemClassContainer || item.SubClass != ItemSubclassBag || item.InventoryType != INVTYPE_BAG)
+        return false;
+    if (!item.ItemLevel)
+        return false;
+    if (item.AllowableClass != UniversalMask || item.AllowableRace != UniversalMask)
+        return false;
+    if (item.RequiredSkill || item.RequiredSpell || item.RequiredReputationFaction ||
+        item.RequiredHonorRank || item.RequiredCityRank)
+        return false;
+    if (item.HasFlag(ITEM_FLAG_DEPRECATED))
+        return false;
+    return true;
+}
+
 RewardPools BuildControlledPools()
 {
     RewardPools pools;
@@ -132,6 +154,9 @@ RewardPools BuildControlledPools()
             else if (item.Quality == ITEM_QUALITY_EPIC)
                 pools.Items[REWARD_EPIC].push_back(entry);
         }
+
+        if (PassesStockBagRules(entry, item))
+            pools.Bags.push_back(entry);
 
         if (!PassesStockAuxiliaryRules(entry, item))
             continue;
@@ -215,6 +240,35 @@ uint32 SelectUsableAuxiliaryFromPool(std::vector<uint32> const& candidates, uint
     return closest[urand(0, static_cast<uint32>(closest.size() - 1))];
 }
 
+uint32 SelectBagFromPool(std::vector<uint32> const& candidates, uint8 rewardLevel)
+{
+    if (candidates.empty())
+        return 0;
+
+    uint32 bestDistance = UINT32_MAX;
+    std::vector<uint32> closest;
+    for (uint32 entry : candidates)
+    {
+        ItemTemplate const* item = sObjectMgr->GetItemTemplate(entry);
+        if (!item)
+            continue;
+
+        uint32 distance = LevelDistance(item->ItemLevel, rewardLevel);
+        if (distance < bestDistance)
+        {
+            bestDistance = distance;
+            closest.clear();
+            closest.push_back(entry);
+        }
+        else if (distance == bestDistance)
+            closest.push_back(entry);
+    }
+
+    if (closest.empty())
+        return 0;
+    return closest[urand(0, static_cast<uint32>(closest.size() - 1))];
+}
+
 void AddLootItem(Loot& loot, uint32 itemEntry, uint8 minCount = 1, uint8 maxCount = 1)
 {
     if (!itemEntry)
@@ -252,6 +306,7 @@ void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
               << " arrowPool=" << pools.Arrows.size()
               << " potionPool=" << pools.Potions.size()
               << " scrollPool=" << pools.Scrolls.size()
+              << " bagPool=" << pools.Bags.size()
               << std::endl;
 
     if (ammoRoll <= AmmoDropChance)
@@ -291,6 +346,21 @@ void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
                   << " selected=" << itemEntry << std::endl;
         if (itemEntry)
             LogSelectedItem("STOCK_SCROLL_SELECTED", itemEntry);
+        AddLootItem(loot, itemEntry, 1, 1);
+    }
+
+    uint32 bagRoll = urand(1, 100);
+    std::cout << "[GauntletLoot] AUX bagRoll=" << bagRoll
+              << " bagChance=" << BagDropChance << std::endl;
+
+    if (bagRoll <= BagDropChance)
+    {
+        uint32 itemEntry = SelectBagFromPool(pools.Bags, rewardLevel);
+
+        std::cout << "[GauntletLoot] >>> BAG SUCCESS roll=" << bagRoll
+                  << " selected=" << itemEntry << std::endl;
+        if (itemEntry)
+            LogSelectedItem("BAG_SELECTED", itemEntry);
         AddLootItem(loot, itemEntry, 1, 1);
     }
 }
