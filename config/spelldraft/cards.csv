@@ -1,5 +1,5 @@
 id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unlocks;replaces_previous;name
-1;battle_stance;active;1;common;100;2457+100;;;24,25,26,27;0;Actitud de batalla
+1;battle_stance;active;1;common;100;2457+100;;;11,24,25,26,27;0;Actitud de batalla
 2;fireball;active;1;common;100;133;;;104;0;Bola de Fuego
 3;frostbolt;active;4;common;100;116;;;105;0;Descarga de Escarcha
 4;shadow_bolt;active;1;common;100;686;;;;0;Descarga de las Sombras
@@ -9,6 +9,7 @@ id;key;type;source_level;rarity;weight;rank_grants;requires_all;requires_any;unl
 8;heroic_strike;active;1;common;110;78;;;107;0;Golpe heroico
 9;rejuvenation;active;4;common;100;774;;;;0;Rejuvenecimiento
 10;stealth;active;1;uncommon;120;1784+921+6770;;;;0;Sigilo
+11;charge;active;4;common;100;100;1:1;;;0;Cargar
 12;arcane_intellect;active;1;common;90;1459;;;;0;Intelecto Arcano
 13;healing_wave;active;1;common;100;331;;;;0;Ola de sanación
 14;sinister_strike;active;1;common;100;920000;;;50,55;0;Golpe siniestro
