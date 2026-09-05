@@ -40,6 +40,7 @@ FILES = (
     "spelldraft.conf",
     "cards.csv",
     "catalog_metadata.csv",
+    "knowledge_books.csv",
     "subclasses.json",
     "card_subclasses.csv",
 )
@@ -390,6 +391,7 @@ def build_packaged_files(core: Path, server_data_dir: Path | None, dbc_src: Path
     files = {
         "spelldraft.conf": (SOURCE / "spelldraft.conf").read_bytes(),
         "catalog_metadata.csv": (SOURCE / "catalog_metadata.csv").read_bytes(),
+        "knowledge_books.csv": (SOURCE / "knowledge_books.csv").read_bytes(),
         "subclasses.json": (SOURCE / "subclasses.json").read_bytes(),
     }
     base_cards = (SOURCE / "cards.csv").read_text(encoding="utf-8")
