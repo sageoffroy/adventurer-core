@@ -1,0 +1,207 @@
+entry;kind;class_key;required_level;card_id;spell_id;name;description
+910240;random_global;any;1;0;0;Tomo perdido;Enseña una habilidad aleatoria disponible que todavía no conozcas.
+910241;random_class;warrior;1;0;0;Manual sobre habilidades de guerrero;Enseña una habilidad aleatoria de warrior que todavía no conozcas.
+910242;random_class;rogue;1;0;0;Manual sobre habilidades de pícaro;Enseña una habilidad aleatoria de rogue que todavía no conozcas.
+910243;random_class;hunter;1;0;0;Manual sobre habilidades de cazador;Enseña una habilidad aleatoria de hunter que todavía no conozcas.
+910244;random_class;druid;1;0;0;Libro sobre habilidades de druida;Enseña una habilidad aleatoria de druid que todavía no conozcas.
+910245;random_class;mage;1;0;0;Escrito sobre habilidades de mago;Enseña una habilidad aleatoria de mage que todavía no conozcas.
+910246;random_class;paladin;1;0;0;Tratado sobre habilidades de paladín;Enseña una habilidad aleatoria de paladin que todavía no conozcas.
+910247;random_class;priest;1;0;0;Códice sobre habilidades de sacerdote;Enseña una habilidad aleatoria de priest que todavía no conozcas.
+910248;random_class;shaman;1;0;0;Tablilla sobre habilidades de chamán;Enseña una habilidad aleatoria de shaman que todavía no conozcas.
+910249;random_class;warlock;1;0;0;Grimorio sobre habilidades de brujo;Enseña una habilidad aleatoria de warlock que todavía no conozcas.
+910250;active_talent;druid;40;0;33891;Tomo del Árbol de Vida;Enseña el talento activo Árbol de Vida. Solo puede obtenerse mediante este tomo.
+910301;active_card;warrior;1;1;0;Manual sobre Actitud de batalla;Enseña Actitud de batalla. Esta habilidad también puede obtenerse mediante SpellDraft.
+910302;active_card;mage;1;2;0;Escrito sobre Bola de Fuego;Enseña Bola de Fuego. Esta habilidad también puede obtenerse mediante SpellDraft.
+910303;active_card;mage;4;3;0;Escrito sobre Descarga de Escarcha;Enseña Descarga de Escarcha. Esta habilidad también puede obtenerse mediante SpellDraft.
+910304;active_card;warlock;1;4;0;Grimorio sobre Descarga de las Sombras;Enseña Descarga de las Sombras. Esta habilidad también puede obtenerse mediante SpellDraft.
+910305;active_card;priest;1;5;0;Códice sobre Punición;Enseña Punición. Esta habilidad también puede obtenerse mediante SpellDraft.
+910306;active_card;shaman;1;6;0;Tablilla sobre Descarga de relámpagos;Enseña Descarga de relámpagos. Esta habilidad también puede obtenerse mediante SpellDraft.
+910307;active_card;druid;1;7;0;Libro sobre Cólera;Enseña Cólera. Esta habilidad también puede obtenerse mediante SpellDraft.
+910308;active_card;warrior;1;8;0;Manual sobre Golpe heroico;Enseña Golpe heroico. Esta habilidad también puede obtenerse mediante SpellDraft.
+910309;active_card;druid;4;9;0;Libro sobre Rejuvenecimiento;Enseña Rejuvenecimiento. Esta habilidad también puede obtenerse mediante SpellDraft.
+910310;active_card;rogue;1;10;0;Manual sobre Sigilo;Enseña Sigilo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910312;active_card;mage;1;12;0;Escrito sobre Intelecto Arcano;Enseña Intelecto Arcano. Esta habilidad también puede obtenerse mediante SpellDraft.
+910313;active_card;shaman;1;13;0;Tablilla sobre Ola de sanación;Enseña Ola de sanación. Esta habilidad también puede obtenerse mediante SpellDraft.
+910314;active_card;rogue;1;14;0;Manual del Golpe siniestro;Enseña Golpe siniestro. Esta habilidad también puede obtenerse mediante SpellDraft.
+910315;active_card;warrior;10;15;0;Manual sobre Actitud defensiva;Enseña Actitud defensiva. Esta habilidad también puede obtenerse mediante SpellDraft.
+910316;active_card;druid;1;16;0;Libro sobre Toque de sanación;Enseña Toque de sanación. Esta habilidad también puede obtenerse mediante SpellDraft.
+910317;active_card;druid;1;17;0;Libro sobre Marca de lo salvaje;Enseña Marca de lo salvaje. Esta habilidad también puede obtenerse mediante SpellDraft.
+910318;active_card;druid;4;18;0;Libro sobre Fuego lunar;Enseña Fuego lunar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910319;active_card;druid;6;19;0;Libro sobre Espinas;Enseña Espinas. Esta habilidad también puede obtenerse mediante SpellDraft.
+910320;active_card;druid;8;20;0;Libro sobre Raíces enredadoras;Enseña Raíces enredadoras. Esta habilidad también puede obtenerse mediante SpellDraft.
+910321;active_card;druid;10;21;0;Libro sobre Forma de oso;Enseña Forma de oso. Esta habilidad también puede obtenerse mediante SpellDraft.
+910322;active_card;druid;10;22;0;Libro sobre Teletransporte: Claro de la Luna;Enseña Teletransporte: Claro de la Luna. Esta habilidad también puede obtenerse mediante SpellDraft.
+910323;active_card;warrior;1;23;0;Manual sobre Grito de batalla;Enseña Grito de batalla. Esta habilidad también puede obtenerse mediante SpellDraft.
+910324;active_card;warrior;4;24;0;Manual sobre Desgarrar;Enseña Desgarrar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910325;active_card;warrior;6;25;0;Manual sobre Atronar;Enseña Atronar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910326;active_card;warrior;6;26;0;Manual sobre Ataque de la victoria;Enseña Ataque de la victoria. Esta habilidad también puede obtenerse mediante SpellDraft.
+910327;active_card;warrior;8;27;0;Manual sobre Seccionar;Enseña Seccionar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910328;active_card;warrior;10;28;0;Manual sobre Ira sangrienta;Enseña Ira sangrienta. Esta habilidad también puede obtenerse mediante SpellDraft.
+910329;active_card;warrior;10;29;0;Manual sobre Hender armadura;Enseña Hender armadura. Esta habilidad también puede obtenerse mediante SpellDraft.
+910330;active_card;paladin;1;30;0;Tratado sobre Luz Sagrada;Enseña Luz Sagrada. Esta habilidad también puede obtenerse mediante SpellDraft.
+910331;active_card;paladin;1;31;0;Tratado sobre Sello de rectitud;Enseña Sello de rectitud. Esta habilidad también puede obtenerse mediante SpellDraft.
+910332;active_card;paladin;1;32;0;Tratado sobre Aura de devoción;Enseña Aura de devoción. Esta habilidad también puede obtenerse mediante SpellDraft.
+910333;active_card;paladin;4;33;0;Tratado sobre Bendición de poderío;Enseña Bendición de poderío. Esta habilidad también puede obtenerse mediante SpellDraft.
+910334;active_card;paladin;4;34;0;Tratado sobre Sentencia de Luz;Enseña Sentencia de Luz. Esta habilidad también puede obtenerse mediante SpellDraft.
+910335;active_card;paladin;6;35;0;Tratado sobre Protección divina;Enseña Protección divina. Esta habilidad también puede obtenerse mediante SpellDraft.
+910336;active_card;paladin;8;36;0;Tratado sobre Martillo de Justicia;Enseña Martillo de Justicia. Esta habilidad también puede obtenerse mediante SpellDraft.
+910337;active_card;paladin;8;37;0;Tratado sobre Purificar;Enseña Purificar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910338;active_card;paladin;10;38;0;Tratado sobre Mano de protección;Enseña Mano de protección. Esta habilidad también puede obtenerse mediante SpellDraft.
+910339;active_card;paladin;10;39;0;Tratado sobre Imposición de manos;Enseña Imposición de manos. Esta habilidad también puede obtenerse mediante SpellDraft.
+910340;active_card;hunter;1;40;0;Manual sobre Golpe de raptor;Enseña Golpe de raptor. Esta habilidad también puede obtenerse mediante SpellDraft.
+910341;active_card;hunter;1;41;0;Manual sobre Rastrear bestias;Enseña Rastrear bestias. Esta habilidad también puede obtenerse mediante SpellDraft.
+910342;active_card;hunter;4;42;0;Manual sobre Aspecto del mono;Enseña Aspecto del mono. Esta habilidad también puede obtenerse mediante SpellDraft.
+910343;active_card;hunter;4;43;0;Manual sobre Picadura de serpiente;Enseña Picadura de serpiente. Esta habilidad también puede obtenerse mediante SpellDraft.
+910344;active_card;hunter;6;44;0;Manual sobre Disparo Arcano;Enseña Disparo Arcano. Esta habilidad también puede obtenerse mediante SpellDraft.
+910345;active_card;hunter;6;45;0;Manual sobre Marca del cazador;Enseña Marca del cazador. Esta habilidad también puede obtenerse mediante SpellDraft.
+910346;active_card;hunter;8;46;0;Manual sobre Disparo de conmoción;Enseña Disparo de conmoción. Esta habilidad también puede obtenerse mediante SpellDraft.
+910347;active_card;hunter;10;47;0;Manual sobre Aspecto del halcón;Enseña Aspecto del halcón. Esta habilidad también puede obtenerse mediante SpellDraft.
+910348;active_card;hunter;10;48;0;Manual sobre Rastrear humanoides;Enseña Rastrear humanoides. Esta habilidad también puede obtenerse mediante SpellDraft.
+910349;active_card;hunter;10;49;0;Manual sobre Domesticar bestia;Enseña Domesticar bestia. Esta habilidad también puede obtenerse mediante SpellDraft.
+910350;active_card;rogue;1;50;0;Manual sobre Eviscerar;Enseña Eviscerar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910351;active_card;rogue;4;51;0;Manual sobre Puñalada;Enseña Puñalada. Esta habilidad también puede obtenerse mediante SpellDraft.
+910353;active_card;rogue;6;53;0;Manual sobre Gubia;Enseña Gubia. Esta habilidad también puede obtenerse mediante SpellDraft.
+910354;active_card;rogue;8;54;0;Manual sobre Evasión;Enseña Evasión. Esta habilidad también puede obtenerse mediante SpellDraft.
+910355;active_card;rogue;10;55;0;Manual sobre Hacer picadillo;Enseña Hacer picadillo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910356;active_card;rogue;10;56;0;Manual sobre Sprint;Enseña Sprint. Esta habilidad también puede obtenerse mediante SpellDraft.
+910357;active_card;priest;1;57;0;Códice sobre Sanación inferior;Enseña Sanación inferior. Esta habilidad también puede obtenerse mediante SpellDraft.
+910358;active_card;priest;1;58;0;Códice sobre Palabra de poder: entereza;Enseña Palabra de poder: entereza. Esta habilidad también puede obtenerse mediante SpellDraft.
+910359;active_card;priest;4;59;0;Códice sobre Palabra de las Sombras: dolor;Enseña Palabra de las Sombras: dolor. Esta habilidad también puede obtenerse mediante SpellDraft.
+910360;active_card;priest;6;60;0;Códice sobre Palabra de poder: escudo;Enseña Palabra de poder: escudo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910361;active_card;priest;8;61;0;Códice sobre Desvanecerse;Enseña Desvanecerse. Esta habilidad también puede obtenerse mediante SpellDraft.
+910362;active_card;priest;8;62;0;Códice sobre Renovar;Enseña Renovar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910363;active_card;priest;10;63;0;Códice sobre Explosión mental;Enseña Explosión mental. Esta habilidad también puede obtenerse mediante SpellDraft.
+910364;active_card;priest;10;64;0;Códice sobre Resurrección;Enseña Resurrección. Esta habilidad también puede obtenerse mediante SpellDraft.
+910365;active_card;shaman;1;65;0;Tablilla sobre Arma Muerdepiedras;Enseña Arma Muerdepiedras. Esta habilidad también puede obtenerse mediante SpellDraft.
+910366;active_card;shaman;4;66;0;Tablilla sobre Choque de tierra;Enseña Choque de tierra. Esta habilidad también puede obtenerse mediante SpellDraft.
+910367;active_card;shaman;4;67;0;Tablilla sobre Tótem Piel de piedra;Enseña Tótem Piel de piedra. Esta habilidad también puede obtenerse mediante SpellDraft.
+910368;active_card;shaman;6;68;0;Tablilla sobre Tótem Nexo terrestre;Enseña Tótem Nexo terrestre. Esta habilidad también puede obtenerse mediante SpellDraft.
+910369;active_card;shaman;8;69;0;Tablilla sobre Escudo de relámpagos;Enseña Escudo de relámpagos. Esta habilidad también puede obtenerse mediante SpellDraft.
+910370;active_card;shaman;8;70;0;Tablilla sobre Tótem Garra de piedra;Enseña Tótem Garra de piedra. Esta habilidad también puede obtenerse mediante SpellDraft.
+910371;active_card;shaman;10;71;0;Tablilla sobre Choque de llamas;Enseña Choque de llamas. Esta habilidad también puede obtenerse mediante SpellDraft.
+910372;active_card;shaman;10;72;0;Tablilla sobre Arma Lengua de Fuego;Enseña Arma Lengua de Fuego. Esta habilidad también puede obtenerse mediante SpellDraft.
+910373;active_card;shaman;10;73;0;Tablilla sobre Tótem abrasador;Enseña Tótem abrasador. Esta habilidad también puede obtenerse mediante SpellDraft.
+910374;active_card;shaman;10;74;0;Tablilla sobre Tótem Fuerza de la tierra;Enseña Tótem Fuerza de la tierra. Esta habilidad también puede obtenerse mediante SpellDraft.
+910375;active_card;mage;1;75;0;Escrito sobre Armadura de Escarcha;Enseña Armadura de Escarcha. Esta habilidad también puede obtenerse mediante SpellDraft.
+910376;active_card;mage;4;76;0;Escrito sobre Crear agua;Enseña Crear agua. Esta habilidad también puede obtenerse mediante SpellDraft.
+910377;active_card;mage;6;77;0;Escrito sobre Crear comida;Enseña Crear comida. Esta habilidad también puede obtenerse mediante SpellDraft.
+910378;active_card;mage;6;78;0;Escrito sobre Explosión de Fuego;Enseña Explosión de Fuego. Esta habilidad también puede obtenerse mediante SpellDraft.
+910379;active_card;mage;8;79;0;Escrito sobre Misiles Arcanos;Enseña Misiles Arcanos. Esta habilidad también puede obtenerse mediante SpellDraft.
+910380;active_card;mage;8;80;0;Escrito sobre Polimorfia;Enseña Polimorfia. Esta habilidad también puede obtenerse mediante SpellDraft.
+910381;active_card;mage;10;81;0;Escrito sobre Nova de Escarcha;Enseña Nova de Escarcha. Esta habilidad también puede obtenerse mediante SpellDraft.
+910382;active_card;warlock;1;82;0;Grimorio sobre Piel de demonio;Enseña Piel de demonio. Esta habilidad también puede obtenerse mediante SpellDraft.
+910383;active_card;warlock;1;83;0;Grimorio sobre Inmolar;Enseña Inmolar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910384;active_card;warlock;1;84;0;Grimorio sobre Invocar diablillo;Enseña Invocar diablillo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910385;active_card;warlock;4;85;0;Grimorio sobre Corrupción;Enseña Corrupción. Esta habilidad también puede obtenerse mediante SpellDraft.
+910386;active_card;warlock;4;86;0;Grimorio sobre Maldición de debilidad;Enseña Maldición de debilidad. Esta habilidad también puede obtenerse mediante SpellDraft.
+910387;active_card;warlock;6;87;0;Grimorio sobre Transfusión de vida;Enseña Transfusión de vida. Esta habilidad también puede obtenerse mediante SpellDraft.
+910388;active_card;warlock;8;88;0;Grimorio sobre Maldición de agonía;Enseña Maldición de agonía. Esta habilidad también puede obtenerse mediante SpellDraft.
+910389;active_card;warlock;8;89;0;Grimorio sobre Miedo;Enseña Miedo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910390;active_card;warlock;10;90;0;Grimorio sobre Drenar alma;Enseña Drenar alma. Esta habilidad también puede obtenerse mediante SpellDraft.
+910391;active_card;warlock;10;91;0;Grimorio sobre Crear piedra de salud;Enseña Crear piedra de salud. Esta habilidad también puede obtenerse mediante SpellDraft.
+910392;active_card;warlock;10;92;0;Grimorio sobre Invocar abisario;Enseña Invocar abisario. Esta habilidad también puede obtenerse mediante SpellDraft.
+910408;active_card;druid;12;108;0;Libro sobre Recrecimiento;Enseña Recrecimiento. Esta habilidad también puede obtenerse mediante SpellDraft.
+910409;active_card;druid;12;109;0;Libro sobre Enfurecer;Enseña Enfurecer. Esta habilidad también puede obtenerse mediante SpellDraft.
+910410;active_card;druid;12;110;0;Libro sobre Revivir;Enseña Revivir. Esta habilidad también puede obtenerse mediante SpellDraft.
+910411;active_card;druid;14;111;0;Libro sobre Curar envenenamiento;Enseña Curar envenenamiento. Esta habilidad también puede obtenerse mediante SpellDraft.
+910412;active_card;druid;14;112;0;Libro sobre Azote;Enseña Azote. Esta habilidad también puede obtenerse mediante SpellDraft.
+910413;active_card;druid;16;113;0;Libro sobre Forma acuática;Enseña Forma acuática. Esta habilidad también puede obtenerse mediante SpellDraft.
+910414;active_card;druid;16;114;0;Libro sobre Flagelo (oso);Enseña Flagelo (oso). Esta habilidad también puede obtenerse mediante SpellDraft.
+910415;active_card;druid;18;115;0;Libro sobre Fuego feérico;Enseña Fuego feérico. Esta habilidad también puede obtenerse mediante SpellDraft.
+910416;active_card;druid;18;116;0;Libro sobre Fuego feérico (feral);Enseña Fuego feérico (feral). Esta habilidad también puede obtenerse mediante SpellDraft.
+910417;active_card;druid;18;117;0;Libro sobre Hibernar;Enseña Hibernar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910418;active_card;druid;20;118;0;Libro sobre Forma felina;Enseña Forma felina. Esta habilidad también puede obtenerse mediante SpellDraft.
+910419;active_card;druid;20;119;0;Libro sobre Renacer;Enseña Renacer. Esta habilidad también puede obtenerse mediante SpellDraft.
+910420;active_card;druid;20;120;0;Libro sobre Fuego estelar;Enseña Fuego estelar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910421;active_card;warrior;12;121;0;Manual sobre Abrumar;Enseña Abrumar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910422;active_card;warrior;12;122;0;Manual sobre Azote de escudo;Enseña Azote de escudo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910423;active_card;warrior;14;123;0;Manual sobre Revancha;Enseña Revancha. Esta habilidad también puede obtenerse mediante SpellDraft.
+910424;active_card;warrior;14;124;0;Manual sobre Grito desmoralizador;Enseña Grito desmoralizador. Esta habilidad también puede obtenerse mediante SpellDraft.
+910425;active_card;warrior;16;125;0;Manual sobre Bloquear con escudo;Enseña Bloquear con escudo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910426;active_card;warrior;16;126;0;Manual sobre Falsa arremetida;Enseña Falsa arremetida. Esta habilidad también puede obtenerse mediante SpellDraft.
+910427;active_card;warrior;18;127;0;Manual sobre Desarmar;Enseña Desarmar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910428;active_card;warrior;20;128;0;Manual sobre Rajar;Enseña Rajar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910429;active_card;warrior;20;129;0;Manual sobre Represalias;Enseña Represalias. Esta habilidad también puede obtenerse mediante SpellDraft.
+910430;active_card;paladin;12;130;0;Tratado sobre Redención;Enseña Redención. Esta habilidad también puede obtenerse mediante SpellDraft.
+910431;active_card;paladin;12;131;0;Tratado sobre Sentencia de sabiduría;Enseña Sentencia de sabiduría. Esta habilidad también puede obtenerse mediante SpellDraft.
+910432;active_card;paladin;14;132;0;Tratado sobre Bendición de sabiduría;Enseña Bendición de sabiduría. Esta habilidad también puede obtenerse mediante SpellDraft.
+910433;active_card;paladin;14;133;0;Tratado sobre Defensa recta;Enseña Defensa recta. Esta habilidad también puede obtenerse mediante SpellDraft.
+910434;active_card;paladin;16;134;0;Tratado sobre Mano de expiación;Enseña Mano de expiación. Esta habilidad también puede obtenerse mediante SpellDraft.
+910435;active_card;paladin;16;135;0;Tratado sobre Furia recta;Enseña Furia recta. Esta habilidad también puede obtenerse mediante SpellDraft.
+910436;active_card;paladin;16;136;0;Tratado sobre Aura de reprensión;Enseña Aura de reprensión. Esta habilidad también puede obtenerse mediante SpellDraft.
+910437;active_card;paladin;18;137;0;Tratado sobre Mano de libertad;Enseña Mano de libertad. Esta habilidad también puede obtenerse mediante SpellDraft.
+910438;active_card;paladin;20;138;0;Tratado sobre Consagración;Enseña Consagración. Esta habilidad también puede obtenerse mediante SpellDraft.
+910439;active_card;paladin;20;139;0;Tratado sobre Exorcismo;Enseña Exorcismo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910440;active_card;paladin;20;140;0;Tratado sobre Destello de Luz;Enseña Destello de Luz. Esta habilidad también puede obtenerse mediante SpellDraft.
+910441;active_card;paladin;20;141;0;Tratado sobre Detectar no-muertos;Enseña Detectar no-muertos. Esta habilidad también puede obtenerse mediante SpellDraft.
+910442;active_card;paladin;20;142;0;Tratado sobre Bendición de reyes;Enseña Bendición de reyes. Esta habilidad también puede obtenerse mediante SpellDraft.
+910443;active_card;hunter;12;143;0;Manual sobre Aliviar mascota;Enseña Aliviar mascota. Esta habilidad también puede obtenerse mediante SpellDraft.
+910444;active_card;hunter;12;144;0;Manual sobre Cortar alas;Enseña Cortar alas. Esta habilidad también puede obtenerse mediante SpellDraft.
+910445;active_card;hunter;12;145;0;Manual sobre Disparo de distracción;Enseña Disparo de distracción. Esta habilidad también puede obtenerse mediante SpellDraft.
+910446;active_card;hunter;14;146;0;Manual sobre Ojo de águila;Enseña Ojo de águila. Esta habilidad también puede obtenerse mediante SpellDraft.
+910447;active_card;hunter;14;147;0;Manual sobre Asustar bestia;Enseña Asustar bestia. Esta habilidad también puede obtenerse mediante SpellDraft.
+910448;active_card;hunter;14;148;0;Manual sobre Ojos de la bestia;Enseña Ojos de la bestia. Esta habilidad también puede obtenerse mediante SpellDraft.
+910449;active_card;hunter;16;149;0;Manual sobre Aspecto del guepardo;Enseña Aspecto del guepardo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910450;active_card;hunter;16;150;0;Manual sobre Trampa de inmolación;Enseña Trampa de inmolación. Esta habilidad también puede obtenerse mediante SpellDraft.
+910451;active_card;hunter;16;151;0;Manual sobre Mordedura de mangosta;Enseña Mordedura de mangosta. Esta habilidad también puede obtenerse mediante SpellDraft.
+910452;active_card;hunter;18;152;0;Manual sobre Multidisparo;Enseña Multidisparo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910453;active_card;hunter;18;153;0;Manual sobre Rastrear no-muertos;Enseña Rastrear no-muertos. Esta habilidad también puede obtenerse mediante SpellDraft.
+910454;active_card;hunter;20;154;0;Manual sobre Aspecto de la víbora;Enseña Aspecto de la víbora. Esta habilidad también puede obtenerse mediante SpellDraft.
+910455;active_card;hunter;20;155;0;Manual sobre Separación;Enseña Separación. Esta habilidad también puede obtenerse mediante SpellDraft.
+910456;active_card;hunter;20;156;0;Manual sobre Trampa congelante;Enseña Trampa congelante. Esta habilidad también puede obtenerse mediante SpellDraft.
+910457;active_card;rogue;12;157;0;Manual sobre Patada;Enseña Patada. Esta habilidad también puede obtenerse mediante SpellDraft.
+910458;active_card;rogue;14;158;0;Manual sobre Garrote;Enseña Garrote. Esta habilidad también puede obtenerse mediante SpellDraft.
+910459;active_card;rogue;14;159;0;Manual sobre Exponer armadura;Enseña Exponer armadura. Esta habilidad también puede obtenerse mediante SpellDraft.
+910460;active_card;rogue;16;160;0;Manual sobre Amago;Enseña Amago. Esta habilidad también puede obtenerse mediante SpellDraft.
+910461;active_card;rogue;16;161;0;Manual sobre Forzar cerradura;Enseña Forzar cerradura. Esta habilidad también puede obtenerse mediante SpellDraft.
+910462;active_card;rogue;18;162;0;Manual sobre Emboscada;Enseña Emboscada. Esta habilidad también puede obtenerse mediante SpellDraft.
+910463;active_card;rogue;20;163;0;Manual sobre Desmantelar;Enseña Desmantelar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910464;active_card;rogue;20;164;0;Manual sobre Ruptura;Enseña Ruptura. Esta habilidad también puede obtenerse mediante SpellDraft.
+910465;active_card;priest;12;165;0;Códice sobre Fuego interno;Enseña Fuego interno. Esta habilidad también puede obtenerse mediante SpellDraft.
+910466;active_card;priest;14;166;0;Códice sobre Curar enfermedad;Enseña Curar enfermedad. Esta habilidad también puede obtenerse mediante SpellDraft.
+910467;active_card;priest;14;167;0;Códice sobre Alarido psíquico;Enseña Alarido psíquico. Esta habilidad también puede obtenerse mediante SpellDraft.
+910468;active_card;priest;16;168;0;Códice sobre Sanación;Enseña Sanación. Esta habilidad también puede obtenerse mediante SpellDraft.
+910469;active_card;priest;18;169;0;Códice sobre Disipar magia;Enseña Disipar magia. Esta habilidad también puede obtenerse mediante SpellDraft.
+910470;active_card;priest;20;170;0;Códice sobre Resguardo de miedo;Enseña Resguardo de miedo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910471;active_card;priest;20;171;0;Códice sobre Sanación relámpago;Enseña Sanación relámpago. Esta habilidad también puede obtenerse mediante SpellDraft.
+910472;active_card;priest;20;172;0;Códice sobre Fuego Sagrado;Enseña Fuego Sagrado. Esta habilidad también puede obtenerse mediante SpellDraft.
+910473;active_card;priest;20;173;0;Códice sobre Nova Sagrada;Enseña Nova Sagrada. Esta habilidad también puede obtenerse mediante SpellDraft.
+910474;active_card;priest;20;174;0;Códice sobre Peste devoradora;Enseña Peste devoradora. Esta habilidad también puede obtenerse mediante SpellDraft.
+910475;active_card;priest;20;175;0;Códice sobre Calmar mente;Enseña Calmar mente. Esta habilidad también puede obtenerse mediante SpellDraft.
+910476;active_card;priest;20;176;0;Códice sobre Encadenar no-muerto;Enseña Encadenar no-muerto. Esta habilidad también puede obtenerse mediante SpellDraft.
+910477;active_card;shaman;12;177;0;Tablilla sobre Espíritu ancestral;Enseña Espíritu ancestral. Esta habilidad también puede obtenerse mediante SpellDraft.
+910478;active_card;shaman;12;178;0;Tablilla sobre Nova de Fuego;Enseña Nova de Fuego. Esta habilidad también puede obtenerse mediante SpellDraft.
+910479;active_card;shaman;12;179;0;Tablilla sobre Purgar;Enseña Purgar. Esta habilidad también puede obtenerse mediante SpellDraft.
+910480;active_card;shaman;16;180;0;Tablilla sobre Curar toxinas;Enseña Curar toxinas. Esta habilidad también puede obtenerse mediante SpellDraft.
+910481;active_card;shaman;16;181;0;Tablilla sobre Lobo fantasmal;Enseña Lobo fantasmal. Esta habilidad también puede obtenerse mediante SpellDraft.
+910482;active_card;shaman;16;182;0;Tablilla sobre Corte de viento;Enseña Corte de viento. Esta habilidad también puede obtenerse mediante SpellDraft.
+910483;active_card;shaman;18;183;0;Tablilla sobre Tótem de tremor;Enseña Tótem de tremor. Esta habilidad también puede obtenerse mediante SpellDraft.
+910484;active_card;shaman;20;184;0;Tablilla sobre Choque de Escarcha;Enseña Choque de Escarcha. Esta habilidad también puede obtenerse mediante SpellDraft.
+910485;active_card;shaman;20;185;0;Tablilla sobre Arma Estigma de Escarcha;Enseña Arma Estigma de Escarcha. Esta habilidad también puede obtenerse mediante SpellDraft.
+910486;active_card;shaman;20;186;0;Tablilla sobre Tótem Corriente de sanación;Enseña Tótem Corriente de sanación. Esta habilidad también puede obtenerse mediante SpellDraft.
+910487;active_card;shaman;20;187;0;Tablilla sobre Ola de sanación inferior;Enseña Ola de sanación inferior. Esta habilidad también puede obtenerse mediante SpellDraft.
+910488;active_card;shaman;20;188;0;Tablilla sobre Escudo de agua;Enseña Escudo de agua. Esta habilidad también puede obtenerse mediante SpellDraft.
+910489;active_card;mage;12;189;0;Escrito sobre Atenuar magia;Enseña Atenuar magia. Esta habilidad también puede obtenerse mediante SpellDraft.
+910490;active_card;mage;12;190;0;Escrito sobre Caída lenta;Enseña Caída lenta. Esta habilidad también puede obtenerse mediante SpellDraft.
+910491;active_card;mage;14;191;0;Escrito sobre Deflagración Arcana;Enseña Deflagración Arcana. Esta habilidad también puede obtenerse mediante SpellDraft.
+910492;active_card;mage;16;192;0;Escrito sobre Fogonazo;Enseña Fogonazo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910493;active_card;mage;18;193;0;Escrito sobre Amplificar magia;Enseña Amplificar magia. Esta habilidad también puede obtenerse mediante SpellDraft.
+910494;active_card;mage;18;194;0;Escrito sobre Eliminar maldición;Enseña Eliminar maldición. Esta habilidad también puede obtenerse mediante SpellDraft.
+910495;active_card;mage;20;195;0;Escrito sobre Traslación;Enseña Traslación. Esta habilidad también puede obtenerse mediante SpellDraft.
+910496;active_card;mage;20;196;0;Escrito sobre Ventisca;Enseña Ventisca. Esta habilidad también puede obtenerse mediante SpellDraft.
+910497;active_card;mage;20;197;0;Escrito sobre Evocación;Enseña Evocación. Esta habilidad también puede obtenerse mediante SpellDraft.
+910498;active_card;mage;20;198;0;Escrito sobre Resguardo contra el Fuego;Enseña Resguardo contra el Fuego. Esta habilidad también puede obtenerse mediante SpellDraft.
+910499;active_card;mage;20;199;0;Escrito sobre Escudo de maná;Enseña Escudo de maná. Esta habilidad también puede obtenerse mediante SpellDraft.
+910500;active_card;warlock;12;200;0;Grimorio sobre Cauce de salud;Enseña Cauce de salud. Esta habilidad también puede obtenerse mediante SpellDraft.
+910501;active_card;warlock;14;201;0;Grimorio sobre Maldición de temeridad;Enseña Maldición de temeridad. Esta habilidad también puede obtenerse mediante SpellDraft.
+910502;active_card;warlock;14;202;0;Grimorio sobre Drenar vida;Enseña Drenar vida. Esta habilidad también puede obtenerse mediante SpellDraft.
+910503;active_card;warlock;16;203;0;Grimorio sobre Aliento inagotable;Enseña Aliento inagotable. Esta habilidad también puede obtenerse mediante SpellDraft.
+910504;active_card;warlock;18;204;0;Grimorio sobre Crear piedra de alma;Enseña Crear piedra de alma. Esta habilidad también puede obtenerse mediante SpellDraft.
+910505;active_card;warlock;18;205;0;Grimorio sobre Dolor abrasador;Enseña Dolor abrasador. Esta habilidad también puede obtenerse mediante SpellDraft.
+910506;active_card;warlock;20;206;0;Grimorio sobre Armadura demoníaca;Enseña Armadura demoníaca. Esta habilidad también puede obtenerse mediante SpellDraft.
+910507;active_card;warlock;20;207;0;Grimorio sobre Ritual de invocación;Enseña Ritual de invocación. Esta habilidad también puede obtenerse mediante SpellDraft.
+910508;active_card;warlock;20;208;0;Grimorio sobre Invocar súcubo;Enseña Invocar súcubo. Esta habilidad también puede obtenerse mediante SpellDraft.
+910509;active_card;warlock;20;209;0;Grimorio sobre Lluvia de Fuego;Enseña Lluvia de Fuego. Esta habilidad también puede obtenerse mediante SpellDraft.
+910510;active_card;warlock;20;210;0;Grimorio sobre Corcel nefasto;Enseña Corcel nefasto. Esta habilidad también puede obtenerse mediante SpellDraft.
+910511;active_card;rogue;1;211;0;Manual sobre Embate brutal;Enseña Embate brutal. Esta habilidad también puede obtenerse mediante SpellDraft.
+910512;active_card;rogue;1;212;0;Manual sobre Tajo despiadado;Enseña Tajo despiadado. Esta habilidad también puede obtenerse mediante SpellDraft.
