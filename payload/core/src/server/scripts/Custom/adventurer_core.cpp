@@ -133,6 +133,26 @@ struct DraftRuntimeData
     std::vector<DraftCard> cards;
 };
 
+enum class KnowledgeBookKind : uint8
+{
+    None = 0,
+    RandomGlobal,
+    RandomClass,
+    ActiveCard,
+    ActiveTalent,
+};
+
+struct KnowledgeBook
+{
+    uint32 entry = 0;
+    KnowledgeBookKind kind = KnowledgeBookKind::None;
+    std::string classKey;
+    uint8 requiredLevel = 1;
+    uint32 cardId = 0;
+    uint32 spellId = 0;
+    std::string name;
+};
+
 struct DraftState
 {
     uint8 processedLevel = 0;
@@ -588,6 +608,91 @@ bool ParseUnlocks(std::string const& raw, std::vector<uint32>& unlocks)
         unlocks.push_back(cardId);
     }
     return true;
+}
+
+KnowledgeBookKind ParseKnowledgeBookKind(std::string const& raw)
+{
+    std::string value = Lower(Trim(raw));
+    if (value == "random_global") return KnowledgeBookKind::RandomGlobal;
+    if (value == "random_class") return KnowledgeBookKind::RandomClass;
+    if (value == "active_card") return KnowledgeBookKind::ActiveCard;
+    if (value == "active_talent") return KnowledgeBookKind::ActiveTalent;
+    return KnowledgeBookKind::None;
+}
+
+bool LoadKnowledgeBooks(std::vector<KnowledgeBook>& books, std::string& error)
+{
+    std::ifstream input(DraftRuntimeDirectory() + "knowledge_books.csv");
+    if (!input.is_open())
+    {
+        error = "cannot open knowledge_books.csv";
+        return false;
+    }
+
+    std::string header;
+    if (!std::getline(input, header) ||
+        header != "entry;kind;class_key;required_level;card_id;spell_id;name;description")
+    {
+        error = "unexpected knowledge_books.csv header";
+        return false;
+    }
+
+    std::vector<KnowledgeBook> parsed;
+    std::set<uint32> entries;
+    std::string line;
+    uint32 lineNumber = 1;
+    while (std::getline(input, line))
+    {
+        ++lineNumber;
+        if (Trim(line).empty() || Trim(line).front() == '#')
+            continue;
+
+        std::vector<std::string> fields = Split(line, ';');
+        if (fields.size() != 8)
+        {
+            error = "knowledge_books.csv line " + std::to_string(lineNumber) + " must contain 8 fields";
+            return false;
+        }
+
+        uint32 entry = 0;
+        uint32 requiredLevel = 0;
+        uint32 cardId = 0;
+        uint32 spellId = 0;
+        KnowledgeBookKind kind = ParseKnowledgeBookKind(fields[1]);
+        if (!ParseUInt(fields[0], entry) || !entry || !entries.insert(entry).second ||
+            kind == KnowledgeBookKind::None ||
+            !ParseUInt(fields[3], requiredLevel) || requiredLevel == 0 || requiredLevel > 255 ||
+            !ParseUInt(fields[4], cardId) ||
+            !ParseUInt(fields[5], spellId))
+        {
+            error = "invalid knowledge book at line " + std::to_string(lineNumber);
+            return false;
+        }
+
+        if (kind == KnowledgeBookKind::ActiveCard && !cardId)
+        {
+            error = "active-card knowledge book without card id at line " + std::to_string(lineNumber);
+            return false;
+        }
+        if (kind == KnowledgeBookKind::ActiveTalent && !spellId)
+        {
+            error = "active-talent knowledge book without spell id at line " + std::to_string(lineNumber);
+            return false;
+        }
+
+        parsed.push_back({
+            entry,
+            kind,
+            Trim(fields[2]),
+            static_cast<uint8>(requiredLevel),
+            cardId,
+            spellId,
+            Trim(fields[6])
+        });
+    }
+
+    books = std::move(parsed);
+    return !books.empty();
 }
 
 bool LoadDraftCards(std::string const& path, std::vector<DraftCard>& cards, std::string& error)
@@ -1636,6 +1741,164 @@ void HandleDraftReady(Player* player)
     EnsureDraftOffer(player, state);
 }
 
+bool KnowsActiveCard(Player* player, DraftState const& state, DraftCard const& card)
+{
+    if (GetOwnedRank(state, card.id) > 0)
+        return true;
+
+    for (uint32 spellId : card.rankGrants.front())
+        if (PlayerKnowsAnyRank(player, spellId))
+            return true;
+    return false;
+}
+
+bool LearnActiveCardFromBook(Player* player, DraftCard const& card)
+{
+    if (!player || card.type != DraftCardType::Active || card.rankGrants.empty())
+        return false;
+
+    DraftState& state = GetDraftState(player);
+    if (KnowsActiveCard(player, state, card) || !MeetsRequirements(state, card))
+        return false;
+
+    for (uint32 spellId : card.rankGrants.front())
+        if (!PlayerKnowsAnyRank(player, spellId))
+            player->learnSpell(spellId);
+
+    state.ownedRanks[card.id] = 1;
+    if (state.blessedCardId == card.id)
+        state.blessedCardId = 0;
+    if (IsCardInCurrentOffer(state, card.id))
+        ClearDraftOffer(state);
+
+    UpgradeDraftedActiveSpells(player, state);
+    PersistDraftState(player, state);
+    player->SaveToDB(false, false);
+    EnsureDraftOffer(player, state);
+    return true;
+}
+
+KnowledgeBook const* FindKnowledgeBook(std::vector<KnowledgeBook> const& books, uint32 entry)
+{
+    for (KnowledgeBook const& book : books)
+        if (book.entry == entry)
+            return &book;
+    return nullptr;
+}
+
+bool ConsumeKnowledgeBook(Player* player, Item* item)
+{
+    if (!player || !item)
+        return true;
+
+    if (!IsAdventurer(player))
+    {
+        player->SendEquipError(EQUIP_ERR_CANT_DO_RIGHT_NOW, item, nullptr);
+        return true;
+    }
+
+    std::vector<KnowledgeBook> books;
+    std::string error;
+    if (!LoadKnowledgeBooks(books, error))
+    {
+        ChatHandler(player->GetSession()).PSendSysMessage(
+            "No se pudo abrir el catalogo de conocimientos: {}.", error);
+        return true;
+    }
+
+    KnowledgeBook const* book = FindKnowledgeBook(books, item->GetEntry());
+    if (!book)
+        return false;
+
+    if (player->GetLevel() < book->requiredLevel)
+    {
+        player->SendEquipError(EQUIP_ERR_CANT_DO_RIGHT_NOW, item, nullptr);
+        return true;
+    }
+
+    ReloadDraftRuntimeData();
+    DraftState& state = GetDraftState(player);
+    DraftCard const* selected = nullptr;
+
+    if (book->kind == KnowledgeBookKind::ActiveCard)
+    {
+        selected = FindDraftCard(book->cardId);
+        if (!selected || selected->type != DraftCardType::Active ||
+            selected->sourceLevel > player->GetLevel() ||
+            KnowsActiveCard(player, state, *selected) ||
+            !MeetsRequirements(state, *selected))
+        {
+            ChatHandler(player->GetSession()).SendSysMessage(
+                "Este libro no puede ensenarte nada nuevo en este momento.");
+            return true;
+        }
+    }
+    else if (book->kind == KnowledgeBookKind::RandomGlobal ||
+             book->kind == KnowledgeBookKind::RandomClass)
+    {
+        std::vector<DraftCard const*> candidates;
+        for (KnowledgeBook const& candidateBook : books)
+        {
+            if (candidateBook.kind != KnowledgeBookKind::ActiveCard)
+                continue;
+            if (book->kind == KnowledgeBookKind::RandomClass &&
+                candidateBook.classKey != book->classKey)
+                continue;
+
+            DraftCard const* card = FindDraftCard(candidateBook.cardId);
+            if (!card || card->type != DraftCardType::Active ||
+                card->sourceLevel > player->GetLevel() ||
+                KnowsActiveCard(player, state, *card) ||
+                !MeetsRequirements(state, *card))
+                continue;
+            candidates.push_back(card);
+        }
+
+        if (candidates.empty())
+        {
+            ChatHandler(player->GetSession()).SendSysMessage(
+                "Este libro no encuentra ninguna habilidad nueva que puedas aprender.");
+            return true;
+        }
+        selected = candidates[urand(0, static_cast<uint32>(candidates.size() - 1))];
+    }
+    else if (book->kind == KnowledgeBookKind::ActiveTalent)
+    {
+        if (!book->spellId || player->HasSpell(book->spellId))
+        {
+            ChatHandler(player->GetSession()).SendSysMessage(
+                "Ya conoces el talento contenido en este tomo.");
+            return true;
+        }
+
+        if (!sSpellMgr->GetSpellInfo(book->spellId))
+        {
+            ChatHandler(player->GetSession()).SendSysMessage(
+                "El conocimiento de este tomo no esta disponible.");
+            return true;
+        }
+
+        player->learnSpell(book->spellId);
+        player->SaveToDB(false, false);
+        player->DestroyItemCount(item->GetEntry(), 1, true);
+        ChatHandler(player->GetSession()).PSendSysMessage(
+            "Has aprendido |cff00ff00{}|r.", book->name);
+        return true;
+    }
+
+    if (!selected || !LearnActiveCardFromBook(player, *selected))
+    {
+        ChatHandler(player->GetSession()).SendSysMessage(
+            "Este libro no puede ensenarte nada nuevo en este momento.");
+        return true;
+    }
+
+    player->DestroyItemCount(item->GetEntry(), 1, true);
+    ChatHandler(player->GetSession()).PSendSysMessage(
+        "Has aprendido |cff00ff00{}|r.", selected->name);
+    return true;
+}
+
 bool ConsumeDraftCurrencyScroll(Player* player, Item* item)
 {
     if (!player || !item)
@@ -1678,6 +1941,17 @@ public:
     bool OnUse(Player* player, Item* item, SpellCastTargets const& /*targets*/) override
     {
         return ConsumeDraftCurrencyScroll(player, item);
+    }
+};
+
+class AdventurerKnowledgeBookScript : public ItemScript
+{
+public:
+    AdventurerKnowledgeBookScript() : ItemScript("AdventurerKnowledgeBook") { }
+
+    bool OnUse(Player* player, Item* item, SpellCastTargets const& /*targets*/) override
+    {
+        return ConsumeKnowledgeBook(player, item);
     }
 };
 
@@ -1853,4 +2127,5 @@ void AddAdventurerCoreScripts()
 {
     new AdventurerCorePlayerScript();
     new AdventurerDraftCurrencyScrollScript();
+    new AdventurerKnowledgeBookScript();
 }
