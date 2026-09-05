@@ -19,7 +19,7 @@ DBC_FIELDS = {
     "sheath": 7,
 }
 
-STRING_FIELDS = {"name"}
+STRING_FIELDS = {"name", "description", "ScriptName"}
 IDENTITY_FIELDS = {"entry", "source_entry"}
 
 
