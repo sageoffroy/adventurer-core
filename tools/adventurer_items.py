@@ -10,6 +10,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CATALOG = ROOT / "config" / "items" / "adventurer_items.csv"
+KNOWLEDGE_CATALOG = ROOT / "config" / "spelldraft" / "knowledge_books.csv"
+KNOWLEDGE_SOURCE_ITEM = 45912
+KNOWLEDGE_USE_SPELL = 920900
+DRAFT_CURRENCY_SCROLLS = {910237, 910238, 910239}
 MAGIC = b"WDBC"
 HEADER = struct.Struct("<4sIIII")
 
@@ -28,6 +32,53 @@ def load_catalog() -> list[dict[str, str]]:
         rows = list(csv.DictReader(handle, delimiter=";"))
     if not rows:
         raise RuntimeError(f"Adventurer item catalog is empty: {CATALOG}")
+
+    # Currency scrolls and knowledge books all use the same owned no-op use
+    # spell. The ItemScript performs the real action; the spell exists only so
+    # the 3.3.5a client exposes the item as usable without inheriting unrelated
+    # stock-item behavior.
+    for row in rows:
+        if int(row["entry"]) in DRAFT_CURRENCY_SCROLLS:
+            row["spellid_1"] = str(KNOWLEDGE_USE_SPELL)
+
+    if KNOWLEDGE_CATALOG.is_file():
+        with KNOWLEDGE_CATALOG.open("r", encoding="utf-8", newline="") as handle:
+            knowledge = list(csv.DictReader(handle, delimiter=";"))
+
+        required = {"entry", "kind", "class_key", "required_level", "card_id", "spell_id", "name", "description"}
+        if not knowledge or set(knowledge[0]) != required:
+            raise RuntimeError(f"Knowledge-book catalog has unexpected header: {KNOWLEDGE_CATALOG}")
+
+        fixed_fields = list(rows[0].keys())
+        for book in knowledge:
+            entry = int(book["entry"])
+            required_level = int(book["required_level"])
+            kind = book["kind"].strip()
+            quality = "4" if kind == "active_talent" else ("3" if kind.startswith("random_") else "2")
+
+            row = {field: "" for field in fixed_fields}
+            row.update({
+                "entry": str(entry),
+                "source_entry": str(KNOWLEDGE_SOURCE_ITEM),
+                "name": book["name"],
+                "Quality": quality,
+                "ItemLevel": str(max(1, required_level)),
+                "RequiredLevel": str(required_level),
+                "bonding": "0",
+                "BuyPrice": "0",
+                "SellPrice": "0",
+                "AllowableClass": "-1",
+                "AllowableRace": "-1",
+                "RequiredSkill": "0",
+                "RequiredSkillRank": "0",
+                "requiredspell": "0",
+                "maxcount": "0",
+                "stackable": "20",
+                "description": book["description"],
+                "ScriptName": "AdventurerKnowledgeBook",
+            })
+            row["spellid_1"] = str(KNOWLEDGE_USE_SPELL)
+            rows.append(row)
 
     entries = [int(row["entry"]) for row in rows]
     if len(entries) != len(set(entries)):
@@ -49,8 +100,8 @@ def generate_world_sql() -> bytes:
     rows = load_catalog()
     entries = ", ".join(row["entry"] for row in rows)
     out = io.StringIO()
-    out.write("-- GENERATED from config/items/adventurer_items.csv. Do not edit this SQL directly.\n")
-    out.write("-- Fixed Adventurer item definitions: one catalog feeds both world SQL and Item.dbc.\n\n")
+    out.write("-- GENERATED from Adventurer fixed items + SpellDraft knowledge catalog. Do not edit this SQL directly.\n")
+    out.write("-- Fixed items and knowledge books feed both world SQL and Item.dbc.\n\n")
     out.write(f"DELETE FROM `item_template` WHERE `entry` IN ({entries});\n\n")
     out.write("DROP TEMPORARY TABLE IF EXISTS `_adventurer_item_clone`;\n")
     out.write("CREATE TEMPORARY TABLE `_adventurer_item_clone` LIKE `item_template`;\n\n")
