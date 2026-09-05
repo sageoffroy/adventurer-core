@@ -51,6 +51,14 @@ SpellDraft uses three persistent meta currencies:
 
 None of these currencies are regenerated automatically by leveling. Additional charges are intended to come from special Gauntlet loot. There is currently no configured accumulation cap; drop rates are the balancing control. Balance/settings live in `config/spelldraft/spelldraft.conf`.
 
+Gauntlet drops three tradeable, single-use SpellDraft currency scrolls through an independent **1%** auxiliary roll:
+
+- **Scroll de Suerte** (`910237`, `INV_Scroll_11`): +1 Reroll.
+- **Scroll de Bendición** (`910238`, `INV_Scroll_15`): +1 Bless.
+- **Scroll del Olvido** (`910239`, `INV_Scroll_16`): +1 Destroy.
+
+On a successful scroll roll, the distribution is **50% / 25% / 25%** respectively. The scroll is consumed on use, the new charge is persisted immediately, and the SpellDraft counters are refreshed. This roll is independent from equipment, ammo, potion, stock-scroll and bag rolls.
+
 ## Persistence
 
 Per-character draft state is stored through the existing Adventurer SpellDraft persistence path. It includes owned card ranks, unresolved offer state and current meta-mechanic state/charges.

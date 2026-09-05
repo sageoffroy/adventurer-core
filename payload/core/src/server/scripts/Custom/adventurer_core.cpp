@@ -4,7 +4,9 @@
 #include "Opcodes.h"
 #include "Player.h"
 #include "Random.h"
+#include "ScriptDefines/ItemScript.h"
 #include "ScriptDefines/PlayerScript.h"
+#include "Item.h"
 #include "SharedDefines.h"
 #include "SpellInfo.h"
 #include "SpellMgr.h"
@@ -44,6 +46,9 @@ constexpr char ADVENTURER_DRAFT_SETTINGS_SOURCE[] = "adventurer_draft_v1";
 constexpr uint32 ADVENTURER_DRAFT_SCHEMA = 3;
 constexpr uint32 ADVENTURER_DRAFT_STANDARD_WEIGHT = 100;
 constexpr uint32 ADVENTURER_DRAFT_MAX_OFFER_SIZE = 3;
+constexpr uint32 ITEM_SCROLL_LUCK = 910237;
+constexpr uint32 ITEM_SCROLL_BLESSING = 910238;
+constexpr uint32 ITEM_SCROLL_FORGETTING = 910239;
 
 constexpr char DRAFT_READY_MESSAGE[] = "ADRAFT_READY";
 constexpr char DRAFT_PICK_PREFIX[] = "ADRAFT_PICK:";
@@ -1630,7 +1635,51 @@ void HandleDraftReady(Player* player)
     PersistDraftState(player, state);
     EnsureDraftOffer(player, state);
 }
+
+bool ConsumeDraftCurrencyScroll(Player* player, Item* item)
+{
+    if (!player || !item)
+        return true;
+
+    if (!IsAdventurer(player))
+    {
+        player->SendEquipError(EQUIP_ERR_CANT_DO_RIGHT_NOW, item, nullptr);
+        return true;
+    }
+
+    DraftState& state = GetDraftState(player);
+    switch (item->GetEntry())
+    {
+        case ITEM_SCROLL_LUCK:
+            AddCharge(state.rerollCharges, 1, 0);
+            break;
+        case ITEM_SCROLL_BLESSING:
+            AddCharge(state.blessCharges, 1, 0);
+            break;
+        case ITEM_SCROLL_FORGETTING:
+            AddCharge(state.destroyCharges, 1, 0);
+            break;
+        default:
+            return false;
+    }
+
+    player->DestroyItemCount(item->GetEntry(), 1, true);
+    PersistDraftState(player, state);
+    SendDraftMeta(player, state);
+    return true;
 }
+}
+
+class AdventurerDraftCurrencyScrollScript : public ItemScript
+{
+public:
+    AdventurerDraftCurrencyScrollScript() : ItemScript("AdventurerDraftCurrencyScroll") { }
+
+    bool OnUse(Player* player, Item* item, SpellCastTargets const& /*targets*/) override
+    {
+        return ConsumeDraftCurrencyScroll(player, item);
+    }
+};
 
 class AdventurerCorePlayerScript : public PlayerScript
 {
@@ -1803,4 +1852,5 @@ public:
 void AddAdventurerCoreScripts()
 {
     new AdventurerCorePlayerScript();
+    new AdventurerDraftCurrencyScrollScript();
 }

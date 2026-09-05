@@ -1,23 +1,26 @@
-entry;source_entry;name;Quality;ItemLevel;RequiredLevel;bonding;BuyPrice;SellPrice;AllowableClass;AllowableRace;dmg_min1;dmg_max1;delay;stat_type1;stat_value1;stat_type2;stat_value2;armor;block;RandomProperty;RandomSuffix;MaxDurability;displayid;InventoryType;sheath
-910202;3220;Racion de viaje del aventurero;;;3;;0;0;;;;;;;;;;;;;;;;;
-910215;1372;Capa de contrabando;2;7;3;;5000;1000;;;;;;7;1;6;1;;;;;;;;
-910216;85;Coraza de cuero de contrabando;2;8;3;;10000;2000;;;;;;3;1;7;2;;;;;;;;
-910217;2392;Coraza de malla de contrabando;2;10;3;;12000;2400;;;;;;4;1;7;2;;;;;;;;
-910218;2125;Guantes de cuero de contrabando;2;7;3;;6000;1200;;;;;;3;1;7;1;;;;;;;;
-910219;2397;Guantes de malla de contrabando;2;8;3;;6500;1300;;;;;;4;1;7;1;;;;;;;;
-910220;2119;Guantes de tela de contrabando;2;7;3;;5500;1100;;;;;;5;1;6;1;;;;;;;;
-910222;3599;Cinturón de tela de contrabando;2;7;3;;5000;1000;;;;;;5;1;6;1;;;;;;;;
-910223;2122;Cinturón de cuero de contrabando;2;7;3;;6000;1200;;;;;;3;1;7;1;;;;;;;;
-910224;2393;Cinturón de malla de contrabando;2;10;3;;7500;1500;;;;;;4;1;7;1;;;;;;;;
-910225;4948;Rompehuesos;2;11;3;2;1630;326;-1;-1;9;18;2300;7;1;5;1;;;0;0;40;;;
-910226;4562;Cortacuellos;2;10;3;2;1490;298;-1;-1;16;24;3200;4;1;7;1;;;0;0;45;;;
-910227;1406;Lanza del Saqueador;2;13;3;2;4395;879;-1;-1;15;37;3200;3;1;4;1;;;0;0;65;;;
-910228;29584;Colmillos del Rufián;2;11;3;2;875;175;-1;-1;7;13;1800;3;2;0;0;;;0;0;0;;;
-910229;27401;Ballesta del Verdugo;2;12;3;2;1500;300;-1;-1;16;25;3400;0;0;0;0;;;0;0;35;;;
-910230;9514;Bastón del Ocultista;2;10;3;2;1530;306;-1;-1;12;20;2900;5;2;6;1;;;0;0;45;;;
-910231;3446;Rama Podrida;2;13;3;2;2960;592;-1;-1;15;25;3200;7;2;0;0;;;0;0;50;;;
-910232;18957;Hoja del Desguace;2;10;3;2;1250;250;-1;-1;11;21;3000;7;1;0;0;;;0;0;40;1542;21;3
-910233;5779;Acero del Contrabandista;2;11;3;2;1975;395;-1;-1;14;23;2700;4;1;0;0;;;0;0;45;;17;
-910234;22215;Destripadora;2;11;3;2;1625;325;-1;-1;5;10;1500;3;2;0;0;;;0;0;30;;;
-910235;4763;Arco del Fugitivo;2;9;3;2;675;135;-1;-1;11;21;2700;3;1;0;0;;;0;0;30;8106;;
-910236;7108;Rodela del Matón;2;11;3;2;1045;209;-1;-1;;;;;;;;207;4;;;45;18480;;
+entry;source_entry;name;Quality;ItemLevel;RequiredLevel;bonding;BuyPrice;SellPrice;AllowableClass;AllowableRace;dmg_min1;dmg_max1;delay;stat_type1;stat_value1;stat_type2;stat_value2;armor;block;RandomProperty;RandomSuffix;MaxDurability;displayid;InventoryType;sheath;RequiredSkill;RequiredSkillRank;requiredspell;maxcount;stackable;description;ScriptName
+910202;3220;Racion de viaje del aventurero;;;3;;0;0;;;;;;;;;;;;;;;;;;;;;;;;
+910215;1372;Capa de contrabando;2;7;3;;5000;1000;;;;;;7;1;6;1;;;;;;;;;;;;;;;
+910216;85;Coraza de cuero de contrabando;2;8;3;;10000;2000;;;;;;3;1;7;2;;;;;;;;;;;;;;;
+910217;2392;Coraza de malla de contrabando;2;10;3;;12000;2400;;;;;;4;1;7;2;;;;;;;;;;;;;;;
+910218;2125;Guantes de cuero de contrabando;2;7;3;;6000;1200;;;;;;3;1;7;1;;;;;;;;;;;;;;;
+910219;2397;Guantes de malla de contrabando;2;8;3;;6500;1300;;;;;;4;1;7;1;;;;;;;;;;;;;;;
+910220;2119;Guantes de tela de contrabando;2;7;3;;5500;1100;;;;;;5;1;6;1;;;;;;;;;;;;;;;
+910222;3599;Cinturón de tela de contrabando;2;7;3;;5000;1000;;;;;;5;1;6;1;;;;;;;;;;;;;;;
+910223;2122;Cinturón de cuero de contrabando;2;7;3;;6000;1200;;;;;;3;1;7;1;;;;;;;;;;;;;;;
+910224;2393;Cinturón de malla de contrabando;2;10;3;;7500;1500;;;;;;4;1;7;1;;;;;;;;;;;;;;;
+910225;4948;Rompehuesos;2;11;3;2;1630;326;-1;-1;9;18;2300;7;1;5;1;;;0;0;40;;;;;;;;;;
+910226;4562;Cortacuellos;2;10;3;2;1490;298;-1;-1;16;24;3200;4;1;7;1;;;0;0;45;;;;;;;;;;
+910227;1406;Lanza del Saqueador;2;13;3;2;4395;879;-1;-1;15;37;3200;3;1;4;1;;;0;0;65;;;;;;;;;;
+910228;29584;Colmillos del Rufián;2;11;3;2;875;175;-1;-1;7;13;1800;3;2;0;0;;;0;0;0;;;;;;;;;;
+910229;27401;Ballesta del Verdugo;2;12;3;2;1500;300;-1;-1;16;25;3400;0;0;0;0;;;0;0;35;;;;;;;;;;
+910230;9514;Bastón del Ocultista;2;10;3;2;1530;306;-1;-1;12;20;2900;5;2;6;1;;;0;0;45;;;;;;;;;;
+910231;3446;Rama Podrida;2;13;3;2;2960;592;-1;-1;15;25;3200;7;2;0;0;;;0;0;50;;;;;;;;;;
+910232;18957;Hoja del Desguace;2;10;3;2;1250;250;-1;-1;11;21;3000;7;1;0;0;;;0;0;40;1542;21;3;;;;;;;
+910233;5779;Acero del Contrabandista;2;11;3;2;1975;395;-1;-1;14;23;2700;4;1;0;0;;;0;0;45;;17;;;;;;;;
+910234;22215;Destripadora;2;11;3;2;1625;325;-1;-1;5;10;1500;3;2;0;0;;;0;0;30;;;;;;;;;;
+910235;4763;Arco del Fugitivo;2;9;3;2;675;135;-1;-1;11;21;2700;3;1;0;0;;;0;0;30;8106;;;;;;;;;
+910236;7108;Rodela del Matón;2;11;3;2;1045;209;-1;-1;;;;;;;;207;4;;;45;18480;;;;;;;;;
+910237;43850;Scroll de Suerte;1;1;1;0;0;0;-1;-1;;;;;;;;;;;;;;;;0;0;0;0;20;Concede 1 Relanzamiento para SpellDraft.;AdventurerDraftCurrencyScroll
+910238;37118;Scroll de Bendición;1;1;1;0;0;0;-1;-1;;;;;;;;;;;;;;;;0;0;0;0;20;Concede 1 Bendición para SpellDraft.;AdventurerDraftCurrencyScroll
+910239;44315;Scroll del Olvido;1;1;1;0;0;0;-1;-1;;;;;;;;;;;;;;;;0;0;0;0;20;Concede 1 Destrucción para SpellDraft.;AdventurerDraftCurrencyScroll

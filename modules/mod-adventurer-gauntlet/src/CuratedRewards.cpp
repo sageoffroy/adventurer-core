@@ -32,6 +32,10 @@ constexpr uint32 AmmoDropChance = 1;
 constexpr uint32 PotionDropChance = 1;
 constexpr uint32 StockScrollDropChance = 1;
 constexpr uint32 BagDropChance = 1;
+constexpr uint32 DraftScrollDropChance = 1;
+constexpr uint32 DraftScrollLuck = 910237;
+constexpr uint32 DraftScrollBlessing = 910238;
+constexpr uint32 DraftScrollForgetting = 910239;
 
 enum RewardPool : uint8
 {
@@ -361,6 +365,23 @@ void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
                   << " selected=" << itemEntry << std::endl;
         if (itemEntry)
             LogSelectedItem("BAG_SELECTED", itemEntry);
+        AddLootItem(loot, itemEntry, 1, 1);
+    }
+
+    uint32 draftScrollRoll = urand(1, 100);
+    std::cout << "[GauntletLoot] AUX draftScrollRoll=" << draftScrollRoll
+              << " draftScrollChance=" << DraftScrollDropChance << std::endl;
+
+    if (draftScrollRoll <= DraftScrollDropChance)
+    {
+        uint32 typeRoll = urand(1, 100);
+        uint32 itemEntry = typeRoll <= 50 ? DraftScrollLuck
+            : (typeRoll <= 75 ? DraftScrollBlessing : DraftScrollForgetting);
+
+        std::cout << "[GauntletLoot] >>> DRAFT SCROLL SUCCESS roll=" << draftScrollRoll
+                  << " typeRoll=" << typeRoll
+                  << " selected=" << itemEntry << std::endl;
+        LogSelectedItem("DRAFT_SCROLL_SELECTED", itemEntry);
         AddLootItem(loot, itemEntry, 1, 1);
     }
 }
