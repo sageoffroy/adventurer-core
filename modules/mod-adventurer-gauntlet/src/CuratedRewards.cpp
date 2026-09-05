@@ -302,49 +302,49 @@ bool GetRewardContext(Map* map, uint32& survivorCount, uint8& rewardLevel)
     return survivorCount && rewardLevel;
 }
 
-void AddCheckpointExtraRoll(Loot& loot, RewardPools const& pools, uint8 rewardLevel,
-    std::unordered_set<uint32>& usedEntries)
+uint32 SelectBossPrimaryReward(RewardPools const& pools, uint8 rewardLevel,
+    std::unordered_set<uint32>& usedEntries, uint32 epicChancePercent)
 {
-    uint32 roll = urand(1, 100);
-    if (roll <= 50)
-        return;
-    if (roll <= 80)
-        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_GREEN], rewardLevel, usedEntries));
-    else if (roll <= 90)
-        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_BLUE], rewardLevel, usedEntries));
-    else if (roll <= 99)
-        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_EPIC], rewardLevel, usedEntries));
+    RewardPool pool = urand(1, 100) <= epicChancePercent ? REWARD_EPIC : REWARD_BLUE;
+    return SelectClosestFromPool(pools.Items[pool], rewardLevel, usedEntries);
 }
 
-void AddFinalExtraRoll(Loot& loot, RewardPools const& pools, uint8 rewardLevel,
-    std::unordered_set<uint32>& usedEntries)
+void AddBlueExtrasPerSurvivor(Loot& loot, RewardPools const& pools, uint8 rewardLevel,
+    uint32 survivorCount, uint32 chancePercent, std::unordered_set<uint32>& usedEntries)
 {
-    uint32 roll = urand(1, 100);
-    if (roll <= 25)
-        return;
-    if (roll <= 75)
-        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_GREEN], rewardLevel, usedEntries));
-    else if (roll <= 90)
-        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_BLUE], rewardLevel, usedEntries));
-    else if (roll <= 97)
-        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_EPIC], rewardLevel, usedEntries));
+    for (uint32 survivor = 0; survivor < survivorCount; ++survivor)
+        if (urand(1, 100) <= chancePercent)
+            AddLootItem(
+                loot,
+                SelectClosestFromPool(pools.Items[REWARD_BLUE], rewardLevel, usedEntries));
 }
-
 bool FillCheckpointLoot(Loot& loot, Map* map)
 {
     uint32 survivorCount = 0;
     uint8 rewardLevel = 0;
     if (!GetRewardContext(map, survivorCount, rewardLevel))
         return false;
+
     RewardPools pools = BuildControlledPools();
     std::unordered_set<uint32> usedEntries;
     uint32 gold = loot.gold;
     loot.clear();
     loot.loot_type = LOOT_CORPSE;
     loot.gold = gold;
-    for (uint32 reward = 0; reward < survivorCount; ++reward)
-        AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_GREEN], rewardLevel, usedEntries));
-    AddCheckpointExtraRoll(loot, pools, rewardLevel, usedEntries);
+
+    // Intermediate boss: one guaranteed quality roll.
+    // 97% blue / 3% epic, plus one independent 15% blue roll per survivor.
+    AddLootItem(
+        loot,
+        SelectBossPrimaryReward(pools, rewardLevel, usedEntries, 3));
+    AddBlueExtrasPerSurvivor(
+        loot,
+        pools,
+        rewardLevel,
+        survivorCount,
+        15,
+        usedEntries);
+
     AddAuxiliaryDrops(loot, pools, rewardLevel);
     return !loot.empty();
 }
@@ -355,14 +355,27 @@ bool FillFinalBossLoot(Loot& loot, Map* map)
     uint8 rewardLevel = 0;
     if (!GetRewardContext(map, survivorCount, rewardLevel))
         return false;
+
     RewardPools pools = BuildControlledPools();
     std::unordered_set<uint32> usedEntries;
     uint32 gold = loot.gold;
     loot.clear();
     loot.loot_type = LOOT_CORPSE;
     loot.gold = gold;
-    AddLootItem(loot, SelectClosestFromPool(pools.Items[REWARD_BLUE], rewardLevel, usedEntries));
-    AddFinalExtraRoll(loot, pools, rewardLevel, usedEntries);
+
+    // Final boss: one guaranteed quality roll.
+    // 87% blue / 13% epic, plus one independent 25% blue roll per survivor.
+    AddLootItem(
+        loot,
+        SelectBossPrimaryReward(pools, rewardLevel, usedEntries, 13));
+    AddBlueExtrasPerSurvivor(
+        loot,
+        pools,
+        rewardLevel,
+        survivorCount,
+        25,
+        usedEntries);
+
     AddAuxiliaryDrops(loot, pools, rewardLevel);
     return !loot.empty();
 }
@@ -386,11 +399,11 @@ bool AddCommonMobTestDrop(Creature* creature)
               << " equipRoll=" << roll << std::endl;
 
     RewardPool pool;
-    if (roll <= 2000)
+    if (roll <= 400)
         pool = REWARD_GREEN;
-    else if (roll <= 2400)
+    else if (roll <= 450)
         pool = REWARD_BLUE;
-    else if (roll <= 2500)
+    else if (roll <= 455)
         pool = REWARD_EPIC;
     else
         pool = REWARD_LEGENDARY;
