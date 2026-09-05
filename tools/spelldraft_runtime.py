@@ -219,6 +219,26 @@ def parse_catalog_metadata(text: str) -> dict[int, dict[str, object]]:
     return result
 
 
+def parse_active_talent_spell_ids(text: str) -> set[int]:
+    rows = csv.DictReader(io.StringIO(text), delimiter=";")
+    expected = {"entry", "kind", "class_key", "required_level", "card_id", "spell_id", "name", "description"}
+    if rows.fieldnames is None or set(rows.fieldnames) != expected:
+        raise SpellDraftRuntimeError("knowledge_books.csv has unexpected header")
+
+    result: set[int] = set()
+    for row in rows:
+        if (row.get("kind") or "").strip() != "active_talent":
+            continue
+        try:
+            spell_id = int((row.get("spell_id") or "").strip())
+        except ValueError as exc:
+            raise SpellDraftRuntimeError("knowledge_books.csv contains invalid active talent spell_id") from exc
+        if not spell_id:
+            raise SpellDraftRuntimeError("active talent knowledge book is missing spell_id")
+        result.add(spell_id)
+    return result
+
+
 def split_grant_spells(rank_grants: str) -> list[int]:
     result: list[int] = []
     for rank in rank_grants.split("/"):
@@ -237,7 +257,12 @@ def render_cards(rows: list[dict[str, str]], fieldnames: list[str]) -> str:
     return output.getvalue()
 
 
-def build_runtime_cards(base_text: str, metadata_text: str, talent_ranks: dict[int, list[int]]) -> tuple[str, list[int]]:
+def build_runtime_cards(
+    base_text: str,
+    metadata_text: str,
+    talent_ranks: dict[int, list[int]],
+    active_talent_tomes: set[int],
+) -> tuple[str, list[int]]:
     reader = csv.DictReader(io.StringIO(base_text), delimiter=";")
     fieldnames = reader.fieldnames
     if fieldnames is None or len(fieldnames) != 12 or fieldnames[0] != "id" or "rank_grants" not in fieldnames:
@@ -264,6 +289,9 @@ def build_runtime_cards(base_text: str, metadata_text: str, talent_ranks: dict[i
             for spell_id in spells:
                 active_by_granted_spell.setdefault(spell_id, set()).add(card_id)
         elif row["type"] == "talent":
+            grants = split_grant_spells(row["rank_grants"])
+            if grants and grants[0] in active_talent_tomes:
+                continue
             explicit_talents.append(row)
         else:
             raise SpellDraftRuntimeError(f"unknown card type {row['type']!r}")
@@ -293,6 +321,8 @@ def build_runtime_cards(base_text: str, metadata_text: str, talent_ranks: dict[i
     synthetic: list[dict[str, str]] = []
     used_card_ids = {int(row["id"]) for row in rows}
     for first_spell in sorted(talent_sources):
+        if first_spell in active_talent_tomes:
+            continue
         if first_spell in explicit_by_first:
             continue
         ranks = talent_ranks[first_spell]
@@ -400,7 +430,13 @@ def build_packaged_files(core: Path, server_data_dir: Path | None, dbc_src: Path
     talent_dbc = resolve_talent_dbc(core, server_data_dir, dbc_src)
     if talent_dbc is None:
         raise SpellDraftRuntimeError("Talent.dbc not found; pass --dbc-src pointing to the WotLK DBC directory")
-    generated_cards, ignored = build_runtime_cards(base_cards, metadata_text, parse_talent_dbc(talent_dbc))
+    active_talent_tomes = parse_active_talent_spell_ids(files["knowledge_books.csv"].decode("utf-8"))
+    generated_cards, ignored = build_runtime_cards(
+        base_cards,
+        metadata_text,
+        parse_talent_dbc(talent_dbc),
+        active_talent_tomes,
+    )
     files["cards.csv"] = generated_cards.encode("utf-8")
     files["card_subclasses.csv"] = build_runtime_subclasses(
         generated_cards, base_cards, subclass_spec
