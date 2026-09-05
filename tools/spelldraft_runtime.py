@@ -261,8 +261,9 @@ def build_runtime_cards(
     base_text: str,
     metadata_text: str,
     talent_ranks: dict[int, list[int]],
-    active_talent_tomes: set[int],
+    active_talent_tomes: set[int] | None = None,
 ) -> tuple[str, list[int]]:
+    active_talent_tomes = active_talent_tomes or set()
     reader = csv.DictReader(io.StringIO(base_text), delimiter=";")
     fieldnames = reader.fieldnames
     if fieldnames is None or len(fieldnames) != 12 or fieldnames[0] != "id" or "rank_grants" not in fieldnames:
