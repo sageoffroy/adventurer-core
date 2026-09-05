@@ -10,6 +10,14 @@ entry;kind;class_key;required_level;card_id;spell_id;name;description
 910248;random_class;shaman;1;0;0;Tablilla sobre habilidades de chamán;Enseña una habilidad aleatoria de shaman que todavía no conozcas.
 910249;random_class;warlock;1;0;0;Grimorio sobre habilidades de brujo;Enseña una habilidad aleatoria de warlock que todavía no conozcas.
 910250;active_talent;druid;40;0;33891;Tomo del Árbol de Vida;Enseña el talento activo Árbol de Vida. Solo puede obtenerse mediante este tomo.
+910251;active_talent;mage;30;0;11958;Tomo de Mordedura de hielo;Enseña el talento activo Mordedura de hielo. Solo puede obtenerse mediante este tomo.
+910252;active_talent;rogue;30;0;14177;Tomo de Sangre fría;Enseña el talento activo Sangre fría. Solo puede obtenerse mediante este tomo.
+910253;active_talent;rogue;30;0;14185;Tomo de Preparación;Enseña el talento activo Preparación. Solo puede obtenerse mediante este tomo.
+910254;active_talent;druid;30;0;17116;Tomo de Presteza de la Naturaleza;Enseña el talento activo Presteza de la Naturaleza. Solo puede obtenerse mediante este tomo.
+910255;active_talent;warlock;20;0;18708;Tomo de Dominación vil;Enseña el talento activo Dominación vil. Solo puede obtenerse mediante este tomo.
+910256;active_talent;paladin;20;0;20216;Tomo de Favor divino;Enseña el talento activo Favor divino. Solo puede obtenerse mediante este tomo.
+910257;active_talent;warrior;40;0;50720;Tomo de Vigilancia;Enseña el talento activo Vigilancia. Solo puede obtenerse mediante este tomo.
+910258;active_talent;rogue;60;0;51713;Tomo de Danza de las Sombras;Enseña el talento activo Danza de las Sombras. Solo puede obtenerse mediante este tomo.
 910301;active_card;warrior;1;1;0;Manual sobre Actitud de batalla;Enseña Actitud de batalla. Esta habilidad también puede obtenerse mediante SpellDraft.
 910302;active_card;mage;1;2;0;Escrito sobre Bola de Fuego;Enseña Bola de Fuego. Esta habilidad también puede obtenerse mediante SpellDraft.
 910303;active_card;mage;4;3;0;Escrito sobre Descarga de Escarcha;Enseña Descarga de Escarcha. Esta habilidad también puede obtenerse mediante SpellDraft.
