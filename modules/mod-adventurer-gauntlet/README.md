@@ -257,3 +257,10 @@ Durante desarrollo Khadgar puede spawnearse con:
 - no volver a desarrollar desde `feature/khadgar-gauntlet-v1`, `feature/khadgar-gauntlet-v1-clientfix` ni desde el antiguo `aventurerosdeazeroth/feature/mod-dungeon-master`.
 
 La documentacion general de esta relacion vive en `docs/GAUNTLET.md`.
+
+
+## Joining an active company
+
+When a player without an active Gauntlet run talks to Khadgar while grouped with an online party member who is already inside that party's active Gauntlet instance, Khadgar replaces the normal start/testing menu with a single option to join that company.
+
+Joining does not require party leadership. The new member is persisted into the existing run, keeps the run's stable base level/campaign stage/checkpoint, and enters at the current dungeon entrance. The existing party and instance are not reset. Late joins retain the current +/-5 level compatibility rule and the run remains capped at five living members.
