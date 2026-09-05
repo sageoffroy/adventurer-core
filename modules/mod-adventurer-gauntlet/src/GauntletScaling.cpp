@@ -19,10 +19,10 @@ constexpr uint32 LoneWolfSpellId = 910501;
 constexpr uint32 LoneWolfDamagePct = 120;
 constexpr uint32 LoneWolfRefreshMs = 1000;
 
-constexpr std::array<uint32, 5> TrashHealthPct = { 50, 100, 150, 250, 300 };
-constexpr std::array<uint32, 5> RareHealthPct  = { 50, 110, 165, 290, 355 };
-constexpr std::array<uint32, 5> BossHealthPct  = { 50, 120, 180, 325, 400 };
-constexpr std::array<uint32, 5> DamagePct      = { 75, 90, 105, 145, 160 };
+constexpr std::array<uint32, 5> TrashHealthPct = { 50, 75, 100, 125, 150 };
+constexpr std::array<uint32, 5> RareHealthPct  = { 60, 90, 120, 150, 180 };
+constexpr std::array<uint32, 5> BossHealthPct  = { 75, 110, 150, 190, 225 };
+constexpr std::array<uint32, 5> DamagePct      = { 75, 90, 100, 105, 110 };
 
 struct CreatureScaleState
 {
