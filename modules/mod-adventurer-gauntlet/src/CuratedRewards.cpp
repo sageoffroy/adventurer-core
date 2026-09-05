@@ -2,6 +2,7 @@
 #include "DatabaseEnv.h"
 #include "DungeonCatalog.h"
 #include "ItemTemplate.h"
+#include "KnowledgeRewards.h"
 #include "LootMgr.h"
 #include "Map.h"
 #include "ObjectMgr.h"
@@ -384,6 +385,10 @@ void AddAuxiliaryDrops(Loot& loot, RewardPools const& pools, uint8 rewardLevel)
         LogSelectedItem("DRAFT_SCROLL_SELECTED", itemEntry);
         AddLootItem(loot, itemEntry, 1, 1);
     }
+
+    bool knowledgeAdded = AdventurerGauntlet::KnowledgeRewards::TryAddDrop(loot, rewardLevel);
+    std::cout << "[GauntletLoot] AUX knowledgeChance=2% added="
+              << knowledgeAdded << std::endl;
 }
 
 bool GetRewardContext(Map* map, uint32& survivorCount, uint8& rewardLevel)
