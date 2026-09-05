@@ -43,11 +43,13 @@ The runtime is authoritative: the client displays offers but does not decide eli
 
 ## Meta mechanics
 
-The current game uses a single SpellDraft meta action:
+SpellDraft uses three persistent meta currencies:
 
-- Reroll: redraw the unresolved offer. Each character starts with **3 total rerolls** and gains no additional charges automatically.
+- Reroll: redraw the unresolved offer. Characters start with **3**.
+- Bless: increase the future draw weight of one eligible displayed card. Characters start with **1**.
+- Destroy: permanently exclude one eligible card from that character's pool. Characters start with **1**.
 
-Bless and Destroy remain legacy runtime code for compatibility but are disabled by configuration and hidden from the client UI. Persisted legacy Bless/Destroy state is cleared when a character is loaded. Balance/settings live in `config/spelldraft/spelldraft.conf`.
+None of these currencies are regenerated automatically by leveling. Additional charges are intended to come from special Gauntlet loot. There is currently no configured accumulation cap; drop rates are the balancing control. Balance/settings live in `config/spelldraft/spelldraft.conf`.
 
 ## Persistence
 
