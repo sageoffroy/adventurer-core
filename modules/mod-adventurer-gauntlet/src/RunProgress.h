@@ -25,6 +25,7 @@ struct Position
 
 struct ActiveRun
 {
+    uint64 RunId = 0;
     std::string CompanyName;
     std::string CampaignKey;
     uint8 RunLevel = 1;
@@ -50,6 +51,7 @@ void MarkMemberFallen(Player* player, bool runEnded);
 void CompleteRun(Player* player);
 
 bool LoadActiveRun(Player* player, ActiveRun& run);
+bool AddMemberToRun(Player* player, ActiveRun const& run);
 uint32 LoadCheckpoint(Player* player);
 
 void SaveLogoutPosition(Player* player);
