@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CATALOG = ROOT / "config" / "items" / "adventurer_items.csv"
 KNOWLEDGE_CATALOG = ROOT / "config" / "spelldraft" / "knowledge_books.csv"
-KNOWLEDGE_SOURCE_ITEM = 45912
+KNOWLEDGE_SOURCE_ITEM = 37118  # same proven usable stock scroll shell as working SpellDraft consumables
 KNOWLEDGE_USE_SPELL = 920900
 DRAFT_CURRENCY_SCROLLS = {910237, 910238, 910239}
 MAGIC = b"WDBC"
@@ -78,6 +78,10 @@ def load_catalog() -> list[dict[str, str]]:
                 "ScriptName": "AdventurerKnowledgeBook",
             })
             row["spellid_1"] = str(KNOWLEDGE_USE_SPELL)
+            row["spellid_2"] = "0"
+            row["spellid_3"] = "0"
+            row["spellid_4"] = "0"
+            row["spellid_5"] = "0"
             rows.append(row)
 
     entries = [int(row["entry"]) for row in rows]
