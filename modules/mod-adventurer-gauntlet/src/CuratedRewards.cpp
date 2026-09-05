@@ -51,6 +51,7 @@ enum RewardProfile : uint8
     REWARD_PROFILE_NONE = 0,
     REWARD_PROFILE_CHECKPOINT = 1,
     REWARD_PROFILE_FINAL = 2,
+    REWARD_PROFILE_RARE = 3,
 };
 
 struct RewardPools
@@ -454,6 +455,37 @@ bool FillCheckpointLoot(Loot& loot, Map* map)
     AddAuxiliaryDrops(loot, pools, rewardLevel);
     return !loot.empty();
 }
+bool FillRareLoot(Loot& loot, Map* map)
+{
+    uint32 survivorCount = 0;
+    uint8 rewardLevel = 0;
+    if (!GetRewardContext(map, survivorCount, rewardLevel))
+        return false;
+
+    RewardPools pools = BuildControlledPools();
+    std::unordered_set<uint32> usedEntries;
+    uint32 gold = loot.gold;
+    loot.clear();
+    loot.loot_type = LOOT_CORPSE;
+    loot.gold = gold;
+
+    // Rare elite: deliberately between an intermediate boss and a final boss.
+    // 93% blue / 7% epic, plus one independent 20% blue roll per survivor.
+    AddLootItem(
+        loot,
+        SelectBossPrimaryReward(pools, rewardLevel, usedEntries, 7));
+    AddBlueExtrasPerSurvivor(
+        loot,
+        pools,
+        rewardLevel,
+        survivorCount,
+        20,
+        usedEntries);
+
+    AddAuxiliaryDrops(loot, pools, rewardLevel);
+    return !loot.empty();
+}
+
 
 bool FillFinalBossLoot(Loot& loot, Map* map)
 {
@@ -563,8 +595,14 @@ void ProcessCreatureAfterDeath(Creature* creature)
     // creature-by-creature. Explicit DB profiles still win (for example a
     // campaign/final boss), but every unconfigured dungeon boss falls back to
     // the checkpoint boss profile and therefore has its stock loot replaced.
-    if (rewardProfile == REWARD_PROFILE_NONE && creature->IsDungeonBoss())
-        rewardProfile = REWARD_PROFILE_CHECKPOINT;
+    if (rewardProfile == REWARD_PROFILE_NONE)
+    {
+        uint32 rank = creature->GetCreatureTemplate()->rank;
+        if (rank == CREATURE_ELITE_RARE || rank == CREATURE_ELITE_RAREELITE)
+            rewardProfile = REWARD_PROFILE_RARE;
+        else if (creature->IsDungeonBoss())
+            rewardProfile = REWARD_PROFILE_CHECKPOINT;
+    }
 
     std::cout << "[GauntletLoot] DEATH entry=" << creature->GetEntry()
               << " guid=" << creature->GetGUID().GetCounter()
@@ -584,6 +622,13 @@ void ProcessCreatureAfterDeath(Creature* creature)
     {
         std::cout << "[GauntletLoot] ROUTE checkpoint" << std::endl;
         if (FillCheckpointLoot(creature->loot, creature->GetMap()))
+            creature->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
+        return;
+    }
+    if (rewardProfile == REWARD_PROFILE_RARE)
+    {
+        std::cout << "[GauntletLoot] ROUTE rare" << std::endl;
+        if (FillRareLoot(creature->loot, creature->GetMap()))
             creature->SetDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
         return;
     }
