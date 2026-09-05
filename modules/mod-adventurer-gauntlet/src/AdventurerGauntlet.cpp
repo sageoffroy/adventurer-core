@@ -183,6 +183,61 @@ std::vector<Player*> GetLivingRunMembers(Map* map)
     return members;
 }
 
+bool FindJoinablePartyRun(Player* player, AdventurerGauntlet::RunProgress::ActiveRun& run, Player*& anchor)
+{
+    anchor = nullptr;
+    if (!player)
+        return false;
+
+    Group* group = player->GetGroup();
+    if (!group)
+        return false;
+
+    for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+    {
+        Player* member = ref->GetSource();
+        if (!member || member == player)
+            continue;
+
+        AdventurerGauntlet::RunProgress::ActiveRun candidate;
+        if (!AdventurerGauntlet::RunProgress::LoadActiveRun(member, candidate))
+            continue;
+        if (!IsGauntletDungeon(candidate.CurrentMap))
+            continue;
+        if (member->GetMapId() != candidate.CurrentMap || !member->GetInstanceId())
+            continue;
+
+        run = candidate;
+        anchor = member;
+        return true;
+    }
+
+    return false;
+}
+
+bool CanJoinPartyRun(Player* player, AdventurerGauntlet::RunProgress::ActiveRun const& run, std::string& error)
+{
+    if (!player || !player->IsAlive())
+    {
+        error = "Debes estar vivo para unirte a la expedicion.";
+        return false;
+    }
+
+    int32 difference = int32(player->GetLevel()) - int32(run.RunLevel);
+    if (difference > 5)
+    {
+        error = "Este aventurero ya juega en otra liga.";
+        return false;
+    }
+    if (difference < -5)
+    {
+        error = "Este aventurero es demasiado debil para acompanar a esta compania.";
+        return false;
+    }
+
+    return true;
+}
+
 bool ValidateParty(Player* player, std::vector<Player*>& members, std::string& error)
 {
     Group* group = player->GetGroup();
@@ -744,6 +799,7 @@ enum KhadgarGauntletActions
     ACTION_SPECIFIC_CLASSIC = GOSSIP_ACTION_INFO_DEF + 11,
     ACTION_SPECIFIC_OUTLAND = GOSSIP_ACTION_INFO_DEF + 12,
     ACTION_SPECIFIC_NORTHREND = GOSSIP_ACTION_INFO_DEF + 13,
+    ACTION_JOIN_ACTIVE_PARTY_RUN = GOSSIP_ACTION_INFO_DEF + 14,
     ACTION_SPECIFIC_BASE = GOSSIP_ACTION_INFO_DEF + 100,
 };
 
@@ -916,6 +972,20 @@ public:
             return true;
         }
 
+        AdventurerGauntlet::RunProgress::ActiveRun joinableRun;
+        Player* joinAnchor = nullptr;
+        if (!GetPendingRunName(player) && FindJoinablePartyRun(player, joinableRun, joinAnchor))
+        {
+            AddGossipItemFor(
+                player,
+                GOSSIP_ICON_CHAT,
+                std::string("Unirme a ") + joinableRun.CompanyName + " en " + GetGauntletDungeonName(joinableRun.CurrentMap) + ".",
+                GOSSIP_SENDER_MAIN,
+                ACTION_JOIN_ACTIVE_PARTY_RUN);
+            SendGossipMenuFor(player, DEFAULT_GOSSIP_MESSAGE, creature->GetGUID());
+            return true;
+        }
+
         if (auto const* campaign = GetPendingCampaign(player))
         {
             uint8 stageIndex = GetPendingCampaignStage(player);
@@ -995,6 +1065,60 @@ public:
 
         switch (action)
         {
+            case ACTION_JOIN_ACTIVE_PARTY_RUN:
+            {
+                AdventurerGauntlet::RunProgress::ActiveRun run;
+                Player* anchor = nullptr;
+                if (!FindJoinablePartyRun(player, run, anchor))
+                {
+                    ChatHandler(player->GetSession()).SendSysMessage(
+                        "Khadgar ya no encuentra una expedicion activa de tu grupo.");
+                    CloseGossipMenuFor(player);
+                    return true;
+                }
+
+                std::string error;
+                if (!CanJoinPartyRun(player, run, error))
+                {
+                    ChatHandler(player->GetSession()).SendSysMessage(error.c_str());
+                    CloseGossipMenuFor(player);
+                    return true;
+                }
+
+                if (!AdventurerGauntlet::RunProgress::AddMemberToRun(player, run))
+                {
+                    ChatHandler(player->GetSession()).SendSysMessage(
+                        "Khadgar no pudo incorporarte a esa compania. Puede que ya este completa.");
+                    CloseGossipMenuFor(player);
+                    return true;
+                }
+
+                RegisterPendingRun(
+                    { player },
+                    run.CompanyName,
+                    run.RunLevel,
+                    run.CampaignKey,
+                    run.CurrentDungeon);
+
+                auto const* dungeon = AdventurerGauntlet::DungeonCatalog::GetDungeon(run.CurrentMap);
+                if (!dungeon)
+                {
+                    CloseGossipMenuFor(player);
+                    return true;
+                }
+
+                ChatHandler(player->GetSession()).PSendSysMessage(
+                    "Khadgar reconoce a tu grupo. Te unes a |cff00ff00{}|r en |cffffd100{}|r.",
+                    run.CompanyName,
+                    dungeon->Name);
+
+                static_cast<npc_adventurer_gauntlet_khadgarAI*>(creature->AI())->BeginTravel(
+                    { player },
+                    *dungeon);
+
+                CloseGossipMenuFor(player);
+                return true;
+            }
             case ACTION_LEARN_MORE:
                 SendGossipMenuFor(player, KhadgarConfirmText, creature->GetGUID());
                 return true;
